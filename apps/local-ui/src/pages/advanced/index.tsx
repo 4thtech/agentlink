@@ -71,67 +71,53 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
         <h1 className="al-text-title-1">{S.title}</h1>
         <p className="al-text-body al-muted">{S.intro}</p>
       </header>
-      <Skeleton loading={state.loading} lines={3}>
-        {unreachable ? (
-          <p className="al-text-body ad-unreachable" role="status">
-            {S.unreachable}
-          </p>
-        ) : null}
-        {answered ? (
-          <dl className="ad-list">
-            <div className="ad-row">
-              <dt>{S.relays}</dt>
-              <dd>
-                {relays.connected === undefined || relays.total === undefined
-                  ? working
-                    ? S.relaysWorking
-                    : checking
-                      ? S.checking
-                      : S.noRelays
-                  : S.relayCount(relays.connected, relays.total)}
-              </dd>
-            </div>
-            <div className="ad-row">
-              <dt>{S.network}</dt>
-              <dd>{S.networkAuto}</dd>
-            </div>
-            {sync === undefined && working ? null : (
+      {/* NET-COMPACT: under the hood the live view below says all of this (banner, list, chip), so the
+          summary card is left out there; it stays for everyone else. */}
+      {hood ? null : (
+        <Skeleton loading={state.loading} lines={3}>
+          {unreachable ? (
+            <p className="al-text-body ad-unreachable" role="status">
+              {S.unreachable}
+            </p>
+          ) : null}
+          {answered ? (
+            <dl className="ad-list">
               <div className="ad-row">
-                <dt>{S.lastSync}</dt>
+                <dt>{S.relays}</dt>
                 <dd>
-                  {sync === undefined ? (
-                    S.never
-                  ) : (
-                    <time dateTime={new Date(sync * 1000).toISOString()}>
-                      {WHEN.format(new Date(sync * 1000))}
-                    </time>
-                  )}
+                  {relays.connected === undefined || relays.total === undefined
+                    ? working
+                      ? S.relaysWorking
+                      : checking
+                        ? S.checking
+                        : S.noRelays
+                    : S.relayCount(relays.connected, relays.total)}
                 </dd>
               </div>
-            )}
-            {hood ? (
-              <>
-                <div className="ad-row" data-hood-fact="relays-connected">
-                  <dt>{S.hoodRelays}</dt>
-                  <dd>{relays.connected === undefined ? S.never : String(relays.connected)}</dd>
-                </div>
-                <div className="ad-row" data-hood-fact="relays-known">
-                  <dt>{S.hoodRelaysKnown}</dt>
-                  <dd>{relays.total === undefined ? S.never : String(relays.total)}</dd>
-                </div>
-                <div className="ad-row" data-hood-fact="last-update-time">
-                  <dt>{S.hoodLastUpdateAt}</dt>
-                  <dd className="al-text-code">
-                    {sync === undefined ? S.never : new Date(sync * 1000).toISOString()}
+              <div className="ad-row">
+                <dt>{S.network}</dt>
+                <dd>{S.networkAuto}</dd>
+              </div>
+              {sync === undefined && working ? null : (
+                <div className="ad-row">
+                  <dt>{S.lastSync}</dt>
+                  <dd>
+                    {sync === undefined ? (
+                      S.never
+                    ) : (
+                      <time dateTime={new Date(sync * 1000).toISOString()}>
+                        {WHEN.format(new Date(sync * 1000))}
+                      </time>
+                    )}
                   </dd>
                 </div>
-              </>
-            ) : null}
-          </dl>
-        ) : (
-          <p className="al-text-body al-muted">{S.unknown}</p>
-        )}
-      </Skeleton>
+              )}
+            </dl>
+          ) : (
+            <p className="al-text-body al-muted">{S.unknown}</p>
+          )}
+        </Skeleton>
+      )}
       {/* NET-UI-A: the live view of the servers, Under the hood only; nothing changes without it. */}
       {hood ? <NetworkView /> : null}
     </div>

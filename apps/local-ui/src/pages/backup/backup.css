@@ -1,10 +1,4 @@
 /* Settings › Backup & restore (WP-R4; design-1112 §6.2). Cards on Surface 1; tokens only. */
-.bk-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-5);
-  max-inline-size: var(--al-layout-max-content);
-}
 .bk-page h1,
 .bk-page h2,
 .bk-page h3,
@@ -12,11 +6,6 @@
 .bk-page ul,
 .bk-page ol {
   margin: 0;
-}
-.bk-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
 }
 .bk-card {
   padding: 0;
@@ -130,15 +119,6 @@
   display: flex;
   flex-direction: column;
 }
-.bk-row {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-4);
-  padding: var(--al-space-4) var(--al-space-5);
-}
-.bk-row + .bk-row {
-  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-}
 .bk-row-ic {
   flex: none;
   display: grid;
@@ -165,11 +145,6 @@
   display: none;
 }
 /* Save a kit: the code shown once, then the checklist. */
-.bk-export {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
 .bk-export p {
   margin: 0;
 }
@@ -177,12 +152,6 @@
 .bk-export[data-backup-export='working'],
 .bk-export[data-backup-export='saved'] {
   flex: 1 1 100%;
-}
-.bk-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-3);
 }
 .bk-file {
   overflow-wrap: anywhere;
@@ -195,11 +164,6 @@
 }
 .bk-ok {
   color: var(--al-color-status-success-fg);
-}
-.bk-checklist {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
 }
 .bk-steps {
   list-style: none;
@@ -218,11 +182,6 @@
   padding: var(--al-space-3);
   border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
   border-radius: var(--al-radius-md);
-}
-.bk-tick {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
 }
 .bk-step-acts {
   display: flex;
@@ -254,12 +213,6 @@
 .bk-status > .bk-export[data-backup-export='working'],
 .bk-status > .bk-export[data-backup-export='saved'] {
   margin-inline-start: 0;
-}
-.bk-facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--al-space-2) var(--al-space-4);
-  margin: 0;
 }
 .bk-facts dd {
   margin: 0;

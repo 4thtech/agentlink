@@ -37,8 +37,16 @@ type OpenArgs = Parameters<RelayNetwork['open']>;
 /** The in-memory relay network, with a misbehaving mode that can be switched on and off. */
 export class MisbehavingRelays extends RelayNetwork {
   mode: RelayMode = 'honest';
+  /** The server of every read of the inbox (a request that is not a look-up by ID), in order. */
+  readonly reads: string[] = [];
+  /** While true, every connection opened and every frame sent is added to `traffic` (the quiet checks). */
+  recording = false;
+  readonly traffic: { url: string; kind: string; frame?: Frame }[] = [];
+  /** While true, every publish is answered "not accepted" and kept nowhere (a retry is then due). */
+  refuseEvents = false;
 
   override open(...[target, handlers]: OpenArgs): ReturnType<RelayNetwork['open']> {
+    if (this.recording) this.traffic.push({ url: target.url, kind: 'open' });
     const honest = super.open(target, handlers);
     const answer = (frame: Frame): void =>
       void Promise.resolve().then(() => handlers.onMessage(JSON.stringify(frame)));
@@ -46,11 +54,18 @@ export class MisbehavingRelays extends RelayNetwork {
       close: () => honest.close(),
       send: (text: string) => {
         const frame = JSON.parse(text) as Frame;
+        // Read at the time of the frame, so a connection opened earlier is seen too.
+        if (this.recording) this.traffic.push({ url: target.url, kind: String(frame[0]), frame });
+        if (frame[0] === 'EVENT' && this.refuseEvents) {
+          answer(['OK', (frame[1] as { id: string }).id, false, 'blocked: test']);
+          return;
+        }
         if (frame[0] === 'EVENT' && this.mode === 'ok-without-storing') {
           answer(['OK', (frame[1] as { id: string }).id, true, '']);
           return;
         }
         const filter = frame[0] === 'REQ' ? (frame[2] as { ids?: string[] }) : undefined;
+        if (filter !== undefined && filter.ids === undefined) this.reads.push(target.url);
         if (filter?.ids !== undefined && this.mode === 'ignores-lookups') return;
         if (filter?.ids !== undefined && this.mode === 'serves-another-event') {
           const subId = frame[1] as string;

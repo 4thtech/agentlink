@@ -8,32 +8,9 @@
   max-inline-size: 960px;
   margin-inline: auto;
 }
-.ls-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--al-space-3);
-}
-.ls-title {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
-  flex: 1 1 320px;
-}
 .ls-title h1,
 .ls-title p {
   margin: 0;
-}
-.ls-eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--al-color-fg-subtle);
-}
-.ls-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
 }
 .ls-state {
   display: inline-flex;

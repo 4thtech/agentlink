@@ -29,13 +29,6 @@
   gap: var(--al-space-1);
   min-width: 0;
 }
-.ag-head-tools,
-.ag-views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
-  align-items: center;
-}
 .ag-count {
   margin-left: var(--al-space-2);
   color: var(--al-color-fg-muted);
@@ -60,11 +53,6 @@
 }
 
 /* Cards (A8). */
-.ag-cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
 .ag-card {
   display: flex;
   flex-direction: column;
@@ -73,12 +61,6 @@
   border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-surface);
-}
-.ag-card-head,
-.ag-detail-head {
-  display: flex;
-  gap: var(--al-space-3);
-  align-items: center;
 }
 .ag-card-title {
   display: flex;
@@ -93,11 +75,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-}
-.ag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
 }
 .ag-chip {
   display: inline-flex;
@@ -115,12 +92,6 @@
 .ag-adot {
   flex: none;
 }
-.ag-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
-  align-items: center;
-}
 .ag-expand {
   display: flex;
   flex-direction: column;
@@ -128,11 +99,6 @@
   padding: var(--al-space-4);
   border-radius: var(--al-radius-md);
   background: var(--al-color-bg-sunken);
-}
-.ag-apps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
 }
 .ag-app-row {
   display: flex;
@@ -263,11 +229,6 @@
   width: 18px;
   height: 18px;
 }
-.ag-fleet {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
-}
 .ag-agent-cell,
 .ag-cell-apps {
   display: inline-flex;
@@ -297,11 +258,6 @@
 }
 
 /* One agent's page. */
-.ag-detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-5);
-}
 .ag-back {
   display: inline-flex;
   gap: var(--al-space-1);
@@ -330,11 +286,6 @@
 .ag-section .ag-expand {
   padding: 0;
   background: none;
-}
-.ag-plain {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
 }
 .ag-event {
   display: flex;
@@ -368,13 +319,6 @@
 }
 
 /* Sheets and the inline editor (Rename, Add, Remove, Pause). */
-.ag-rename,
-.ag-sheet-body,
-.ag-code-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
-}
 .ag-code-form p {
   margin: 0;
 }
@@ -384,11 +328,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--al-space-2);
-}
-.ag-check {
-  display: flex;
-  gap: var(--al-space-3);
-  align-items: center;
 }
 .ag-tidy {
   display: flex;
@@ -440,11 +379,6 @@
 }
 .ag-fit-box.is-id {
   border-color: var(--al-color-accent-default);
-}
-.ag-fit-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
 }
 .ag-fit-arrow {
   text-transform: uppercase;
@@ -501,11 +435,6 @@
 }
 a.al-btn .ag-glyph {
   margin-right: var(--al-space-2);
-}
-.ag-foot .al-btn > span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-2);
 }
 .ag-foot .al-btn .ag-glyph {
   margin: 0;

@@ -24,12 +24,6 @@
   flex-direction: column;
   gap: var(--al-space-4);
 }
-.pf-table-wrap {
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
-  overflow-x: auto;
-}
 .pf-table {
   width: 100%;
   border-collapse: collapse;
@@ -57,19 +51,6 @@
 }
 
 /* M1-11c-a4c: Add credits by QR and Withdraw credits (topup-ux.md 3c). Tokens only. */
-.pf-actions,
-.pf-confirm-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-3);
-}
-.pf-topup,
-.pf-confirm {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--al-space-4);
-}
 .pf-topup h2,
 .pf-confirm h2,
 .pf-facts {

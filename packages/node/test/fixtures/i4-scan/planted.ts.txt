@@ -1,0 +1,3 @@
+// A planted reference the I-4 canary's scanner must report (never compiled or imported).
+import type { ServerListPlan } from '@4thtech-io/core';
+export const planted = (owner: { changeServers(plan: ServerListPlan): void }) => owner;

@@ -483,6 +483,15 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/agents/name-update.tsx': { offers: /<OwnerButton\b/ },
   // RELAY-CARD-MIGRATION: the contact-details notice on Home, one OwnerButton like the rename notice.
   'pages/home/contact-details-banner.tsx': { offers: /<OwnerButton\b/ },
+  // NET-UI-B (D-158): the review and reset cards confirm through the one OwnerButton.
+  'pages/advanced/network/servers/review-card.tsx': { offers: /<OwnerButton\b/ },
+  'pages/advanced/network/servers/flow.tsx': { offers: /<ReviewCard\b/ },
+  'pages/advanced/network/servers/reset.tsx': { offers: /<ReviewCard\b/ },
+  // NET-ANNOUNCE-OPTOUT: the opt-out on its own confirms through the same review card.
+  'pages/advanced/network/servers/announce.tsx': { offers: /<ReviewCard\b/ },
+  'pages/advanced/network/servers/entry.tsx': {
+    notAScreen: 'reads the sensor name for the paused notice; the confirm is review-card.tsx',
+  },
   'pages/agents/parts.tsx': { offers: /<OwnerButton\b/ },
   'pages/agents/sheets.tsx': { offers: /<OwnerButton\b/ },
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },

@@ -25,7 +25,7 @@ These are the words AgentLink uses, in the product's own wording. Entries marked
 | Word | Meaning |
 |---|---|
 | **MCP** | The way AI apps plug in tools. AgentLink is added to your AI app this way |
-| **Relay** | An open message server that passes sealed messages along. It cannot read them |
+| **Servers** | The open message servers (relays) that pass sealed messages along. They cannot read them |
 | **Test network** | A practice version of the public record, where nothing has real value. Proof is recorded on test networks |
 | **Proof pack** | The file you export from a proof so anyone can check it. Also called a proof file |
 | **AI app** | The program where you talk to your AI, like Claude Code, Claude Desktop, Codex or Cursor. Developers call these harnesses |

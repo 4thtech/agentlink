@@ -130,7 +130,7 @@ export interface ReadbackOptions {
 /**
  * NET-PROBE: what one probe found. A fixed set: relay text never reaches a caller.
  * - `ready`: connected and answered the probe's REQ (EOSE, or CLOSED);
- * - `timeout`: no answer within PROBE_TIMEOUT_MS (`connectMs` says whether it connected);
+ * - `timeout`: no answer within PROBE_TIMEOUT_MS (`connectMs`, or `reused`, says it connected);
  * - `unreachable`: the name did not resolve, or the connection failed;
  * - `blocked`: an answer of the name is not globally routable (04 §4); nothing was opened;
  * - `invalid`: the URL fails the relay rule; nothing was resolved;
@@ -152,6 +152,12 @@ export interface RelayProbeResult {
   readonly authRequired: boolean | null;
   /** NIP-11 `limitation.payment_required: true`. null: no readable document. */
   readonly paymentRequired: boolean | null;
+  /**
+   * NET-VIEW-0514-1: true when the probe asked over the pool's own open connection to the relay
+   * (then `connectMs` is null: nothing was connected for it). Some relays limit connections from
+   * one address and refuse a second one at once, so a fresh connection would read as unreachable.
+   */
+  readonly reused: boolean;
 }
 
 const probeResult = (state: RelayProbeState): RelayProbeResult =>
@@ -161,6 +167,7 @@ const probeResult = (state: RelayProbeState): RelayProbeResult =>
     roundTripMs: null,
     authRequired: null,
     paymentRequired: null,
+    reused: false,
   });
 
 /** NIP-11 `limitation.auth_required` and `payment_required`: true only for a JSON `true`. */
@@ -340,6 +347,8 @@ export class RelayPool {
   /** Checks waiting for a slot, first in first out: `grant` hands one over, `fail` ends the wait. */
   private readonly readbackQueue: { grant: () => boolean; fail: () => void }[] = [];
   private readonly readbackSockets = new Set<RelaySocket>();
+  /** NET-VIEW-0514-1: probes waiting on a pooled connection, by `url \n subId`. */
+  private readonly probeSubs = new Map<string, (frame: readonly unknown[]) => void>();
 
   constructor(options: RelayPoolOptions) {
     this.connector = options.connector;
@@ -696,10 +705,23 @@ export class RelayPool {
    * Bounded: PROBE_TIMEOUT_MS from start to answer (NIP-11 inside it with its own 3 s bound, 64 KiB);
    * it uses a read-back slot and never waits for one (all busy: `unknown` at once). Never rejects;
    * relay text never leaves this method, and nothing is logged.
+   *
+   * NET-VIEW-0514-1: when the pool already holds an open connection to `relay`, the REQ goes over
+   * that connection instead (`reused`), and no second connection is opened: relays that limit
+   * connections from one address (one default server refuses a third at once) read as unreachable
+   * on a fresh one while the agent's own connection works. No slot is needed then; no login starts.
    */
   async probe(relay: string): Promise<RelayProbeResult> {
     if (this.closed) return probeResult('unknown');
     if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return probeResult('invalid');
+    const pooled = this.conns.get(relay);
+    if (pooled !== undefined && pooled.state === 'open' && pooled.socket !== undefined) {
+      try {
+        return await this.probePooled(relay, pooled);
+      } catch {
+        return probeResult('unknown');
+      }
+    }
     if (this.readbacks >= MAX_READBACKS) return probeResult('unknown');
     this.readbacks += 1;
     try {
@@ -754,6 +776,7 @@ export class RelayPool {
             roundTripMs,
             authRequired: state === 'ready' || flags !== undefined ? auth : null,
             paymentRequired: flags === undefined ? null : flags.payment,
+            reused: false,
           }),
         );
       };
@@ -867,6 +890,127 @@ export class RelayPool {
         },
         () => finish('unreachable'),
       );
+    });
+  }
+
+  /**
+   * NET-VIEW-0514-1: the probe's REQ over the pool's open connection (pinned while it runs, so the
+   * idle timer cannot close it). The same answer rules as runProbe: EOSE or CLOSED is `ready`, only
+   * the `auth-required:` prefix is read, no answer within PROBE_TIMEOUT_MS is `timeout` (or
+   * `unreachable` when the connection ends meanwhile, at once). The subscription is closed after.
+   */
+  private probePooled(relay: string, conn: Connection): Promise<RelayProbeResult> {
+    const subId = `p-${encodeHex(randomBytes(6))}`;
+    const key = `${conn.url}\n${subId}`;
+    const req = JSON.stringify(['REQ', subId, { ids: [encodeHex(randomBytes(32))], limit: 1 }]);
+    conn.inflight += 1;
+    return new Promise((resolve) => {
+      let done = false;
+      let answered: RelayProbeState | undefined;
+      let closedByRelay = false;
+      let roundTripMs: number | null = null;
+      let reqAuth: boolean | null = null;
+      let flags: { auth: boolean; payment: boolean } | undefined;
+      let nip11Done = this.nip11 === undefined;
+      const sentAt = this.now();
+      const finish = (state: RelayProbeState): void => {
+        if (done) return;
+        done = true;
+        this.timers.clearTimeout(timer);
+        this.probeSubs.delete(key);
+        stopWatch();
+        if (!closedByRelay && conn.state === 'open' && conn.socket !== undefined) {
+          try {
+            conn.socket.send(JSON.stringify(['CLOSE', subId]));
+          } catch {
+            // a dead socket: nothing to close
+          }
+        }
+        conn.inflight -= 1;
+        this.touch(conn);
+        const auth =
+          reqAuth === true || flags?.auth === true
+            ? true
+            : reqAuth === false || flags !== undefined
+              ? false
+              : null;
+        resolve(
+          Object.freeze({
+            state,
+            connectMs: null,
+            roundTripMs,
+            authRequired: state === 'ready' || flags !== undefined ? auth : null,
+            paymentRequired: flags === undefined ? null : flags.payment,
+            reused: true,
+          }),
+        );
+      };
+      const settle = (): void => {
+        if (answered !== undefined && nip11Done) finish(answered);
+      };
+      const timer = this.timers.setTimeout(
+        () => finish(answered ?? (conn.state === 'open' ? 'timeout' : 'unreachable')),
+        PROBE_TIMEOUT_MS,
+      );
+      // The pooled connection ends before an answer: unreachable now, not at the bound.
+      const stopWatch = this.onRelayClose((url) => {
+        if (url === conn.url && answered === undefined) finish('unreachable');
+      });
+      this.probeSubs.set(key, (frame) => {
+        if (done || answered !== undefined) return;
+        if (frame[0] === 'EOSE') {
+          reqAuth = false;
+        } else if (frame[0] === 'CLOSED') {
+          closedByRelay = true;
+          // Only the machine-readable prefix is read (NIP-01); the rest of the text is never kept.
+          reqAuth = typeof frame[2] === 'string' && frame[2].startsWith('auth-required:');
+        } else {
+          return; // EVENT (a forged match), NOTICE, anything else: ignored
+        }
+        roundTripMs = Math.max(0, Math.round(this.now() - sentAt));
+        answered = 'ready';
+        settle();
+      });
+      const fetcher = this.nip11;
+      if (fetcher !== undefined) {
+        void this.resolveTarget(relay, true).then(
+          (target) => {
+            if (done || typeof target === 'string') {
+              nip11Done = true;
+              settle();
+              return;
+            }
+            void this.boundedFetch(fetcher, target).then((body) => {
+              try {
+                if (
+                  typeof body === 'string' &&
+                  utf8Length(body, NIP11_MAX_BYTES) <= NIP11_MAX_BYTES
+                ) {
+                  flags = readProbeFlags(parseJson(body));
+                }
+              } catch {
+                flags = undefined; // an unreadable document: the flags stay unknown
+              }
+              nip11Done = true;
+              settle();
+            });
+          },
+          () => {
+            nip11Done = true;
+            settle();
+          },
+        );
+      }
+      let sent = false;
+      try {
+        if (conn.state === 'open' && conn.socket !== undefined) {
+          conn.socket.send(req);
+          sent = true;
+        }
+      } catch {
+        sent = false;
+      }
+      if (!sent) finish('unreachable');
     });
   }
 
@@ -1221,6 +1365,13 @@ export class RelayPool {
         this.handleAuth(conn, frame);
         return;
       default:
+        if (typeof frame[1] === 'string' && this.probeSubs.size > 0) {
+          const probe = this.probeSubs.get(`${conn.url}\n${frame[1]}`);
+          if (probe !== undefined) {
+            probe(frame);
+            return; // a probe's own subscription: no subscriber asked for it
+          }
+        }
         for (const listener of [...this.listeners]) {
           try {
             listener(conn.url, frame);

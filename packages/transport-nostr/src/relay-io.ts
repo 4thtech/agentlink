@@ -27,7 +27,16 @@ export interface RelaySocketHandlers {
   onMessage(data: unknown): void;
   /** The connection ended, for any reason (including a failed upgrade). The pool tolerates repeats. */
   onClose(): void;
+  /**
+   * NET-PRECHECK: optional, before the close of a connection that never opened: which step failed,
+   * as a fixed class (`tls`: the TLS handshake or the certificate; `upgrade`: the server answered the
+   * WebSocket upgrade with something other than 101; `connect`: anything else). Never error text.
+   */
+  onFailure?(kind: RelayConnectFailure): void;
 }
+
+/** NET-PRECHECK: why a connection never opened (RelaySocketHandlers.onFailure). */
+export type RelayConnectFailure = 'tls' | 'upgrade' | 'connect';
 
 /** An open (or opening) WebSocket to one relay. */
 export interface RelaySocket {

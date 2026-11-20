@@ -1,12 +1,6 @@
 /* DESK-NATIVE-DEBUG (stopgap until WP-S2): "Use Touch ID for approvals" as its own settings card,
    the same border, radius and row metrics as the Settings list (settings.css), the switch on the
    right of its row and the master code prompt inline beneath it. Tokens only; no motion. */
-.st-native {
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
-  overflow: hidden;
-}
 .st-native-row {
   box-sizing: border-box;
   inline-size: 100%;
@@ -30,11 +24,7 @@
 }
 .st-native-body p {
   margin: 0;
-}
-.st-native-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
+  max-inline-size: 60ch;
 }
 .st-native-note {
   margin: 0;
@@ -60,9 +50,6 @@
 }
 .st-native-row .al-switch.is-pending:disabled {
   opacity: 1;
-}
-.st-native-body p {
-  max-inline-size: 60ch;
 }
 /* DESK051-C2: the row's own text styles (the Settings redesign renamed its rows to `set-row-*`, so
    the title and its line ran together on the Touch ID page). The same metrics as `.set-row-*`. */

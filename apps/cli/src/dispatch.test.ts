@@ -131,7 +131,14 @@ describe('--help (06 §8)', () => {
     expect(help).toContain("agentlink join '<invite link>'");
     // UX1113-R1: `backup restore` and `restore`.
     // RELAY-CARD-MIGRATION: `owner update-contact-details`.
-    expect(commandLines).toHaveLength(30);
+    // NET-CLI (D-158; 06 §8): `owner servers` list, test, set and reset, exactly these four lines.
+    expect(commandLines.filter((line) => line.includes('agentlink owner servers'))).toEqual([
+      '  agentlink owner servers [list] [--json] [--id <name>]',
+      '  agentlink owner servers test <wss://…>… [--json]',
+      '  agentlink owner servers set <wss://…>… [--no-automatic] [--no-announce] [--id <name>]   †',
+      '  agentlink owner servers reset [--id <name>]   †',
+    ]);
+    expect(commandLines).toHaveLength(34);
   });
 
   it('prints help for --help, -h and help', async () => {

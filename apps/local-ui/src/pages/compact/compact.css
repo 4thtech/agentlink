@@ -42,27 +42,11 @@
   min-inline-size: 0;
   flex-wrap: wrap;
 }
-.cp-agent-name {
-  flex: 1 1 auto;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .cp-agent-line {
   flex: 1 0 100%;
 }
 
 /* 2. Needs you: an orange left edge when not zero, as the Home tile. */
-.cp-block[data-attention='true'] {
-  border-inline-start: var(--al-space-2) solid var(--al-color-accent-default);
-}
-.cp-needs-head {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  color: var(--al-color-fg-muted);
-}
 .cp-soonest {
   overflow-wrap: anywhere;
 }
@@ -83,13 +67,6 @@
   gap: var(--al-space-3);
   block-size: 32px;
   min-inline-size: 0;
-}
-.cp-contact-name {
-  flex: 1 1 auto;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 /* Marker: a shape in a fixed 8 px slot, so words line up (never colour alone, §24.3). */
 .cp-marker {

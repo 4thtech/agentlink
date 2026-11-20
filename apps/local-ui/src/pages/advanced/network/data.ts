@@ -173,6 +173,18 @@ export function summarize(answer: NetworkAnswer): NetworkSummary {
   return 'healthy';
 }
 
+/** A server that is down, slow or blocked: it always sorts first and is never folded away. */
+export const isProblem = (s: NetworkServer): boolean =>
+  s.state === 'slow' || s.state === 'unreachable' || s.state === 'blocked';
+
+/** Problems first, the rest in the order given (stable). */
+export function problemsFirst(servers: readonly NetworkServer[]): readonly NetworkServer[] {
+  return [...servers.filter(isProblem), ...servers.filter((s) => !isProblem(s))];
+}
+
+/** Own servers shown before "Show all N servers" (problems beyond that are shown too). */
+export const OWN_VISIBLE = 5;
+
 /** 48 ms, 1.9 s. */
 export function formatMs(ms: number): string {
   return ms < 1000 ? `${String(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;

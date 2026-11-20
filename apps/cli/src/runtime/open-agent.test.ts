@@ -167,6 +167,14 @@ describe('openAgent (M1-9k)', () => {
     expect(Object.keys(result.agent.approvals).sort()).toEqual(['request', 'status']);
   });
 
+  it('REL-0515 L3: this host turns the owner card-update capability on (M1-7j, 07 §4.3)', async () => {
+    const disk = new Disk();
+    await initAgent();
+    const { deps, rec } = processDeps(disk);
+    expect((await open(deps)).status).toBe('ok');
+    expect(rec.clients[0]?.ownerCardUpdates).toBe(true);
+  });
+
   it('two processes opening the agent share one store file (06 §6)', async () => {
     const disk = new Disk();
     await initAgent();

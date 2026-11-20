@@ -1,20 +1,9 @@
 /* Settings > Storage (REL051-RET1; same surfaces and tokens as the Settings pages, design-1112 §3.1). */
-.sto-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-5);
-  max-inline-size: var(--al-layout-max-content);
-}
 .sto-page h1,
 .sto-page h2,
 .sto-page h3,
 .sto-page p {
   margin: 0;
-}
-.sto-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
 }
 .sto-coming {
   display: flex;
@@ -22,35 +11,6 @@
   align-items: flex-start;
   gap: var(--al-space-4);
   padding: var(--al-space-5);
-}
-.sto-coming-text {
-  flex: 1 1 260px;
-  min-inline-size: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-1);
-}
-.sto-ic {
-  flex: none;
-  display: grid;
-  place-items: center;
-  inline-size: 40px;
-  block-size: 40px;
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-raised);
-  color: var(--al-color-fg-muted);
-}
-.sto-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-  padding: var(--al-space-5);
-}
-.sto-id-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-3);
 }
 .sto-tag {
   font-size: 13px;
@@ -62,15 +22,6 @@
 .sto-sub {
   font-weight: 600;
   margin-block-start: var(--al-space-2);
-}
-.sto-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
-  overflow: hidden;
 }
 .sto-row {
   display: flex;
@@ -100,12 +51,6 @@
   font-variant-numeric: tabular-nums;
   color: var(--al-color-fg-default);
 }
-.sto-failed {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-4);
-}
 /* RET-4: Free up space filters. */
 .sto-filters {
   display: flex;
@@ -113,12 +58,6 @@
   align-items: flex-end;
   gap: var(--al-space-3);
   margin-block-start: var(--al-space-2);
-}
-.sto-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-1);
-  min-inline-size: 160px;
 }
 .sto-check {
   display: flex;

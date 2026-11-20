@@ -145,12 +145,6 @@
   justify-self: start;
   text-decoration: none;
 }
-.hm-start-app {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2);
-}
 .hm-start-app-name {
   color: var(--al-color-fg-default);
 }

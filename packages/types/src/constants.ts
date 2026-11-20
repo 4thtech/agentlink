@@ -215,6 +215,9 @@ export const OWNER_ACTION_OPS = freeze([
   // W4-FILES-SAVE (proposed, owner confirms at merge): the owner saves one received file into the
   // Inbox folder from the local app; local only, no envelope carries it.
   'file.save',
+  // NET-ANNOUNCE-OPTOUT (D-158 (7); proposed, owner confirms at merge): "Don't also announce on the
+  // default servers", turned on or off from the local app without changing the list; local only.
+  'network.announce',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
 
@@ -318,6 +321,8 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   'agent.revoke': null,
   // W4-FILES-SAVE: a local owner action, applied within seconds on the agent's own machine.
   'file.save': 600,
+  // NET-ANNOUNCE-OPTOUT: a local owner action, applied within seconds on the agent's own machine.
+  'network.announce': 600,
 } as const);
 
 /**

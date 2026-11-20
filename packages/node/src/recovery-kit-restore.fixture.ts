@@ -97,6 +97,8 @@ export async function makeAgent(
     readonly policyMark?: number;
     /** An owner-signed `agent.label` applied through core (UX1113-R1-LABEL). */
     readonly label?: string;
+    /** NET-ANNOUNCE-OPTOUT: an owner-signed `network.announce` applied through core. */
+    readonly announceDefault?: false;
   } = {},
 ): Promise<TestAgent> {
   const keychain = new MemoryKeychain();
@@ -142,6 +144,18 @@ export async function makeAgent(
         sig: await session.signOwnerAction(body),
       });
       if (applied.status !== 'applied') throw new Error('fixture: label not applied');
+    }
+    if (extra.announceDefault === false) {
+      const prepared = await client.ownerActions.prepareAnnounce(false);
+      if (prepared.status !== 'prepared') throw new Error('fixture: opt-out not prepared');
+      const body = JSON.parse(JSON.stringify(prepared.body)) as Parameters<
+        typeof session.signOwnerAction
+      >[0];
+      const applied = await client.ownerActions.apply({
+        body,
+        sig: await session.signOwnerAction(body),
+      });
+      if (applied.status !== 'applied') throw new Error('fixture: opt-out not applied');
     }
     const contacts: Record<string, unknown>[] = [];
     for (let i = 0; i < (extra.people ?? 0); i += 1) {

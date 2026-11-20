@@ -251,7 +251,7 @@ export function JoinPage({
   if (view.state === 'connected') {
     return (
       <section className="jn-moment">
-        <p className="jn-live" role="status" aria-live="polite">
+        <p className="al-sr-only" role="status" aria-live="polite">
           {S.connected(name)}
         </p>
         <ConnectedMoment

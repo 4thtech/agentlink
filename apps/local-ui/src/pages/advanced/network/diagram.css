@@ -99,12 +99,7 @@
   stroke: var(--nc, var(--al-color-fg-subtle));
 }
 
-/* The legend keys and the stacked list's connector lines. */
-.nwd-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-1) var(--al-space-4);
-}
+/* The legend keys and the stacked list's connector lines (the legend row: .nw-meta in network.css). */
 .nwd-legend li,
 .nwd-person {
   display: inline-flex;

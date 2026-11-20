@@ -18,8 +18,11 @@ import {
 import { isSecp256k1SecretKey } from './secp256k1-range.js';
 import { wipe } from './wipe.js';
 
-/** A secp256k1 secret key from the CSPRNG; out-of-range draws (probability ~2^-128) are wiped. */
-function ephemeralSecretKey(): Uint8Array {
+/**
+ * A secp256k1 secret key from the CSPRNG; out-of-range draws (probability ~2^-128) are wiped.
+ * Internal: the gift wrap and the throwaway test event (throwaway-event.ts); exported from no entry.
+ */
+export function ephemeralSecretKey(): Uint8Array {
   for (;;) {
     const candidate = randomBytes(32);
     if (isSecp256k1SecretKey(candidate)) return candidate;

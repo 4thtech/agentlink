@@ -357,6 +357,7 @@ type Processed = (r: { readonly stored: number; readonly reports: readonly unkno
 class StubSubscription implements LoopSubscription {
   closed = false;
   keyEpoch?: number;
+  readSet?: string;
   closes = 0;
   constructor(
     readonly onProcessed: Processed | undefined,
@@ -460,6 +461,47 @@ describe('background loop with live subscriptions (M1-9s)', () => {
     timers.fire(SYNC_INTERVAL_MS);
     await flush();
     expect(s.sync).toHaveBeenCalledTimes(2);
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    await loop.stop();
+  });
+
+  it('REL-0515 F1: a change of the read set while live (opt-out on, a leaving server ended) reopens the subscription', async () => {
+    const s = liveStubClient();
+    const set = { value: 'own,legacy' };
+    const subscribe = vi.fn((options?: { onProcessed?: Processed }) => {
+      const sub = new StubSubscription(options?.onProcessed, s.order);
+      sub.readSet = set.value;
+      s.subs.push(sub);
+      s.order.push('subscribe');
+      return Promise.resolve(sub);
+    });
+    const client = {
+      ...s.client,
+      subscribeInbox: subscribe,
+      liveReadSet: () => Promise.resolve(set.value),
+    };
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    // Nothing changed: kept.
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    // The owner turned the opt-out on: the legacy servers leave the read set.
+    set.value = 'own';
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.subs[0]?.closed).toBe(true);
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    expect(s.subs[1]?.readSet).toBe('own');
+    expect(s.order.indexOf('close')).toBeLessThan(s.order.lastIndexOf('subscribe'));
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
     expect(subscribe).toHaveBeenCalledTimes(2);
     await loop.stop();
   });

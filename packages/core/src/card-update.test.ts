@@ -147,14 +147,19 @@ async function deliver(to: TestAgent, envelope: unknown): Promise<InboundReport[
   return to.client.envelopes.processReceived();
 }
 
-/** The stored outbound card-update envelopes of `from`, oldest first. */
+/**
+ * The stored outbound card-update envelopes of `from` to contacts, oldest first. The owner-channel
+ * card-update (M1-7j, no contact) is covered by leaving-servers.test.ts.
+ */
 async function sentCardUpdates(from: TestAgent) {
   const rows = await from.store.transaction((tx) =>
-    tx.select(
-      'envelopes',
-      { direction: 'out', type: 'card-update' },
-      { orderBy: [['created_at', 'asc']] },
-    ),
+    tx
+      .select(
+        'envelopes',
+        { direction: 'out', type: 'card-update' },
+        { orderBy: [['created_at', 'asc']] },
+      )
+      .filter((row) => row.contact_id !== null),
   );
   return rows.map((row) => ({
     row,

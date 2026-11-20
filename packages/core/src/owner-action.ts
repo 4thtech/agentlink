@@ -71,6 +71,10 @@ export type OwnerActionRefusal =
   | 'not_blocked'
   // SEC-INVITE-CAPS (D-156): a `contact.keep` for a contact that is not waiting for the owner
   | 'not_waiting'
+  // NET-ANNOUNCE-OPTOUT (D-158 (7)): a `network.announce` false while the agent's list holds a
+  // default or an old default server; or one while a list change is still finishing
+  | 'mix_in_on'
+  | 'rotation_pending'
   | 'pairing_unavailable'
   | 'credential_missing'
   | 'credential_mismatch'
@@ -331,7 +335,9 @@ export function verifyOwnerAction(
     case 'app.disconnect':
     case 'agent.resume':
     case 'file.save':
+    case 'network.announce':
     case 'agent.revoke':
+      // network.announce (NET-ANNOUNCE-OPTOUT): the stored list is the store side's (`mix_in_on`).
       // agent.resume (W4-PAUSE): the pause row is the store side's (`not_paused`).
       // file.save (W4-FILES-SAVE): the received file is the store side's (core fetchFile).
       // agent.label (U3-d): the restricted-label rule and the store record are the store side's;

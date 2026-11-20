@@ -23,7 +23,7 @@ const path = (): string => join(dir, 'store.sqlite');
 
 describe('schema version 23 (NET-STATS)', () => {
   it('creates relay_stats only', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(23);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(23);
     expect(MIGRATIONS[22]?.version).toBe(23);
     const v23 = MIGRATIONS[22]?.statements ?? [];
     expect(v23.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
@@ -46,7 +46,7 @@ describe('schema version 23 (NET-STATS)', () => {
       .run('a1'.repeat(16));
     raw.close();
     const store = await SqliteStore.open(path());
-    expect(store.schemaVersion).toBe(23);
+    expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     expect(await store.transaction((tx) => tx.select('install_state'))).toHaveLength(1);
     expect(await store.transaction((tx) => tx.select('relay_stats'))).toEqual([]);
     await store.transaction((tx) =>

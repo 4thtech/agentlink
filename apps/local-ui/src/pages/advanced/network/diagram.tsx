@@ -8,8 +8,15 @@
 //   never HTML, never a link; the host is the already-checked plain DNS text from data.ts.
 // - Health is a dot that differs by shape as well as colour (DOT_SHAPE, the same system as the cards).
 // - Nothing animates (no travelling pulse), so reduced motion needs no special case.
+import { Button } from '@4thtech-io/ui';
 import { useId, type ReactElement } from 'react';
-import { formatMs, type NetworkAnswer, type NetworkServer, type ServerHealth } from './data.js';
+import {
+  formatMs,
+  isProblem,
+  type NetworkAnswer,
+  type NetworkServer,
+  type ServerHealth,
+} from './data.js';
 import { NETWORK_STRINGS as S } from './strings.js';
 import './diagram.css';
 
@@ -22,8 +29,9 @@ export const DOT_SHAPE: Readonly<Record<ServerHealth, string>> = {
   unknown: 'is-checking',
 };
 
-/** The most contacts drawn; the rest become "+ N more contacts". */
+/** The most contacts and servers drawn; the rest become "+N more contacts" / "+N more servers". */
 export const MAX_DIAGRAM_CONTACTS = 5;
+export const MAX_DIAGRAM_SERVERS = 5;
 const MAX_HOST_CHARS = 17;
 const MAX_NAME_CHARS = 13;
 
@@ -47,7 +55,10 @@ export interface DiagramContact {
 }
 
 export interface DiagramModel {
+  /** The drawn servers: problems first, then own before old (at most MAX_DIAGRAM_SERVERS). */
   readonly servers: readonly NetworkServer[];
+  /** Servers that are not drawn (the list below has them). */
+  readonly moreServers: number;
   readonly contacts: readonly DiagramContact[];
   /** Contacts that share a server with us but are not drawn. */
   readonly more: number;
@@ -60,9 +71,14 @@ export function buildDiagram(
   answer: NetworkAnswer,
   names: ReadonlyMap<string, string> | undefined,
 ): DiagramModel {
-  const servers = answer.servers;
+  // Problems first (never left out), then own before old; the sort is stable.
+  const rank = (s: NetworkServer): number => (isProblem(s) ? 0 : 2) + (s.kind === 'own' ? 0 : 1);
+  const first = [...answer.servers].sort((a, b) => rank(a) - rank(b));
+  const servers = first.slice(0, MAX_DIAGRAM_SERVERS);
+  const moreServers = first.length - servers.length;
   const rows = answer.contactHosts;
-  if (rows === undefined) return { servers, contacts: [], more: 0, reach: 0 };
+  if (rows === undefined) return { servers, moreServers, contacts: [], more: 0, reach: 0 };
+  const everyone = rows.filter((c) => first.some((s) => c.hosts.includes(s.host)));
   const sharing = rows
     .map((c) => ({
       ref: c.ref,
@@ -72,8 +88,8 @@ export function buildDiagram(
     .filter((c) => c.via.length > 0)
     .sort((a, b) => b.via.length - a.via.length || a.name.localeCompare(b.name));
   const contacts = sharing.slice(0, MAX_DIAGRAM_CONTACTS);
-  const reach = Math.max(answer.contacts.sharing, sharing.length);
-  return { servers, contacts, more: Math.max(0, reach - contacts.length), reach };
+  const reach = Math.max(answer.contacts.sharing, everyone.length);
+  return { servers, moreServers, contacts, more: Math.max(0, reach - contacts.length), reach };
 }
 
 /** Plain text cut to a length with an ellipsis (the full text stays in the title). */
@@ -122,7 +138,8 @@ export function describeDiagram(model: DiagramModel): string {
           model.contacts.map((c) => c.name),
           model.more,
         )}`;
-  return `${S.diagramSummary(model.servers.length)} ${facts.join('. ')}.${people}`;
+  const hidden = model.moreServers === 0 ? '' : ` ${S.diagramMoreServersFact(model.moreServers)}`;
+  return `${S.diagramSummary(model.servers.length + model.moreServers)} ${facts.join('. ')}.${hidden}${people}`;
 }
 
 function SvgDot({
@@ -203,10 +220,10 @@ function Wide({
   readonly model: DiagramModel;
   readonly label: string;
 }): ReactElement {
-  const { servers, contacts, more } = model;
+  const { servers, contacts } = model;
   const hasContacts = contacts.length > 0;
   const srvH = servers.length * ROW - (ROW - NODE_H);
-  const conH = contacts.length * CONTACT_PITCH + (more > 0 ? 24 : 0);
+  const conH = contacts.length * CONTACT_PITCH;
   const body = Math.max(srvH, conH, 76);
   const height = TOP + body + 4;
   const width = hasContacts ? 720 : 470;
@@ -315,11 +332,6 @@ function Wide({
           </g>
         );
       })}
-      {more > 0 ? (
-        <text className="nwd-s" x={CON_X} y={conTop + contacts.length * CONTACT_PITCH + 6}>
-          {S.diagramMore(more)}
-        </text>
-      ) : null}
     </svg>
   );
 }
@@ -331,7 +343,7 @@ function Stack({
   readonly model: DiagramModel;
   readonly label: string;
 }): ReactElement {
-  const { servers, contacts, more, reach } = model;
+  const { servers, contacts, reach } = model;
   return (
     <div className="nwd-stack">
       <div className="nwd-nd is-id">
@@ -366,9 +378,6 @@ function Stack({
                 <span className="nwd-nd-name">{c.name}</span>
               </span>
             ))}
-            {more > 0 ? (
-              <span className="nwd-nd-r al-text-body-sm">{S.diagramMoreShort(more)}</span>
-            ) : null}
           </div>
         </>
       )}
@@ -414,6 +423,10 @@ export interface NetworkDiagramProps {
   readonly names: ReadonlyMap<string, string> | undefined;
   /** This ID's label ("Tali"); undefined → "Your agent". */
   readonly agentLabel: string | undefined;
+  /** "+N more servers" was pressed: the page opens the full list below. */
+  readonly onMoreServers?: () => void;
+  /** "+N more contacts" was pressed: the page opens the contacts' servers below. */
+  readonly onMoreContacts?: () => void;
 }
 
 /** The whole card. Renders nothing when there is no server to draw. */
@@ -421,6 +434,8 @@ export function NetworkDiagram({
   answer,
   names,
   agentLabel,
+  onMoreServers,
+  onMoreContacts,
 }: NetworkDiagramProps): ReactElement | null {
   const describedBy = useId();
   if (answer.servers.length === 0) return null;
@@ -431,12 +446,26 @@ export function NetworkDiagram({
       <div
         className="nwd-pic"
         role="img"
-        aria-label={S.diagramSummary(model.servers.length)}
+        aria-label={S.diagramSummary(model.servers.length + model.moreServers)}
         aria-describedby={describedBy}
       >
         <Wide model={model} label={label} />
         <Stack model={model} label={label} />
       </div>
+      {model.moreServers === 0 && model.more === 0 ? null : (
+        <div className="nw-head nwd-more">
+          {model.moreServers === 0 ? null : (
+            <Button size="sm" variant="ghost" onClick={onMoreServers}>
+              {S.diagramMoreServers(model.moreServers)}
+            </Button>
+          )}
+          {model.more === 0 ? null : (
+            <Button size="sm" variant="ghost" onClick={onMoreContacts}>
+              {S.diagramMore(model.more)}
+            </Button>
+          )}
+        </div>
+      )}
       <p id={describedBy} hidden>
         {describeDiagram(model)}
       </p>

@@ -16,28 +16,34 @@ import { Banner, Button, formatContactName, Skeleton } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactElement,
+  type RefObject,
 } from 'react';
 import { createApiClient, type ApiResult } from '../../../api/client.js';
 import { agoText, getLive, subscribeLive } from '../../../api/live.js';
 import { parseList, LIST_PATH as CONTACTS_PATH, type ContactRow } from '../../contacts/data.js';
 import {
   NETWORK_CHANGED,
+  OWN_VISIBLE,
   NETWORK_CONTACTS_PATH,
   NETWORK_EVENT_MIN_MS,
   NETWORK_PATH,
   NETWORK_POLL_MS,
   formatMs,
+  isProblem,
   parseNetwork,
+  problemsFirst,
   summarize,
   type NetworkAnswer,
   type NetworkServer,
   type NetworkSummary,
 } from './data.js';
 import { DOT_SHAPE, NetworkDiagram } from './diagram.js';
+import { ServersEntry } from './servers/entry.js';
 import { NETWORK_STRINGS as S } from './strings.js';
 import './network.css';
 
@@ -72,6 +78,9 @@ type Load =
   | { readonly kind: 'failed'; readonly last?: NetworkAnswer }
   | { readonly kind: 'ok'; readonly answer: NetworkAnswer };
 
+/** A server that took messages this recently and fails a fresh check gets downRecentNote. */
+const RECENT_OK_SECONDS = 600;
+
 /** After a failed `?contacts=hosts` read, the diagram shows servers alone for this long. */
 const HOSTS_RETRY_MS = 60_000;
 
@@ -102,6 +111,11 @@ export function NetworkView({
 }: NetworkViewProps): ReactElement {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+  const [oldOpen, setOldOpen] = useState(false);
+  const listTop = useRef<HTMLDivElement>(null);
+  const reachTop = useRef<HTMLDivElement>(null);
   const [names, setNames] = useState<ReadonlyMap<string, string> | undefined>(undefined);
   const [, redraw] = useState(0);
   const liveIds = useSyncExternalStore(subscribeLive, getLive);
@@ -245,16 +259,31 @@ export function NetworkView({
   return (
     <section className="nw" aria-label={S.serversHeading} data-agent={answer.agent}>
       {/* The network diagram (owner's three-column design): a separate card in its slot. */}
-      <div className="nw-diagram-slot" data-slot="network-diagram">
-        {diagramOn ? <NetworkDiagram answer={answer} names={names} agentLabel={idLabel} /> : null}
+      <div className="nw-diagram-slot" data-slot="network-diagram" hidden={!diagramOn}>
+        {diagramOn ? (
+          <NetworkDiagram
+            answer={answer}
+            names={names}
+            agentLabel={idLabel}
+            onMoreServers={() => {
+              setShowAll(true);
+              setOldOpen(true);
+              listTop.current?.scrollIntoView?.({ block: 'nearest' });
+            }}
+            onMoreContacts={() => {
+              setExpanded(true);
+              reachTop.current?.scrollIntoView?.({ block: 'nearest' });
+            }}
+          />
+        ) : null}
       </div>
       <div className="nw-head">
         <h2 className="al-text-title-3">{S.serversHeading}</h2>
         {answer.mode === null ? null : (
-          <span className="al-chip al-tone-info">
-            <span className="al-text-label">
-              {answer.mode === 'automatic' ? S.modeAutomatic : S.modeCustom}
-            </span>
+          // NET-VIEW-0514-1: a static status chip, not the shell's `.al-chip` (the agent switcher's
+          // pill button). It only names the mode: nothing here looks clickable.
+          <span className="nw-mode al-text-body-sm">
+            {answer.mode === 'automatic' ? S.modeAutomatic : S.modeCustom}
           </span>
         )}
       </div>
@@ -265,15 +294,31 @@ export function NetworkView({
         </Banner>
       ) : null}
       <Headline answer={answer} offline={offline} />
-      {answer.servers.length === 0 ? null : (
-        <ul className="nw-list">
-          {answer.servers.map((s) => (
-            <ServerCard key={s.host} server={s} answer={answer} now={clock} />
-          ))}
-        </ul>
-      )}
+      <div ref={listTop}>
+        <Servers
+          answer={answer}
+          now={clock}
+          open={open}
+          onToggle={(host) => {
+            setOpen((cur) => {
+              const next = new Set(cur);
+              if (!next.delete(host)) next.add(host);
+              return next;
+            });
+          }}
+          showAll={showAll}
+          onShowAll={() => {
+            setShowAll((v) => !v);
+          }}
+          oldOpen={oldOpen}
+          onOld={() => {
+            setOldOpen((v) => !v);
+          }}
+        />
+      </div>
       {answer.agent === 'needs_setup' || answer.agent === 'not_running' ? null : (
         <Reach
+          top={reachTop}
           answer={answer}
           expanded={expanded}
           onToggle={() => {
@@ -288,6 +333,7 @@ export function NetworkView({
           {S.lastChecked(agoText(answer.checkedAt, clock))}
         </p>
       )}
+      <ServersEntry />
     </section>
   );
 }
@@ -332,7 +378,12 @@ function Headline({
   const summary = summarize(answer);
   const own = answer.servers.filter((s) => s.kind === 'own');
   const slow = own.filter((s) => s.state === 'slow').length;
-  const down = own.filter((s) => s.state === 'unreachable' || s.state === 'blocked').length;
+  const isDown = (s: NetworkServer): boolean => s.state === 'unreachable' || s.state === 'blocked';
+  const down = own.filter(isDown).length;
+  const oldDown = answer.servers.filter((s) => s.kind === 'legacy' && isDown(s)).length;
+  const old = oldDown === 0 ? '' : ` ${S.oldDown(oldDown)}`;
+  // A message counts as sent once MIN_ACKS (2) servers accept it: with fewer working, it waits.
+  const sending = own.length - down >= 2 ? S.stillSending : S.mayWait;
   const tone = TONES[summary];
   switch (summary) {
     case 'checking':
@@ -344,29 +395,33 @@ function Headline({
     case 'empty':
       return <p className="al-text-body al-muted">{S.noServers}</p>;
     case 'healthy':
-      return <p className="al-text-body al-muted nw-ok">{S.allHealthy}</p>;
+      return (
+        <p className="al-text-body al-muted nw-ok">
+          {oldDown === 0 ? S.allHealthy : `${S.ownHealthy}${old}`}
+        </p>
+      );
     case 'one_slow':
       return (
         <Banner tone={tone ?? 'warning'} title={S.oneSlowTitle}>
-          {S.oneSlow}
+          {`${S.oneSlow}${old}`}
         </Banner>
       );
     case 'some_slow':
       return (
         <Banner tone={tone ?? 'warning'} title={S.someSlowTitle(slow)}>
-          {S.someSlow}
+          {`${S.someSlow}${old}`}
         </Banner>
       );
     case 'one_down':
       return (
         <Banner tone={tone ?? 'warning'} title={S.oneDownTitle}>
-          {S.oneDown}
+          {`${sending}${old}`}
         </Banner>
       );
     case 'some_down':
       return (
         <Banner tone={tone ?? 'warning'} title={S.someDownTitle(down)}>
-          {S.someDown}
+          {`${sending}${old}`}
         </Banner>
       );
     case 'all_down':
@@ -378,15 +433,140 @@ function Headline({
   }
 }
 
+function Chevron(): ReactElement {
+  return <span className="nw-chev" aria-hidden="true" />;
+}
+
+/** The servers: problems first, own servers folded after OWN_VISIBLE, old read-only ones in a group. */
+function Servers({
+  answer,
+  now,
+  open,
+  onToggle,
+  showAll,
+  onShowAll,
+  oldOpen,
+  onOld,
+}: {
+  readonly answer: NetworkAnswer;
+  readonly now: number;
+  readonly open: ReadonlySet<string>;
+  readonly onToggle: (host: string) => void;
+  readonly showAll: boolean;
+  readonly onShowAll: () => void;
+  readonly oldOpen: boolean;
+  readonly onOld: () => void;
+}): ReactElement | null {
+  const ordered = problemsFirst(answer.servers);
+  const own = ordered.filter((s) => s.kind === 'own');
+  const old = ordered.filter((s) => s.kind === 'legacy');
+  // A server with a problem is never behind "Show all": only the healthy ones fold.
+  const limit = showAll ? own.length : Math.max(OWN_VISIBLE, own.filter(isProblem).length);
+  const shown = own.slice(0, limit);
+  const toggle = own.length > shown.length || (showAll && own.length > OWN_VISIBLE);
+  const oldId = useId();
+  const oldDown = old.filter(isProblem).length;
+  const until =
+    answer.legacyReadUntil === null
+      ? undefined
+      : DAY.format(new Date(answer.legacyReadUntil * 1000));
+  const row = (s: NetworkServer): ReactElement => (
+    <ServerCard
+      key={s.host}
+      server={s}
+      answer={answer}
+      now={now}
+      open={open.has(s.host)}
+      onToggle={() => {
+        onToggle(s.host);
+      }}
+    />
+  );
+  if (own.length + old.length === 0) return null;
+  return (
+    <>
+      {own.length === 0 ? null : (
+        <ul className="nw-list">
+          {shown.map(row)}
+          {toggle ? (
+            <li className="nw-srv">
+              <div>
+                <Button size="sm" aria-expanded={showAll} onClick={onShowAll}>
+                  {showAll ? S.showFewerServers : S.showAllServers(own.length)}
+                </Button>
+              </div>
+            </li>
+          ) : null}
+        </ul>
+      )}
+      {old.length === 0 ? null : (
+        <ul className="nw-list">
+          <li className="nw-srv is-fold is-old">
+            <button
+              type="button"
+              className="nw-srv-top nw-srv-btn"
+              aria-expanded={oldOpen}
+              aria-controls={oldId}
+              onClick={onOld}
+            >
+              <span className="nw-host al-text-body-sm">{S.oldGroup(old.length, until)}</span>
+              {oldDown === 0 ? null : (
+                <span className="nw-state al-text-body-sm">{S.oldGroupDown(oldDown)}</span>
+              )}
+              <Chevron />
+            </button>
+          </li>
+          {oldOpen ? (
+            <li id={oldId} className="nw-fold">
+              <ul>{old.map(row)}</ul>
+            </li>
+          ) : null}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** A 24 h bar of accepted against failed, from the counts the route returns (never inline styles). */
+function Bar24({
+  ok,
+  failed,
+}: {
+  readonly ok: number;
+  readonly failed: number;
+}): ReactElement | null {
+  const total = ok + failed;
+  if (total === 0) return null;
+  const pct = failed === 0 ? 100 : Math.min(99, Math.round((ok / total) * 100));
+  return (
+    <svg
+      className="nw-bar"
+      viewBox="0 0 100 4"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+      data-bar24=""
+    >
+      <rect className="nw-bar-ok" x={0} y={0} width={pct} height={4} />
+      <rect className="nw-bar-bad" x={pct} y={0} width={100 - pct} height={4} />
+    </svg>
+  );
+}
+
 function ServerCard({
   server: s,
   answer,
   now,
+  open,
+  onToggle,
 }: {
   readonly server: NetworkServer;
   readonly answer: NetworkAnswer;
   readonly now: number;
+  readonly open: boolean;
+  readonly onToggle: () => void;
 }): ReactElement {
+  const detailId = useId();
   const legacy = s.kind === 'legacy';
   const role = legacy
     ? answer.legacyReadUntil === null
@@ -405,48 +585,73 @@ function ServerCard({
       ? null
       : answer.contactHosts.filter((c) => c.hosts.includes(s.host)).length);
   const counted = s.publishedOk + s.publishedFailed + s.received > 0;
+  const quick = s.roundTripMs ?? s.connectMs;
   const note =
     s.state === 'slow'
       ? S.slowNote
       : s.state === 'unreachable'
-        ? S.downNote
+        ? // NET-VIEW-0514-1: "Can't reach" next to "Last worked just now" is explained, not left as is.
+          s.lastOkAt !== null && now - s.lastOkAt <= RECENT_OK_SECONDS
+          ? S.downRecentNote
+          : legacy
+            ? S.oldDownNote
+            : S.downNote
         : s.state === 'blocked'
           ? S.blockedNote
           : undefined;
   return (
-    <li className={`nw-srv${legacy ? ' is-old' : ''}`} data-state={s.state}>
-      <div className="nw-srv-top">
+    <li className={`nw-srv is-fold${legacy ? ' is-old' : ''}`} data-state={s.state}>
+      <button
+        type="button"
+        className="nw-srv-top nw-srv-btn"
+        aria-expanded={open}
+        aria-controls={detailId}
+        onClick={onToggle}
+      >
         <span className={`al-dot nw-dot ${DOT_SHAPE[s.state]}`} aria-hidden="true" />
         <span className="nw-host al-text-code" title={s.host}>
           {s.host}
         </span>
-        <span className="nw-state al-text-body-sm">{S.health[s.state]}</span>
-      </div>
-      <div className="nw-meta al-text-body-sm al-muted">
-        <span>{role}</span>
-        {times.length === 0 ? null : <span>{times.join(' · ')}</span>}
-        <span>{counted ? S.counts(s.publishedOk, s.publishedFailed, s.received) : S.noCounts}</span>
-        {usedBy === null ? null : <span>{S.usedBy(usedBy)}</span>}
-        <span>{s.lastOkAt === null ? S.neverOk : S.lastOk(agoText(s.lastOkAt, now))}</span>
-      </div>
-      {note === undefined ? null : <p className="al-text-body-sm nw-detail">{note}</p>}
-      {s.signInRequired === true ? (
-        <p className="al-text-body-sm nw-detail">{S.needsSignIn}</p>
-      ) : null}
-      {s.paymentRequired === true ? (
-        <p className="al-text-body-sm nw-detail">{S.needsPayment}</p>
+        <span className="nw-state al-text-body-sm">
+          {S.health[s.state]}
+          {quick === null ? '' : ` · ${formatMs(quick)}`}
+        </span>
+        <Chevron />
+      </button>
+      {open ? (
+        <div id={detailId} className="nw-more">
+          <div className="nw-meta al-text-body-sm al-muted">
+            <span>{role}</span>
+            {times.length === 0 ? null : <span>{times.join(' · ')}</span>}
+            <span>
+              {counted ? S.counts(s.publishedOk, s.publishedFailed, s.received) : S.noCounts}
+            </span>
+            {usedBy === null ? null : <span>{S.usedBy(usedBy)}</span>}
+            <span>{s.lastOkAt === null ? S.neverOk : S.lastOk(agoText(s.lastOkAt, now))}</span>
+          </div>
+          <Bar24 ok={s.publishedOk} failed={s.publishedFailed} />
+          {note === undefined ? null : <p className="al-text-body-sm nw-detail">{note}</p>}
+          {s.signInRequired === true ? (
+            <p className="al-text-body-sm nw-detail">{S.needsSignIn}</p>
+          ) : null}
+          {s.paymentRequired === true ? (
+            <p className="al-text-body-sm nw-detail">{S.needsPayment}</p>
+          ) : null}
+        </div>
       ) : null}
     </li>
   );
 }
 
 function Reach({
+  top,
   answer,
   expanded,
   onToggle,
   names,
   offline,
 }: {
+  readonly top: RefObject<HTMLDivElement | null>;
   readonly answer: NetworkAnswer;
   readonly expanded: boolean;
   readonly onToggle: () => void;
@@ -456,7 +661,7 @@ function Reach({
   const { total, sharing } = answer.contacts;
   const rows = answer.contactHosts;
   return (
-    <div className="nw-card">
+    <div className="nw-card" ref={top}>
       <div className="nw-reach">
         <div>
           <h3 className="al-text-title-3">{S.reachHeading}</h3>

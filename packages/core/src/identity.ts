@@ -75,10 +75,19 @@ import {
   type SignedCard,
   type StoredCard,
 } from './card.js';
+import { holdsDefaultServer } from './announce-optout.js';
 import { STORAGE_PREFIX_BYTES } from './constants.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { isOwnIdName } from './names.js';
+import {
+  leavingText,
+  nextLeaving,
+  parseLeaving,
+  runningLeaving,
+  sameLeaving,
+  type LeavingServer,
+} from './leaving-servers.js';
 import { migratedRelays, needsRelayMigration, type RelayMigration } from './relay-migration.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
@@ -170,7 +179,16 @@ export interface RotateIdentityInput {
    * rotation is unfinished. Only the owner flow passes it (I-4).
    */
   readonly relays?: readonly string[];
+  /**
+   * M1-7j (D-158 (7); 07 §3): the announce choice to store with the new card
+   * (`identity.announce_default`). Absent: unchanged. Only the owner flow passes it (a reset signs
+   * true, the NET-ANNOUNCE-OPTOUT opt-out false); never an MCP path (I-4).
+   */
+  readonly announceDefault?: boolean;
 }
+
+/** Commit attempts of a write whose leaving list must be current at the clock read inside it. */
+const LEAVING_COMMIT_ATTEMPTS = 3;
 
 function isRevoked(tx: StoreTx, row: Row<'identity'>): boolean {
   return (
@@ -443,6 +461,8 @@ export class IdentityService {
       revoked_at: null,
       created_at: now,
       updated_at: now,
+      prev_relays: null,
+      announce_default: null,
     };
     await ctx.store.transaction((tx) => {
       if (tx.count('identity') > 0) {
@@ -501,6 +521,14 @@ export class IdentityService {
     const relaysChanged = !sameList(relays, storedRelays);
     // 07 §4.3 "Counts" (owner D2): a changed own list holds 2 to 8 relays.
     if (relaysChanged) checkOwnRelays(relays);
+    // NET-ANNOUNCE-OPTOUT (D-158 (7); 07 §4.3 "Privacy"): the opt-out holds only while the list has no
+    // default or old default server, so a change to a list with one (the mix-in back on) clears it.
+    const announceDefault =
+      relaysChanged && holdsDefaultServer(relays) ? true : input.announceDefault;
+    // M1-7j (D-158 (5)): every server that leaves the list stays readable for 30 days; a change that
+    // needs more than 16 leaving servers is refused here, before any key is previewed or signed.
+    const storedLeaving = relaysChanged ? await openLeavingOrEmpty(ctx, current.row) : [];
+    if (relaysChanged) nextLeaving(storedLeaving, storedRelays, relays, nowOf(ctx));
     if (renamed) {
       const allowance = renameAllowanceOf(oldStored, nowOf(ctx));
       if (allowance.status === 'limited') throw renameLimited();
@@ -540,11 +568,13 @@ export class IdentityService {
     const signed = await this.#issue(next, input, name, relays, now);
     // D-141: a renaming pending card carries its name, so finishing it on open stores that name.
     // RELAY-CARD-MIGRATION: so does a pending card with a new relay list.
+    // NET-OWNER-SET: and the announce choice, so an interrupted list change keeps it too.
     const text =
-      renamed || relaysChanged
+      renamed || relaysChanged || announceDefault !== undefined
         ? pendingCardText(signed, {
             ...(renamed ? { name } : {}),
             ...(relaysChanged ? { relays } : {}),
+            ...(announceDefault === undefined ? {} : { announceDefault }),
           })
         : storedCardText(signed);
     // M1-4d-f: the current card joins the history. A card stored before M1-4d-d gets its `cardPop`
@@ -612,16 +642,88 @@ export class IdentityService {
       updated_at: now,
       ...(sealedName === undefined ? {} : { name: sealedName }),
       ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
+      ...(announceDefault === undefined
+        ? {}
+        : { announce_default: announceDefault ? (1 as const) : (0 as const) }),
     };
-    await ctx.store.transaction((tx) => {
-      assertNotRevoked(tx, old.agentId);
-      if (tx.update('identity', where, patch) !== 1) throw concurrentRotation();
-    });
+    // M1-7j: the leaving servers are written in the same transaction as the card, as of the clock
+    // read inside it (an entry that ended meanwhile is not stored).
+    const committed = await commitWithLeaving(
+      ctx,
+      (at) =>
+        relaysChanged ? nextLeaving(storedLeaving, storedRelays, relays, at, true) : undefined,
+      [old.agentId],
+      (tx, prev) => {
+        assertNotRevoked(tx, old.agentId);
+        const full = prev === undefined ? patch : { ...patch, prev_relays: prev };
+        if (tx.update('identity', where, full) !== 1) throw concurrentRotation();
+        return full;
+      },
+    );
     ctx.log.info(
       renamed ? 'identity renamed' : relaysChanged ? 'identity relays changed' : 'identity rotated',
       { keyEpoch: next.keyEpoch },
     );
-    return this.#view({ ...current.row, ...patch }, false);
+    return this.#view({ ...current.row, ...committed }, false);
+  }
+
+  /**
+   * M1-7j (D-158 (5); 07 §3, §4.3): the servers that left the own list and are still read, each with
+   * its end, at the current time. Empty before init, after every entry ended, and when the stored
+   * value does not open (then the agent reads its own list and the legacy relays only; fixed log).
+   * Public relay addresses only.
+   */
+  async leavingServers(): Promise<readonly LeavingServer[]> {
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined) return Object.freeze([]);
+    return runningLeaving(await openLeavingOrEmpty(this.#ctx, got.row), nowOf(this.#ctx));
+  }
+
+  /**
+   * M1-7j (D-158 (7); 07 §3): whether this ID's owner card-update is also announced on the release's
+   * default set (`identity.announce_default`; true unless the owner opted out). Stored, restored and
+   * exposed here; NET-ANNOUNCE-OPTOUT applies it. True before init.
+   */
+  async announceDefault(): Promise<boolean> {
+    const got = await readIdentity(this.#ctx);
+    return got?.row.announce_default !== 0;
+  }
+
+  /**
+   * M1-7j (07 §3): removes the leaving servers whose end has passed, as of the clock read inside the
+   * store transaction (a compare-and-set on the stored value). The sync pass runs it. Returns how
+   * many entries were removed; 0 when nothing ended or the value does not open (left for `doctor`).
+   */
+  async pruneLeavingServers(): Promise<number> {
+    const ctx = this.#ctx;
+    const got = await readIdentity(ctx);
+    if (got === undefined || got.row.prev_relays === null) return 0;
+    const sealedBefore = got.row.prev_relays;
+    let stored: readonly LeavingServer[];
+    try {
+      stored = parseLeaving(
+        await open(ctx, 'identity', 'prev_relays', [got.row.agent_id], sealedBefore),
+      );
+    } catch {
+      ctx.log.warn('leaving servers unreadable');
+      return 0;
+    }
+    const removed = await commitWithLeaving(
+      ctx,
+      (at) => runningLeaving(stored, at),
+      [got.row.agent_id],
+      (tx, prev, kept) => {
+        if (kept === undefined || sameLeaving(kept, stored)) return 0;
+        const n = tx.update(
+          'identity',
+          { agent_id: got.row.agent_id, prev_relays: sealedBefore },
+          { prev_relays: prev ?? null },
+        );
+        return n === 1 ? stored.length - kept.length : 0;
+      },
+    );
+    if (removed > 0) ctx.log.info('leaving servers ended', { count: removed });
+    return removed;
   }
 
   /**
@@ -767,7 +869,11 @@ function rotationPending(): CoreError {
  */
 function pendingCardText(
   signed: StoredCard,
-  extra: { readonly name?: string; readonly relays?: readonly string[] },
+  extra: {
+    readonly name?: string;
+    readonly relays?: readonly string[];
+    readonly announceDefault?: boolean;
+  },
 ): string {
   return canonicalize({
     card: signed.card as unknown as JsonValue,
@@ -776,7 +882,24 @@ function pendingCardText(
     cardPop: signed.cardPop,
     ...(extra.name === undefined ? {} : { name: extra.name }),
     ...(extra.relays === undefined ? {} : { relays: [...extra.relays] }),
+    ...(extra.announceDefault === undefined ? {} : { announceDefault: extra.announceDefault }),
   });
+}
+
+/**
+ * NET-OWNER-SET: the announce choice a pending card text carries, or undefined (unchanged). Anything
+ * but a boolean is ignored (the choice then stays as stored).
+ */
+function pendingAnnounceOf(text: string): boolean | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null) return undefined;
+  const announce = (value as Record<string, unknown>)['announceDefault'];
+  return typeof announce === 'boolean' ? announce : undefined;
 }
 
 /** The relay list a pending card text carries (RELAY-CARD-MIGRATION), or undefined (unchanged). */
@@ -856,7 +979,12 @@ async function usablePendingCard(
   bundle: PublicIdentity,
   now: number,
 ): Promise<
-  (StoredCard & { readonly name?: string; readonly relays?: readonly string[] }) | undefined
+  | (StoredCard & {
+      readonly name?: string;
+      readonly relays?: readonly string[];
+      readonly announceDefault?: boolean;
+    })
+  | undefined
 > {
   const key = [row.agent_id];
   try {
@@ -866,6 +994,7 @@ async function usablePendingCard(
     const name = pendingNameOf(text);
     // RELAY-CARD-MIGRATION: a pending card with a new list names it, and relaysHash commits to it.
     const relays = pendingRelaysOf(text);
+    const announceDefault = pendingAnnounceOf(text);
     const current = parseStoredCard(
       await open(ctx, 'identity', 'agent_card_json', key, row.agent_card_json),
     ).card;
@@ -889,6 +1018,7 @@ async function usablePendingCard(
       ...pending,
       ...(name === undefined ? {} : { name }),
       ...(relays === undefined ? {} : { relays }),
+      ...(announceDefault === undefined ? {} : { announceDefault }),
     };
   } catch (error) {
     if (error instanceof CoreError) return undefined;
@@ -958,27 +1088,110 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
     pending.relays === undefined
       ? undefined
       : await seal(ctx, 'identity', 'relays', [row.agent_id], canonicalize([...pending.relays]));
-  const finished = await ctx.store.transaction((tx) => {
-    if (isRevoked(tx, row)) return false;
-    // Exactly the row and the pending card that were verified; otherwise another flow moved on.
-    const where = {
-      agent_id: row.agent_id,
-      key_epoch: row.key_epoch,
-      revoked_at: null,
-      pending_card_json: sealed,
-      agent_card_json: row.agent_card_json,
-    };
-    const patch = {
-      agent_card_json: sealedCard,
-      pending_card_json: null,
-      key_epoch: bundle.keyEpoch,
-      updated_at: now,
-      ...(sealedName === undefined ? {} : { name: sealedName }),
-      ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
-    };
-    return tx.update('identity', where, patch) === 1;
-  });
+  // M1-7j: an interrupted list change moves the servers that leave into the leaving servers too.
+  const toRelays = pending.relays;
+  const fromRelays =
+    toRelays === undefined
+      ? undefined
+      : checkStoredRelays(await open(ctx, 'identity', 'relays', [row.agent_id], row.relays));
+  const storedLeaving = fromRelays === undefined ? [] : await openLeavingOrEmpty(ctx, row);
+  const finished = await commitWithLeaving(
+    ctx,
+    (at) =>
+      fromRelays === undefined || toRelays === undefined
+        ? undefined
+        : nextLeaving(storedLeaving, fromRelays, toRelays, at, true),
+    [row.agent_id],
+    (tx, prev) => {
+      if (isRevoked(tx, row)) return false;
+      // Exactly the row and the pending card that were verified; otherwise another flow moved on.
+      const where = {
+        agent_id: row.agent_id,
+        key_epoch: row.key_epoch,
+        revoked_at: null,
+        pending_card_json: sealed,
+        agent_card_json: row.agent_card_json,
+      };
+      const patch = {
+        agent_card_json: sealedCard,
+        pending_card_json: null,
+        key_epoch: bundle.keyEpoch,
+        updated_at: now,
+        ...(sealedName === undefined ? {} : { name: sealedName }),
+        ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
+        ...(pending.announceDefault === undefined
+          ? {}
+          : { announce_default: pending.announceDefault ? (1 as const) : (0 as const) }),
+        ...(prev === undefined ? {} : { prev_relays: prev }),
+      };
+      return tx.update('identity', where, patch) === 1;
+    },
+  );
   if (finished) ctx.log.info('identity rotation finished', { keyEpoch: bundle.keyEpoch });
+}
+
+/**
+ * The stored leaving servers of the identity row (all entries, ended ones included). A value that
+ * does not open counts as none: the agent still reads its own list and the legacy relays (07 §3;
+ * a fixed log line, for `doctor`).
+ */
+async function openLeavingOrEmpty(
+  ctx: CoreContext,
+  row: Row<'identity'>,
+): Promise<readonly LeavingServer[]> {
+  if (row.prev_relays === null) return [];
+  try {
+    return parseLeaving(
+      await open(ctx, 'identity', 'prev_relays', [row.agent_id], row.prev_relays),
+    );
+  } catch {
+    ctx.log.warn('leaving servers unreadable');
+    return [];
+  }
+}
+
+/**
+ * M1-7j (07 §3): one identity write that carries a leaving list computed for a time `at`, as of the
+ * clock read inside the store transaction. `compute(at)` gives the list (undefined: the write does
+ * not touch it). It is sealed outside the transaction (sealing is async); inside it the clock is read
+ * again, and if an entry has ended by then nothing is written and the list is computed again for that
+ * time. `write(tx, sealed, list)` makes the write (sealed null: the list is empty). Bounded: the last
+ * attempt writes, since an ended entry is never read anyway (runningLeaving).
+ */
+async function commitWithLeaving<R>(
+  ctx: CoreContext,
+  compute: (at: number) => readonly LeavingServer[] | undefined,
+  key: readonly string[],
+  write: (
+    tx: StoreTx,
+    sealed: Sealed | null | undefined,
+    list: readonly LeavingServer[] | undefined,
+  ) => R,
+): Promise<R> {
+  let at = nowOf(ctx);
+  for (let attempt = 1; ; attempt += 1) {
+    const list = compute(at);
+    const text = list === undefined ? undefined : leavingText(list);
+    const sealed =
+      text === undefined || text === null
+        ? text
+        : await seal(ctx, 'identity', 'prev_relays', key, text);
+    const outcome = await ctx.store.transaction(
+      (tx): { readonly stale: number } | { readonly done: R } => {
+        const txNow = nowOf(ctx);
+        if (
+          list !== undefined &&
+          attempt < LEAVING_COMMIT_ATTEMPTS &&
+          list.some((e) => e.until <= txNow)
+        ) {
+          return { stale: txNow };
+        }
+        return { done: write(tx, sealed, list) };
+      },
+    );
+    if ('done' in outcome) return outcome.done;
+    at = Math.max(at, outcome.stale);
+  }
 }
 
 function checkStoredRelays(text: string): readonly string[] {

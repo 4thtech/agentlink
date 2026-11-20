@@ -25,7 +25,7 @@ import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
 import type { LocalUiHistoryStep } from './history-paths.js';
 import type { LocalUiHistorySession } from './history-desk.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
-import type { RelayMigrationOutcome } from '../owner-relay-migration.js';
+import type { RelayMigrationOutcome, ServerChangeOutcome } from '../owner-relay-migration.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
 /**
@@ -93,6 +93,19 @@ export interface LocalUiOwnerOperation {
    * owner session or the epoch control. Absent outside the app host or without the key items.
    */
   updateContactDetails?(review: OwnerReview): Promise<RelayMigrationOutcome>;
+  /**
+   * NET-OWNER-SET (D-158 (6); 04 §2.6; 07 §4.3 "Use your own servers"): the one owner operation of a
+   * server-list change or a reset, instead of `sign` (one or the other, once). With the presence this
+   * request carried it signs exactly the open agent's next card with exactly `plan.relays` (the list
+   * the route built after testing every server again) and stores `plan.announceDefault` with it
+   * (owner-relay-migration.ts signServerChange); then core's card-update tells the contacts. The
+   * handler never sees the owner session or the epoch control. Absent outside the app host or
+   * without the key items.
+   */
+  changeServers?(plan: {
+    readonly relays: readonly string[];
+    readonly announceDefault: boolean;
+  }): Promise<ServerChangeOutcome>;
   /**
    * WP-11 (F-1, D-117 A; 04 §2.3.3 "Export: who sees the seeds", §2.5.1 `backup.export`): the one
    * owner operation of saving a recovery kit, instead of `sign` (one or the other, once). Offered
@@ -196,6 +209,13 @@ export interface LocalUiOwnerRoute {
     context: LocalUiContext,
     request: LocalUiRequest,
   ) => Promise<LocalUiResult | undefined>;
+  /**
+   * NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6; 04 §2.6, 11 §5.14 C5): the one line the OS presence
+   * sheet names this operation with (Touch ID's prompt detail), read after the precheck let the
+   * request on. A fixed string of the route's own words and counts, never request or server text;
+   * undefined keeps the sheet's generic reason. Display only: it binds nothing (04 §2.3.4).
+   */
+  readonly sheetDetail?: (context: LocalUiContext, request: LocalUiRequest) => string | undefined;
   readonly handler: (
     context: LocalUiContext,
     request: LocalUiRequest,
@@ -464,6 +484,26 @@ export interface LocalUiAttachRoute {
   ) => Promise<LocalUiResult>;
 }
 
+/**
+ * NET-PRECHECK (08 §1 `POST /api/ui/network/test`; 04 §4; 07 §4.3): the server Test under Advanced ›
+ * Message network › Your servers. Only that path, registered once (routes.ts). The server's
+ * net-test gate runs after the same session, CSRF, Origin, fetch-metadata and octet-stream checks
+ * as every write, refuses a query, an operation input or a presence header, reads at most
+ * NETWORK_TEST_MAX_BODY_BYTES, parses one strict JSON object and hands the handler only that
+ * object. No owner presence: it changes nothing, signs nothing with an ID key and writes nothing;
+ * it only opens outbound connections under the relay URL rule (api/network-test.ts). Never MCP.
+ */
+export const NETWORK_TEST_PATH = '/api/ui/network/test';
+/** The largest body the net-test gate reads: 8 addresses of at most 256 characters, with room. */
+export const NETWORK_TEST_MAX_BODY_BYTES = 8192;
+
+export interface LocalUiNetworkTestRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'net-test';
+  readonly handler: (context: LocalUiContext, body: JsonObject) => Promise<LocalUiResult>;
+}
+
 /** U3-c: the fixed path of the switch kind (08 §1). */
 export const AGENTS_SWITCH_PATH = '/api/ui/agents/switch';
 
@@ -683,7 +723,8 @@ export type LocalUiRoute =
   | LocalUiHistoryRoute
   | LocalUiInboxRevealRoute
   | LocalUiInviteRoute
-  | LocalUiAttachRoute;
+  | LocalUiAttachRoute
+  | LocalUiNetworkTestRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A

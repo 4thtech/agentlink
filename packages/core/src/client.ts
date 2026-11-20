@@ -154,6 +154,13 @@ export interface AgentLinkClientOptions {
    */
   readonly deliveryAcks?: boolean;
   /**
+   * M1-7j (07 §4.3): whether `syncInbox` and `sendCardUpdates` also send the owner `card-update` on
+   * the owner channel (announceToOwner). A host capability, off by default: only a host where the
+   * owner's surfaces read it (the node runtime of the desktop app and the CLI) turns it on. The
+   * cloud agent never does (custom servers and the owner card-update there are M2-2e).
+   */
+  readonly ownerCardUpdates?: boolean;
+  /**
    * The verified on-chain records this agent knows (M1-7g, M1b): lets a commitment see whether the
    * answered envelope is recorded. Without it, no record is known.
    */
@@ -219,6 +226,8 @@ export class AgentLinkClient {
   readonly acks: DeliveryAcks;
   /** The `card-update` sender (M1-4d-f; 04 §3.4.1): the current card to contacts that lack it. */
   readonly cardUpdates: CardUpdateSender;
+  /** M1-7j: the host turned the owner card-update on (`ownerCardUpdates`). */
+  readonly #ownerCardUpdates: boolean;
   /**
    * U3-e: removing this agent from the local app (04 §2.5): what removal reads first, and the
    * owner-signed `revoke` carriers to its contacts. The local app's removal only; never an MCP tool.
@@ -281,6 +290,7 @@ export class AgentLinkClient {
     receiptsKept: ReceiptsKeptMark | undefined,
     transport: TransportFactory | undefined,
     deliveryAcks: boolean,
+    ownerCardUpdates: boolean,
     records: RecordLookup | undefined,
     dropOrigins: readonly string[],
     files: FilesPlatform | undefined,
@@ -290,6 +300,7 @@ export class AgentLinkClient {
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
+    this.#ownerCardUpdates = ownerCardUpdates;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
     this.pause = new AgentPause({ store: ctx.store, now: () => nowOf(ctx) });
@@ -451,6 +462,16 @@ export class AgentLinkClient {
     await this.cardUpdates.sendPending().catch(() => {
       this.#ctx.log.warn('card updates not sent');
     });
+    // M1-7j (07 §4.3): the owner card-update when due, and leaving servers whose end has passed are
+    // pruned. Best effort, as above.
+    if (this.#ownerCardUpdates) {
+      await this.cardUpdates.announceToOwner().catch(() => {
+        this.#ctx.log.warn('owner card update not sent');
+      });
+    }
+    await this.identity.pruneLeavingServers().catch(() => {
+      this.#ctx.log.warn('leaving servers not pruned');
+    });
     // M1-1g-h: delete on receipt, per `files.deleteAfter`. Best effort, as above.
     await this.deleteFilesOnReceipt().catch(() => {
       this.#ctx.log.warn('delete on receipt not run');
@@ -506,7 +527,14 @@ export class AgentLinkClient {
    */
   async sendCardUpdates(): Promise<CardUpdateSendResult> {
     await this.pause.assertRunning();
-    return this.cardUpdates.sendPending();
+    const result = await this.cardUpdates.sendPending();
+    // M1-7j (07 §4.3): the owner card-update for the new card too. Best effort.
+    if (this.#ownerCardUpdates) {
+      await this.cardUpdates.announceToOwner().catch(() => {
+        this.#ctx.log.warn('owner card update not sent');
+      });
+    }
+    return result;
   }
 
   /**
@@ -518,6 +546,14 @@ export class AgentLinkClient {
   async subscribeInbox(options?: SubscribeInboxOptions): Promise<InboxSubscription> {
     await this.pause.assertRunning();
     return this.#sync.subscribeInbox(options);
+  }
+
+  /**
+   * REL-0515 F1: the read set a live subscription opened now would use (store reads only). The
+   * background loop reopens the subscription when it differs from the subscription's `readSet`.
+   */
+  liveReadSet(): Promise<string> {
+    return this.#sync.liveReadSet();
   }
 
   /** The current key epoch (public). The background loop reopens a live subscription when it moves. */
@@ -881,6 +917,7 @@ export class AgentLinkClient {
       options.receiptsKept,
       options.transport,
       options.deliveryAcks !== false,
+      options.ownerCardUpdates === true,
       options.records,
       options.dropOrigins ?? [],
       options.files,

@@ -6,19 +6,6 @@
   align-items: center;
   gap: 0 var(--al-space-4);
 }
-.al-setup-exit-link {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: 44px;
-  padding: 0 var(--al-space-2);
-  color: var(--al-color-fg-muted);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.al-setup-exit-link:focus-visible {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
-}
 .al-setup-first {
   display: flex;
   flex-direction: column;

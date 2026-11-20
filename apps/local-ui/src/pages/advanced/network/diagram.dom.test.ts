@@ -200,7 +200,8 @@ describe('old server date', () => {
     const card = host.querySelector('.nw-srv.is-old') as HTMLElement;
     expect(card.textContent).toContain('2027');
     expect(card.textContent).toContain(
-      S.oldServerUntil(
+      S.oldGroup(
+        1,
         new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
           new Date(1_803_945_600 * 1000),
         ),
@@ -254,9 +255,29 @@ describe('network diagram: contacts', () => {
     );
     const svg = wide() as SVGElement;
     expect(svg.querySelectorAll('.nwd-av:not(.is-id)')).toHaveLength(MAX_DIAGRAM_CONTACTS);
-    expect(svg.textContent).toContain(S.diagramMore(4));
+    expect(slot().querySelector('.nwd-more')?.textContent).toContain(S.diagramMore(4));
     expect(slot().querySelector('.nwd-stack')?.textContent).toContain(S.reaches(9));
-    expect(slot().querySelector('.nwd-stack')?.textContent).toContain(S.diagramMoreShort(4));
+  });
+
+  it('shows at most five servers, problems first, then "+N more servers" that opens the full list', async () => {
+    const twelve = Array.from({ length: 12 }, (_, i) =>
+      server({ host: `s${String(i)}.example.org`, state: i === 11 ? 'unreachable' : 'ready' }),
+    );
+    await mount(() =>
+      Promise.resolve(ok(answer({ servers: twelve, contacts: { total: 0, sharing: 0 } }))),
+    );
+    const svg = wide() as SVGElement;
+    const drawn = [...svg.querySelectorAll('[data-node-state]')];
+    expect(drawn).toHaveLength(5);
+    // The one that cannot be reached is the last in the answer, yet drawn first.
+    expect(drawn[0]?.textContent).toContain('s11.example.org');
+    expect(slot().querySelectorAll('.nwd-stack .nwd-stack-item')).toHaveLength(5);
+    const more = [...slot().querySelectorAll('.nwd-more button')];
+    expect(more.map((b) => b.textContent)).toEqual([S.diagramMoreServers(7)]);
+    expect(slot().querySelector('.nwd-pic')?.getAttribute('aria-label')).toBe(S.diagramSummary(12));
+    await act(async () => (more[0] as HTMLElement).click());
+    // Pressing it opens the full list below: all 12 rows, no "Show all" left to press.
+    expect(host.querySelectorAll('.nw-list > .nw-srv[data-state]')).toHaveLength(12);
   });
 
   it('falls back to the server column alone when the contacts read fails, and shows the cards', async () => {

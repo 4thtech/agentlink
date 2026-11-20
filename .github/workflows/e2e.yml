@@ -184,7 +184,7 @@ jobs:
                 failed = true;
               }
             }
-            for (const name of ["relay-availability", "hostile-contact", "uploads-and-proofs"]) {
+            for (const name of ["relay-availability", "hostile-contact", "uploads-and-proofs", "net-servers"]) {
               const text = fs.readFileSync(`e2e/hostile/${name}.test.ts`, "utf8");
               // The count below sees only plain it( and test( calls, so a modifier or a table form
               // (each, for, skip, only, todo, ...) would make it wrong: refused outright, also in the
@@ -204,8 +204,8 @@ jobs:
                 failed = true;
               }
             }
-            if (r.testResults.length !== 3) {
-              console.error("::error::the hostile suites must be exactly 3 test files");
+            if (r.testResults.length !== 4) {
+              console.error("::error::the hostile suites must be exactly 4 test files");
               failed = true;
             }
             if (failed) process.exit(1);

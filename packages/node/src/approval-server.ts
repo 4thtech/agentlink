@@ -274,6 +274,7 @@ import { OwnerCodeChanges } from './local-ui/api/owner-presence.js';
 import { ownerCodeProofAllowed, type LocalUiOwnerCodeStep } from './local-ui/owner-code-paths.js';
 import {
   NativeHelperError,
+  isPromptDetail,
   type NativeHelper,
   type NativeReason,
   type NativeUiState,
@@ -328,7 +329,7 @@ import {
 } from './owner-first-card.js';
 import { signNewAgent } from './owner-add-agent.js';
 import { signRename } from './owner-rename.js';
-import { signRelayMigration } from './owner-relay-migration.js';
+import { signRelayMigration, signServerChange } from './owner-relay-migration.js';
 import {
   CREATE_CONNECT_HOLD_MS,
   CREATE_CONNECT_NONCE_BYTES,
@@ -356,9 +357,11 @@ import {
 import { attachDesk } from './local-ui/attach-desk.js';
 import { revealOwnSendFolder } from './send-folder-reveal.js';
 import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
+import { NETWORK_TEST_MAX_BODY_BYTES } from './local-ui/route-types.js';
 import {
   creditsPort,
   fileSavePort,
+  serverListPort,
   inviteAcceptPort,
   inviteDesk,
   pauseDesk,
@@ -381,6 +384,7 @@ import { HOST_SHOW_PATH, HOST_YIELD_PATH, JOIN_PAGE_PATH } from './local-ui/invi
 import type {
   LocalUiInviteRoute,
   LocalUiAttachRoute,
+  LocalUiNetworkTestRoute,
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
@@ -1861,7 +1865,22 @@ export async function startApprovalServerWith(
           : await widgetActivityMark(readClient, uiContext.notifications, now(), widgetMarkMemo);
       // NET-ROUTE: the open ID's network mark (counters and finished probes; numbers only), compared
       // by the hub for the `network` event, never sent.
-      const networkMark = client === undefined ? undefined : await networkReaderOf(client)?.mark();
+      const viewMark = client === undefined ? undefined : await networkReaderOf(client)?.mark();
+      // NET-OWNER-SET: the card-update progress after a server-list change joins it (counts only),
+      // so the page's progress view reads `GET /api/ui/network/progress` again when it moves.
+      const progressMark =
+        client === undefined
+          ? undefined
+          : await Promise.resolve()
+              .then(() => client.cardUpdates.progress())
+              .then((p) => `${p.changedAt ?? 0}.${p.sent}.${p.waiting}`)
+              .catch(() => undefined);
+      const networkMark =
+        viewMark === undefined
+          ? undefined
+          : progressMark === undefined
+            ? viewMark
+            : `${viewMark}|${progressMark}`;
       return {
         generation: list.generation,
         current: list.current,
@@ -2302,6 +2321,9 @@ export async function startApprovalServerWith(
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
+      // NET-OWNER-SET: the server-list routes' reads (own list, leaving servers, announce choice,
+      // pause, contacts, card-update progress); the change itself is the gate's `changeServers`.
+      ...(agentUi?.client === undefined ? {} : { serverList: serverListPort(agentUi.client) }),
       // REL051-A34: the in-app preview's checked read (the route passes only store values).
       previewRead,
       // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
@@ -3790,6 +3812,12 @@ export async function startApprovalServerWith(
        */
       readonly history?: true;
       /**
+       * NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6): the route's one-line name of this operation for
+       * the OS sheet (route-types.ts `sheetDetail`; a fixed string of the route's own words and
+       * counts). Display only: it binds nothing (04 §2.3.4).
+       */
+      readonly detail?: string;
+      /**
        * WIN-BROKEN-ID: "Remove this ID from this computer" for an ID whose key is missing. Presence
        * is verified as for every owner route and nothing is signed (as `history`): the handler marks
        * its one owner operation with `presenceChecked`. The owner is the open ID's owner; with no ID
@@ -3937,6 +3965,7 @@ export async function startApprovalServerWith(
             codeStep === 'replace' ? 'code' : 'approve',
             req,
             res,
+            codeStep === 'replace' ? undefined : gate.detail,
           );
           if (!('presence' in got)) {
             finishOwner(res, got.http, 'presence_rejected', { native: got.state });
@@ -4277,6 +4306,46 @@ export async function startApprovalServerWith(
                           contacts: client.contacts,
                         },
                         epochKeys,
+                      });
+                    },
+                  }),
+              // NET-OWNER-SET (D-158 (6); 04 §2.6; 07 §4.3): a server-list change or a reset, in
+              // the app host only and with the open agent's key items. One owner operation: exactly
+              // the open agent's next card with exactly the plan's list, the announce choice stored
+              // with it (signServerChange); never `sign` as well.
+              ...(host === undefined ||
+              byNostr !== undefined ||
+              renameUi?.client === undefined ||
+              renameUi.epochKeys === undefined
+                ? {}
+                : {
+                    changeServers: async (plan: {
+                      readonly relays: readonly string[];
+                      readonly announceDefault: boolean;
+                    }) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      const client = renameUi.client;
+                      const epochKeys = renameUi.epochKeys;
+                      if (client === undefined || epochKeys === undefined) {
+                        throw new NodeKeyStoreError('owner_operation_invalid', 'Not here.');
+                      }
+                      return signServerChange(session, ownerKeys, {
+                        agent: client.agentId,
+                        client: {
+                          identity: client.identity,
+                          sendCardUpdates: () => client.sendCardUpdates(),
+                          contacts: client.contacts,
+                        },
+                        epochKeys,
+                        relays: plan.relays,
+                        announceDefault: plan.announceDefault,
                       });
                     },
                   }),
@@ -7316,6 +7385,71 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * NET-PRECHECK (08 §1 `POST /api/ui/network/test`; 04 §4): the net-test kind, run after the
+   * session, CSRF, Origin, fetch-metadata, octet-stream and generation checks of every write. It
+   * refuses a query, an operation input and a presence header; refuses a body without a declared
+   * length (411) or declared over NETWORK_TEST_MAX_BODY_BYTES (413) before reading; parses one
+   * strict JSON object and hands the handler only that object. The handler applies the rate limit
+   * (api/network-test.ts). No owner presence, no owner store, no ID key, nothing signed or written.
+   */
+  async function netTestGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiNetworkTestRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const declaredText = header(req, 'content-length');
+    const declared = declaredText === undefined ? Number.NaN : Number(declaredText);
+    if (!Number.isSafeInteger(declared) || declared < 0) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 411, { error: 'length_required' });
+      return;
+    }
+    if (declared > NETWORK_TEST_MAX_BODY_BYTES) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 413, { error: 'too_large' });
+      return;
+    }
+    const body = await boundedBody(req, res, NETWORK_TEST_MAX_BODY_BYTES);
+    if (body === undefined) return;
+    let parsed: JsonValue;
+    try {
+      parsed = parseJson(decodeUtf8(body));
+    } catch {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, parsed as JsonObject);
+    } catch {
+      // Never the error's text: it could name a host or an address (I-7).
+      sendJson(res, 503, { error: 'unavailable' });
+      return;
+    }
+    sendResult(res, result);
+  }
+
+  /**
    * U3-invite (08 §4): opens the join screen through the OS opener, or first run while no owner
    * exists (it ends on the join screen). A fixed path and a one-shot session link; the invite is
    * never in it. At most one open per JOIN_OPEN_INTERVAL_MS for a handoff (`limited`).
@@ -7679,6 +7813,11 @@ export async function startApprovalServerWith(
       await attachGate(req, res, url, route);
       return;
     }
+    if (route.presence === 'net-test') {
+      // NET-PRECHECK: the server Test has its own gate; ownerGate never runs it (no presence).
+      await netTestGate(req, res, url, route);
+      return;
+    }
     if (route.presence === 'setup') {
       // M1-11s-c: owner setup has its own gate; ownerGate never runs it.
       await setupGate(req, res, route.step, cookie);
@@ -7723,6 +7862,19 @@ export async function startApprovalServerWith(
       route.historyFinish === true
         ? Object.freeze({ ...uiContext, historySession: historyDesk.forSession(cookie) })
         : uiContext;
+    // NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6): the OS sheet names the operation when the route
+    // gives a line; a line that is not plain is dropped (the generic reason stays).
+    let detail: string | undefined;
+    try {
+      const line = route.sheetDetail?.(uiContext, {
+        params,
+        query: url.searchParams,
+        ...(input === undefined ? {} : { input }),
+      });
+      detail = isPromptDetail(line) ? line : undefined;
+    } catch {
+      detail = undefined;
+    }
     await ownerGate(
       req,
       res,
@@ -7738,7 +7890,9 @@ export async function startApprovalServerWith(
           ? { ownerCode: route.ownerCode, session: cookie }
           : route.historyFinish === true
             ? { history: true }
-            : {},
+            : detail === undefined
+              ? {}
+              : { detail },
     );
   }
 

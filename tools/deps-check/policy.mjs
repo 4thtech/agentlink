@@ -64,6 +64,60 @@ export const RELATIVE_ESCAPES = [
   },
   {
     zone: 'e2e',
+    target: 'packages/node/dist/local-ui/api/network-test.js',
+    reason:
+      'E2E-HOSTILE server Test: the real route (createNetworkTestRoute) over a stub resolver and local stand-in servers; the package entry binds the production relay I/O only',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/relay-io.js',
+    reason:
+      'E2E-HOSTILE server Test: the real Node relay connector and NIP-11 fetcher routed to local stand-in servers by a stub address route; never a real server',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/src/relay-io.fixture.js',
+    reason:
+      'E2E-HOSTILE server Test: local TLS stand-in servers on 127.0.0.1 with a throwaway certificate (test helper source, never built)',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/local-ui/api/network-servers.js',
+    reason:
+      'E2E-HOSTILE own servers: the real server-list routes (createNetworkServersRoutes) over a stub resolver and local stand-in servers; the package entry binds the production relay I/O only',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/local-ui/context.js',
+    reason:
+      'E2E-HOSTILE own servers: serverListPort, the reads of the server-list routes over a core client (no key, no write); not exported by the package entry',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/local-ui/network-view.js',
+    reason:
+      'E2E-HOSTILE fully quiet: the real network view reader (createNetworkReader) and its probe over a core client on in-memory relays; not exported by the package entry',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/transport-nostr/dist/index.js',
+    reason:
+      'E2E-HOSTILE fully quiet: DEFAULT_RELAYS and LEGACY_READ_RELAYS, the lists the opt-out must never touch; constants only, e2e does not declare the package',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/src/recovery-kit-restore.js',
+    reason:
+      'E2E-HOSTILE fully quiet: createRestoreEngine on a clean temp HOME and a keychain stand-in, as the restore flow runs it; never the OS keychain or the real home',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/src/recovery-kit-restore.fixture.js',
+    reason:
+      'E2E-HOSTILE fully quiet: the recovery kit fixtures (owner, agent, kit on a keychain stand-in in a temp folder); test helper source, never built',
+  },
+  {
+    zone: 'e2e',
     target: 'packages/node/dist/owner-setup.js',
     reason:
       'M1-11b-6 first-run smoke: ownerSetupAvailableWith and defaultOwnerFiles against a temp home and a keychain stand-in, never the OS keychain or the real home',

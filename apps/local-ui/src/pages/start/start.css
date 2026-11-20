@@ -1,44 +1,9 @@
 /* W4-WIZARD: Get started (artboards A1 to A3). Tokens only; no keyframes here: motion comes from the
    U0 kit (al-reveal, al-pop, al-draw, al-press), which turns into fades under reduced motion. Sizes
    are fixed per screen so nothing shifts while an answer arrives (CLS). 16 px gutter at 360. */
-.st-wizard {
-  display: flex;
-  flex-direction: column;
-  min-block-size: 100dvh;
-  inline-size: 100%;
-  background: var(--al-color-bg-canvas);
-  color: var(--al-color-fg-default);
-}
-.st-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--al-space-3) var(--al-space-6);
-  padding: var(--al-space-6) clamp(16px, 4vw, 40px);
-  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-}
-.st-head-end {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--al-space-3) var(--al-space-6);
-}
-.st-progress {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-4);
-}
 .st-segs {
   display: inline-flex;
   gap: var(--al-space-2);
-}
-.st-seg {
-  inline-size: 24px;
-  block-size: 4px;
-  border-radius: 2px;
-  background: var(--al-color-border-default);
 }
 .st-seg[data-state='done'] {
   background: var(--al-color-status-success-icon);
@@ -46,24 +11,6 @@
 .st-seg[data-state='current'] {
   background: var(--al-color-accent-default);
 }
-.st-eyebrow {
-  font-family: var(--al-font-family-mono);
-  font-size: 11px;
-  line-height: 16px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--al-color-fg-subtle);
-}
-.st-skip {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: 44px;
-  padding: 0 var(--al-space-2);
-  color: var(--al-color-fg-muted);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 /* R1-UI-01: no "Skip to Home" before the ID exists; its room stays so nothing moves. */
 .st-skip-gone {
   visibility: hidden;
@@ -98,11 +45,6 @@
   align-items: center;
   text-align: center;
 }
-.st-intro {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
 .st-title,
 .st-title-2 {
   margin: 0;
@@ -122,12 +64,6 @@
 .st-title:focus,
 .st-title-2:focus {
   outline: none;
-}
-.st-lead {
-  margin: 0;
-  font-size: 16px;
-  line-height: 24px;
-  color: var(--al-color-fg-muted);
 }
 .st-note {
   margin: 0;
@@ -175,13 +111,6 @@
   cursor: default;
   opacity: 0.7;
 }
-.st-tile:focus-visible,
-.st-back:focus-visible,
-.st-skip:focus-visible,
-.st-card-hide:focus-visible {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
-}
 .st-tile-top {
   display: flex;
   align-items: center;
@@ -209,12 +138,6 @@
   border-radius: 9999px;
   background: var(--al-color-accent-default);
   color: var(--al-color-fg-on-accent);
-}
-.st-tile-name {
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: var(--al-font-weight-semibold);
-  overflow-wrap: anywhere;
 }
 .st-tile-state {
   display: inline-flex;
@@ -293,10 +216,6 @@
   gap: 2px;
   min-inline-size: 0;
 }
-.st-agent-name {
-  font-weight: var(--al-font-weight-semibold);
-  overflow-wrap: anywhere;
-}
 .st-go {
   gap: var(--al-space-3);
   min-block-size: 48px;
@@ -374,11 +293,6 @@
   border-radius: var(--al-radius-md);
   background: var(--al-color-bg-surface);
 }
-.st-card-head {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-4);
-}
 .st-card-head h2 {
   flex: 1;
   margin: 0;
@@ -440,13 +354,6 @@
 .st-card-suggest a:hover {
   color: var(--al-color-fg-default);
 }
-.st-card-steps a:focus-visible,
-.st-card-suggest a:focus-visible {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--al-radius-sm);
-}
-
 /* W7-ID-B1: the ID explainer is the Get started card with less padding and no bar. */
 .st-explainer {
   gap: var(--al-space-2);
@@ -489,8 +396,3 @@
 }
 
 /* R1-UI-01: Home before any ID exists. */
-.st-finish {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
