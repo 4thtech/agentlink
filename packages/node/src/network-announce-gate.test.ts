@@ -112,8 +112,9 @@ beforeEach(async () => {
   await session.close();
   await owner.close();
 
-  // The app's source applies owner actions through core (apps/cli ui-source.ts `apply`); the
-  // fixture's own apply knows approvals only, so `network.announce` goes to this client's core.
+  // The app's source applies owner actions through core (apps/cli/src/approval/ui-source.ts
+  // `apply`); the fixture's own apply knows approvals only, so `network.announce` goes to this
+  // client's core.
   const fake = fakeSource(world);
   const source: typeof fake = {
     ...fake,
