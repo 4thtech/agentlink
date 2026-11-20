@@ -89,6 +89,8 @@ export interface LocalUiNetworkProbe {
   readonly roundTripMs: number | null;
   readonly authRequired: boolean | null;
   readonly paymentRequired: boolean | null;
+  /** NET-VIEW-0514-1: asked over the pool's open connection (a timeout there is slow, not down). */
+  readonly reused?: boolean;
 }
 
 /** One server's counters as the source hands them (untrusted shape, checked here). */
@@ -203,12 +205,16 @@ const time = (value: unknown, nowMs: number): number | null => {
 
 function stateOf(probe: unknown): LocalUiNetworkState {
   if (typeof probe !== 'object' || probe === null) return 'unknown';
-  const { state, connectMs } = probe as { state?: unknown; connectMs?: unknown };
+  const { state, connectMs, reused } = probe as {
+    state?: unknown;
+    connectMs?: unknown;
+    reused?: unknown;
+  };
   switch (state) {
     case 'ready':
       return 'ready';
     case 'timeout':
-      return ms(connectMs) === null ? 'unreachable' : 'slow';
+      return ms(connectMs) === null && reused !== true ? 'unreachable' : 'slow';
     case 'unreachable':
       return 'unreachable';
     case 'blocked':

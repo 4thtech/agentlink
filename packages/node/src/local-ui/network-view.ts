@@ -2,9 +2,9 @@
 // view source, behind `GET /api/ui/network` (api/network.ts) and the live `network` event.
 //
 // - Lazy and bounded, like network-health.ts: a probe of the agent's own and legacy servers (core
-//   `network.probe`, one fresh connection each, no login, 5 s bound) starts only when the view is
-//   read (Advanced › Message network is open and visible), at most once per NETWORK_PROBE_MS, never
-//   two at once. A read waits for a probe it started at most NETWORK_PROBE_WAIT_MS, then answers the
+//   `network.probe`, one fresh connection each or the pool's open one, no login, 5 s bound) starts
+//   only when the view is read (Advanced › Message network is open and visible), at most once per
+//   NETWORK_PROBE_MS, never two at once. A read waits for a probe it started at most NETWORK_PROBE_WAIT_MS, then answers the
 //   last result (or `checking`); the next read gets the new one. A paused agent is never probed.
 // - The servers, counters (relay_stats, written by whichever process runs the passes) and contact
 //   counts are read on every request; contacts' lists only for the expanded answer.

@@ -17,6 +17,11 @@ import type {
 export interface MockRelayConfig {
   /** Never completes the WebSocket upgrade (a black hole). */
   blackHole?: boolean;
+  /**
+   * NET-VIEW-0514-1: refuses a connection while this many to it are open already (a relay that
+   * limits connections from one address, as offchain.pub does: the extra one is refused at once).
+   */
+  maxConnections?: number;
   /** Accepts the connection but never answers an EVENT. */
   silent?: boolean;
   /** W6-SEND-LATENCY: stores the EVENT at once but answers OK only after this many ms (a slow relay). */
@@ -114,6 +119,14 @@ export class MockSocket implements RelaySocket {
     this.challenge = `challenge-${network.sockets.length}`;
     const config = this.config;
     if (config.blackHole === true) return;
+    if (
+      config.maxConnections !== undefined &&
+      network.sockets.filter((s) => s.target.url === target.url && !s.closed).length >=
+        config.maxConnections
+    ) {
+      this.dropFromRelay();
+      return;
+    }
     microtask(() => {
       if (this.closed) return;
       handlers.onOpen();

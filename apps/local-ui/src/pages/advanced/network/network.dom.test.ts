@@ -231,7 +231,12 @@ describe('Message network view: states', () => {
       answer({
         servers: [
           server(),
-          server({ host: 'nostr.bitcoiner.social', state: 'unreachable', connectMs: null }),
+          server({
+            host: 'nostr.bitcoiner.social',
+            state: 'unreachable',
+            connectMs: null,
+            lastOkAt: NOW - 3600,
+          }),
         ],
       }),
     );
@@ -508,5 +513,98 @@ describe('Message network view: contact-details update note', () => {
     await mount(answer());
     expect(text()).not.toContain(S.dropTitle);
     expect(parseNetwork(answer())?.updateWouldDrop).toBe(0);
+  });
+});
+
+// NET-VIEW-0514-1: the owner's 0.5.14 screen. The banner promised an automatic swap that does not
+// exist (a list changes only through an owner-signed contact-details update, 07 §4.3), counted only
+// own servers while three cards said "Can't reach", and the mode chip took the agent switcher's
+// global `.al-chip` look (a 44 px pill, cursor pointer) with uppercase mono text.
+describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-1)', () => {
+  const down = (h: string, over: Record<string, unknown> = {}): Record<string, unknown> =>
+    server({ host: h, state: 'unreachable', connectMs: null, roundTripMs: null, ...over });
+  const oldDown = (h: string): Record<string, unknown> =>
+    down(h, { kind: 'legacy', roles: ['read'], lastOkAt: null });
+
+  it('never claims an automatic swap, and says how sending works', async () => {
+    await mount(
+      answer({
+        servers: [server(), server({ host: 'relay.snort.social' }), down('offchain.pub')],
+      }),
+    );
+    const banner = host.querySelector('.al-banner') as HTMLElement;
+    expect(banner.textContent).toContain("One of your servers can't be reached.");
+    expect(banner.textContent).toContain('Messages still go through your other servers.');
+    expect(banner.textContent).toContain('A message counts as sent once 2 servers accept it.');
+    expect(JSON.stringify(S).toLowerCase()).not.toMatch(/swap|automatically/);
+    expect(lintVocabulary(banner.textContent ?? '')).toEqual([]);
+  });
+
+  it('counts own servers as "of your servers"; old read-only ones are named apart', async () => {
+    await mount(
+      answer({
+        servers: [
+          server(),
+          server({ host: 'relay.snort.social' }),
+          down('offchain.pub'),
+          oldDown('nos.lol'),
+          oldDown('nostr.mom'),
+        ],
+      }),
+    );
+    const banner = host.querySelector('.al-banner') as HTMLElement;
+    expect(banner.textContent).toContain("One of your servers can't be reached.");
+    expect(banner.textContent).toContain("2 old read-only servers can't be reached");
+    expect(banner.textContent).not.toContain('3 servers');
+  });
+
+  it('two own servers down out of three: says new messages may wait', async () => {
+    await mount(answer({ servers: [server(), down('offchain.pub'), down('relay.snort.social')] }));
+    const banner = host.querySelector('.al-banner') as HTMLElement;
+    expect(banner.textContent).toContain("2 of your servers can't be reached.");
+    expect(banner.textContent).toContain('may wait');
+    expect(banner.textContent).not.toContain('still go through');
+  });
+
+  it('own servers fine, old read-only ones down: no warning, a plain line that names them', async () => {
+    await mount(
+      answer({ servers: [server(), server({ host: 'offchain.pub' }), oldDown('nos.lol')] }),
+    );
+    expect(host.querySelector('.al-banner')).toBeNull();
+    expect(text()).not.toContain(S.allHealthy);
+    expect(text()).toContain("1 old read-only server can't be reached");
+    const old = host.querySelector('.nw-srv.is-old') as HTMLElement;
+    expect(old.textContent).toContain("Sending doesn't use it.");
+  });
+
+  it('a card never says "Can\'t reach" and "Last worked just now" without explaining both', async () => {
+    await mount(
+      answer({
+        servers: [
+          server(),
+          server({ host: 'relay.snort.social' }),
+          down('offchain.pub', { lastOkAt: NOW - 5 }),
+        ],
+      }),
+    );
+    const card = host.querySelector('[data-state="unreachable"]') as HTMLElement;
+    expect(card.textContent).toContain('worked');
+    expect(card.textContent).not.toContain(S.downNote);
+    expect(card.textContent).toContain('A new check couldn');
+  });
+
+  it('the mode is a small static status chip reading "Automatic", never a button', async () => {
+    await mount(answer());
+    const head = host.querySelector('.nw-head') as HTMLElement;
+    const chip = head.querySelector('.nw-mode') as HTMLElement;
+    expect(chip).not.toBeNull();
+    expect(chip.textContent).toBe('Automatic');
+    expect(chip.tagName).toBe('SPAN');
+    expect(chip.getAttribute('role')).toBeNull();
+    // Not the shell's `.al-chip` (the agent switcher's 44 px pill), not the uppercase mono label.
+    expect(chip.closest('.al-chip')).toBeNull();
+    expect(chip.querySelector('.al-chip, .al-text-label')).toBeNull();
+    expect(chip.className).not.toContain('al-text-label');
+    expect(head.querySelector('button, a, [tabindex]')).toBeNull();
   });
 });

@@ -30,6 +30,10 @@ export const NETWORK_STRINGS = {
   needsPayment: 'This server asks for payment.',
   slowNote: 'Slow right now. Messages still go through the others.',
   downNote: "Can't reach this server. Your messages use the others.",
+  /** NET-VIEW-0514-1: a fresh check failed, yet the server took messages minutes ago. */
+  downRecentNote:
+    "A new check couldn't connect, but this server worked recently. Some servers allow only a few connections from one computer.",
+  oldDownNote: "Can't reach this old server. Sending doesn't use it.",
   blockedNote: 'This network blocks this server. Your messages use the others.',
   // Banners.
   dropTitle: 'Your list has more than 8 servers.',
@@ -43,11 +47,17 @@ export const NETWORK_STRINGS = {
   oneSlow: 'Your messages still go out through the others, so nothing is wrong on your side.',
   someSlowTitle: (n: number): string => `${String(n)} servers are slow.`,
   someSlow: 'Your messages still go out through the others.',
-  oneDownTitle: "One server can't be reached.",
-  oneDown:
-    'Messages are still going through the other servers. If it keeps failing, AgentLink swaps it for another automatically.',
-  someDownTitle: (n: number): string => `${String(n)} servers can't be reached.`,
-  someDown: 'Messages are still going through the others.',
+  // NET-VIEW-0514-1: a server list changes only through a contact-details update (07 §4.3), never
+  // on its own; the count is of the ID's own servers, the old read-only ones are named apart.
+  oneDownTitle: "One of your servers can't be reached.",
+  someDownTitle: (n: number): string => `${String(n)} of your servers can't be reached.`,
+  stillSending:
+    'Messages still go through your other servers. A message counts as sent once 2 servers accept it.',
+  mayWait:
+    'A message counts as sent once 2 servers accept it, so new messages may wait until enough servers are back.',
+  ownHealthy: 'Your servers are working.',
+  oldDown: (n: number): string =>
+    `${String(n)} old read-only ${n === 1 ? 'server' : 'servers'} can't be reached. Sending doesn't use ${n === 1 ? 'it' : 'them'}.`,
   allDownTitle: "Can't reach the message network.",
   allDown:
     "Can't reach the message network from this computer. Messages wait and send when it's back. A school or office network may block it.",
