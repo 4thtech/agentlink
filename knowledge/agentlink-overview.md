@@ -54,7 +54,7 @@ Component-by-component detail: [status and roadmap](https://github.com/4thtech/a
 
 - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) and is chosen automatically once deployed (M1-3j-c).
 - **Mainnet:** After the external audit (M3). Not deployed.
-- **Coming next:** Coming next, not released yet: 0.5.15 (use your own message-network servers under Under the hood, with a Test button and a reset to automatic), then before mainnet an on-chain spending allowance and a signed Mac helper, proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
+- **Coming next:** Coming next, not released yet: 0.5.15 (use your own message-network servers under Under the hood: add, Test, a list of 2 to 8, owner approval, old servers readable 30 days, reset to automatic, an option to stay off the default servers, a compact live Message network view and `agentlink owner servers`), then before mainnet an on-chain spending allowance and a signed Mac helper, proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
 
 ### Latest releases
 
