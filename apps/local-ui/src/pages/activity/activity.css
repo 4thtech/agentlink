@@ -88,10 +88,6 @@
 .al-act-count:hover {
   background: var(--al-color-bg-raised);
 }
-.al-act-count[aria-pressed='true'] {
-  border-color: var(--al-color-accent-default);
-  box-shadow: 0 0 0 1px var(--al-color-accent-default);
-}
 .al-act-count:focus-visible {
   outline: 2px solid var(--al-color-accent-default);
   outline-offset: 2px;

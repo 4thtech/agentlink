@@ -22,10 +22,6 @@ body {
   color: var(--al-color-fg-default);
   font-family: var(--al-font-family-sans);
 }
-.wg :focus-visible {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
-}
 .wg-blk {
   box-sizing: border-box;
   min-inline-size: 0;
@@ -39,9 +35,6 @@ body {
 }
 .wg-blk p {
   margin: 0;
-}
-.wg-blk[data-attention='true'] {
-  border-inline-start: var(--al-space-2) solid var(--al-color-accent-default);
 }
 .wg-head {
   display: flex;
@@ -74,8 +67,7 @@ body {
   margin: 0;
   color: var(--al-color-fg-muted);
 }
-.muted,
-.al-muted {
+.muted {
   color: var(--al-color-fg-muted);
 }
 .subtle {
@@ -286,13 +278,6 @@ body {
   min-inline-size: 0;
   padding-block: var(--al-space-1);
 }
-.wg-contact-name {
-  flex: 1 1 auto;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .wg-when {
   flex: none;
   display: inline-flex;
@@ -310,14 +295,6 @@ body {
   background: var(--al-color-status-success-icon);
   border-color: var(--al-color-status-success-icon);
 }
-.wg-event-text {
-  flex: 1 1 auto;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Today */
 .wg-strip {
   inline-size: 100%;
@@ -390,15 +367,6 @@ body {
   flex: 1 1 0;
   min-inline-size: 0;
 }
-.al-sr-only {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .wg *,
   .wg *::before,

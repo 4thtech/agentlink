@@ -3,11 +3,6 @@
    progress, and is off under reduced motion (a static arrowhead and the word "now" show instead).
    Streams use the success colour and no orange. At 600 px and under there are no lines: each agent
    is a card, its contacts are 44 px rows, and the stream is a 2 px segment at the row's left edge. */
-.mp {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
 .mp h2,
 .mp p,
 .mp ul {

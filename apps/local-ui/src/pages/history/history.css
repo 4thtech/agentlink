@@ -16,17 +16,6 @@
 .hs-counts {
   font-weight: 600;
 }
-.hs-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-3);
-}
-.hs-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-1);
-  min-inline-size: 160px;
-}
 .hs-switch {
   display: flex;
   align-items: flex-start;
@@ -40,18 +29,6 @@
   font-size: 13px;
 }
 
-.hs-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-3);
-}
-.hs-select-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2);
-}
 .hs-pick {
   inline-size: 18px;
   block-size: 18px;

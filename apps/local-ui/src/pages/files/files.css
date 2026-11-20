@@ -29,23 +29,12 @@
   flex-direction: column;
   gap: var(--al-space-3);
 }
-.fl-row {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-4);
-}
 .fl-row-main {
   flex: 1 1 auto;
   min-inline-size: 0;
   display: flex;
   flex-direction: column;
   overflow-wrap: anywhere;
-}
-.fl-enter,
-.fl-confirm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
 }
 .fl-folder {
   display: flex;
@@ -67,17 +56,6 @@
 }
 .fl-warnings .al-check {
   align-items: flex-start;
-}
-.fl-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-3);
-}
-
-.fl-feed {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
 }
 .fl-item {
   display: flex;
@@ -209,11 +187,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--al-space-2);
-}
-.fl-chooser {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
 }
 .fl-chooser-btn {
   display: inline-flex;

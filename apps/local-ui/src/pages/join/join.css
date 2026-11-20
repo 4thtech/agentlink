@@ -40,14 +40,6 @@
 .jn-actions > * {
   min-block-size: 44px;
 }
-.jn-live {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 @media (max-width: 480px) {
   .jn-card {
     padding: var(--al-space-5);
@@ -62,11 +54,6 @@
    from the U0 kit classes (al-reveal, al-press); nothing here animates by itself. */
 .jn-friend {
   gap: var(--al-space-6);
-}
-.jn-who-row {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
 }
 .jn-letter {
   inline-size: 48px;
@@ -116,10 +103,6 @@
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-.jn-not-now:focus-visible {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
 }
 .jn-declined {
   padding: var(--al-space-3);

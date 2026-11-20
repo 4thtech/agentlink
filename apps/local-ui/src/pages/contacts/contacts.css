@@ -35,11 +35,6 @@
 .ct-row[aria-current='true'] {
   background: var(--al-color-bg-sunken);
 }
-.ct-detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-5);
-}
 .ct-detail p {
   margin: 0;
 }
@@ -68,20 +63,6 @@
 .ct-detail-head .inv-menu-wrap {
   flex: none;
 }
-.ct-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
-  align-items: center;
-}
-.ct-rename,
-.ct-confirm,
-.ct-presence,
-.ct-presence-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
-}
 .ct-presence {
   padding: var(--al-space-5);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
@@ -96,11 +77,6 @@
 .ct-dup .al-banner {
   border-color: var(--al-color-border-subtle);
   box-shadow: var(--al-shadow-3);
-}
-.ct-dup .al-banner-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
 }
 @media (prefers-reduced-motion: no-preference) {
   .ct-dup {
@@ -120,11 +96,6 @@
 
 /* "Waiting for {name}": the line breathes (opacity only) while the other agent has not answered.
    Still with reduced motion (the system setting or the app's own). */
-.ct-waiting {
-  display: flex;
-  gap: var(--al-space-3);
-  align-items: center;
-}
 @media (prefers-reduced-motion: no-preference) {
   .ct-waiting[data-motion='full'] {
     animation: ct-breathe var(--al-duration-ambient) var(--al-easing-standard) infinite alternate;
@@ -303,11 +274,6 @@
 }
 .ct-idrow .al-contact-side .al-btn {
   flex: none;
-}
-.ct-check,
-.ct-open {
-  text-transform: none;
-  letter-spacing: normal;
 }
 .ct-sum,
 .ct-group {

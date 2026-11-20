@@ -42,13 +42,13 @@
 .rl-summary-list {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--al-space-3) var(--al-space-7);
+  gap: var(--al-space-1) var(--al-space-5);
   margin: 0;
+  font-size: 13px;
 }
 .rl-summary-list > div {
   display: flex;
-  flex-direction: column;
-  gap: var(--al-space-1);
+  gap: var(--al-space-2);
 }
 .rl-summary-list dt {
   color: var(--al-color-fg-muted);
@@ -102,11 +102,6 @@
 .rl-fields > * {
   flex: 1 1 calc(var(--al-layout-max-content) / 4);
 }
-.rl-limits {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-5);
-}
 .rl-toggle {
   display: inline-flex;
   align-items: center;
@@ -117,11 +112,6 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-}
-.rl-toggle:focus-visible {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--al-radius-sm);
 }
 .rl-unsaved {
   margin-top: var(--al-space-6);
@@ -138,12 +128,6 @@
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-raised);
   box-shadow: var(--al-shadow-2);
-}
-.rl-unsaved-actions,
-.rl-confirm-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-3);
 }
 .rl-confirm-actions {
   justify-content: flex-end;
@@ -192,11 +176,6 @@
   color: inherit;
   background: transparent;
   border: 0;
-}
-.rl-row-title {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-2);
 }
 .rl-tag {
   padding: 1px var(--al-space-3);
@@ -249,12 +228,6 @@
 .rl-amt-input[aria-invalid='true'] {
   color: var(--al-color-status-danger-fg, var(--al-color-commitment-fg));
 }
-.rl-ask-over {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2);
-}
 /* Rules in force: a quiet one-line summary. */
 section.rl-summary {
   flex-direction: row;
@@ -274,14 +247,6 @@ section.rl-summary {
 }
 .rl-summary > p {
   display: none;
-}
-.rl-summary-list {
-  gap: var(--al-space-1) var(--al-space-5);
-  font-size: 13px;
-}
-.rl-summary-list > div {
-  flex-direction: row;
-  gap: var(--al-space-2);
 }
 .rl-summary-list dt::after {
   content: ':';

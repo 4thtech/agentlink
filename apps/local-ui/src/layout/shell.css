@@ -653,12 +653,6 @@
   font: inherit;
   resize: vertical;
 }
-.al-report-diag {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-2);
-}
-
 /* Cmd+K (kept from #715), with the prototype's hint column. */
 .al-goto-backdrop {
   position: fixed;
