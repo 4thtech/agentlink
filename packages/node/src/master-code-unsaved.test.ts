@@ -12,12 +12,21 @@
 // - Anything else is kept: an owner with Touch ID (the page then offers a new master code), an owner
 //   item that is not the restore's, a live run's marker.
 import { execFileSync } from 'node:child_process';
-import { readFile, readdir, rename, symlink, unlink, writeFile } from 'node:fs/promises';
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  symlink,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 import { encodeUtf8, randomBytes, type JsonValue } from '@4thtech-io/crypto';
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   UNSAVED_FILE,
   readUnsavedMarker,
@@ -29,6 +38,7 @@ import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
 import {
   FAST,
   MemoryKeychain,
+  type TestAgent,
   makeAgent,
   makeKit,
   makeOwner,
@@ -121,11 +131,44 @@ async function until(what: string, check: () => boolean | Promise<boolean>): Pro
   }
 }
 
+// The kits are the same input for every test (the restore only reads the kit file and writes into the
+// test's own keychain and HOME), so each is sealed once (an ID's store with its migrations, the
+// identity, the kit's key derivation) and copied into each test's Downloads.
+type SealedKit = Awaited<ReturnType<typeof makeKit>>;
+const shared = new Map<string, Promise<{ ids: TestAgent[]; kit: SealedKit }>>();
+let sharedRoot: Promise<Awaited<ReturnType<typeof tempRoot>>> | undefined;
+afterAll(async () => {
+  if (sharedRoot !== undefined) await (await sharedRoot).cleanup();
+});
+
+async function sealedKit(count: 1 | 2): Promise<{ ids: TestAgent[]; kit: SealedKit }> {
+  const key = String(count);
+  let made = shared.get(key);
+  if (made === undefined) {
+    sharedRoot ??= tempRoot('al-cf3-shared-');
+    const root = (await sharedRoot).root;
+    made = (async () => {
+      const owner = await makeOwner();
+      const ids: TestAgent[] = [];
+      for (const name of ['alpha', 'beta'].slice(0, count)) {
+        ids.push(await makeAgent(root, owner, name));
+      }
+      const kit = await makeKit(root, owner, ids, KIT, join(root, `kit-${key}`));
+      return { ids, kit };
+    })();
+    shared.set(key, made);
+  }
+  const { ids, kit } = await made;
+  const dir = join(t.home, 'Downloads');
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, KIT);
+  await copyFile(kit.path, path);
+  return { ids, kit: { ...kit, path } };
+}
+
 async function oneIdKit() {
-  const owner = await makeOwner();
-  const a1 = await makeAgent(t.root, owner, 'alpha');
-  const kit = await makeKit(t.root, owner, [a1], KIT, join(t.home, 'Downloads'));
-  return { owner, a1, kit };
+  const { ids, kit } = await sealedKit(1);
+  return { a1: ids[0] as TestAgent, kit };
 }
 
 /** The app closed while the Touch ID wrap was being written: the owner item is there, no passkey. */
@@ -301,11 +344,8 @@ class HoldingKeychain extends HangingKeychain {
 }
 
 async function twoIdKit() {
-  const owner = await makeOwner();
-  const a1 = await makeAgent(t.root, owner, 'alpha');
-  const a2 = await makeAgent(t.root, owner, 'beta');
-  const kit = await makeKit(t.root, owner, [a1, a2], KIT, join(t.home, 'Downloads'));
-  return { owner, a1, a2, kit };
+  const { ids, kit } = await sealedKit(2);
+  return { a1: ids[0] as TestAgent, a2: ids[1] as TestAgent, kit };
 }
 
 describe('R2-CLASS-02: the app closed right after "Restore 2 IDs"', () => {
