@@ -60,7 +60,7 @@ export function ReviewCard({
         {headline}
       </h3>
       {rows === undefined || rows.length === 0 ? null : (
-        <ul className="nw-list" data-review-servers>
+        <ul className="nw-list nw-scroll" tabIndex={0} aria-label={S.listLabel} data-review-servers>
           {rows.map((r) => (
             <li key={`${r.host}-${r.role}`} className="nw-srv">
               <div className="nw-srv-top">

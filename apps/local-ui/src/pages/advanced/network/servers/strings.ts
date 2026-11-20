@@ -37,6 +37,8 @@ export const SERVERS_STRINGS = {
   info: 'Public servers only, starting with wss://. Only add servers you run or trust. AgentLink never asks you to add a server.',
   testing: 'Testing…',
   testResults: 'Test results',
+  /** The scrolling list of servers in the panel (step 2 and the review). */
+  listLabel: 'Your servers',
   already: 'Already added.',
   full: 'That is the most servers you can add.',
   // Proposed: the test itself did not run.
@@ -91,7 +93,7 @@ export const SERVERS_STRINGS = {
   mixBack: 'Turn it back on',
   signInOkTitle: 'One server needs a sign-in to read',
   signInOk:
-    "That's okay while at least two other servers work (they do). We can't confirm delivery on this one.",
+    "That's fine as long as 2 other servers work, and they do. We can't confirm delivery on this one.",
   needMoreHint: 'Add at least one more server to continue',
   needTwoTitle: 'Two working servers are needed',
   needTwo:

@@ -585,7 +585,7 @@ D-158 (decided by Tali in chat, 19–20 Nov 2026: the C1–C8 wireframes are the
 | C3, list | "{n} of up to {max} added." · "Step 2 of 3" · role "Sends and receives" · **Remove** · **Review** |
 | C3, mix-in switch | "Also use AgentLink's automatic servers" · "We mix in two healthy ones, so your messages still arrive if yours go down." |
 | C3, mix-in off (warning) | "Only your servers will carry your messages" · "If all of yours are down, nothing gets through until one is back. Most people leave this on." · **Turn it back on** |
-| C3, needs sign-in allowed (warning) | "One server needs a sign-in to read" · "That's okay while at least two other servers work (they do). We can't confirm delivery on this one." |
+| C3, needs sign-in allowed (warning) | "One server needs a sign-in to read" · "That's fine as long as 2 other servers work, and they do. We can't confirm delivery on this one." |
 | C3, blocked: fewer than 2 ready | "Add at least one more server to continue" · "Two working servers are needed" · "One isn't enough: if it goes down, your messages stop. Add another, or go back to automatic." |
 | C3, opt-out switch (mix-in off only) | "Don't also announce on the default servers" · "For companies that run everything on their own servers." |
 | C3, opt-out on (warning) | "Only your servers will know this ID" · "Another computer can find it only with your owner link or a backup. Contacts still only on AgentLink's old servers may miss your new details." |
@@ -595,6 +595,7 @@ D-158 (decided by Tali in chat, 19–20 Nov 2026: the C1–C8 wireframes are the
 | C4, consequence: what servers see | "What servers can see" · "That you're online, and scrambled messages. Never what's inside them." |
 | C4, confirm | **Use these servers with {sensor}** / **Use these servers with your master code** · **Back** |
 | C5, system prompt reason | "Use {n} message servers" · "AgentLink wants to change which servers carry your messages." |
+| Message network, compact list (0.5.15) | Server row, one line: dot, host, state · time; it opens to roles, times, 24 h counts and bar, contacts, last worked. **Show all {n} servers** · **Show fewer servers** · "Old servers ({n}) · read only until {date}" · "{n} can't be reached" · diagram "+{n} more servers" / "+{n} more contacts". A slow, down or blocked server is always on top and never folded. |
 | C6, progress | "Servers changed" · "{time} · done" · "Telling your contacts… {sent} of {total}" · "The rest wait if they're offline and get it when they're back." · "Old servers readable until {date}" · per contact "Sent" / "Waiting" |
 | C7, done | "Done" · "All {n} contacts have your new details" · "Your messages now use your {n} servers. Old ones stay readable until {date}." · "Back to automatic any time" · toast "Servers updated" · "Your contacts have your new details." |
 | C7b, paused | "Paused · Resume to change servers" · "Your ID is paused. Resume it with {sensor} first." |

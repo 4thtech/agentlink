@@ -108,7 +108,19 @@ async function mount(
 }
 const text = (): string => host.textContent ?? '';
 const states = (): string[] =>
-  [...host.querySelectorAll('.nw-srv')].map((li) => li.getAttribute('data-state') ?? '');
+  [...host.querySelectorAll('.nw-srv[data-state]')].map(
+    (li) => li.getAttribute('data-state') ?? '',
+  );
+/** Opens every folded group and every server row (twice: an old group's rows appear after it opens). */
+async function openAll(): Promise<void> {
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const b of host.querySelectorAll<HTMLButtonElement>(
+      '.nw-srv-btn[aria-expanded="false"]',
+    )) {
+      await act(async () => b.click());
+    }
+  }
+}
 
 describe('parseNetwork', () => {
   it('reads the pinned answer and nothing else', () => {
@@ -170,8 +182,14 @@ describe('Message network view: states', () => {
     await mount(answer());
     expect(text()).toContain(S.allHealthy);
     expect(host.querySelector('.al-banner')).toBeNull();
+    // Collapsed: the old server is folded away; each row is one line with the state and the time.
+    expect(states()).toEqual(['ready', 'ready', 'ready']);
+    const line = host.querySelector('.nw-srv[data-state] .nw-srv-btn') as HTMLElement;
+    expect(line.textContent).toBe(`relay.primal.net${S.health.ready} · 48 ms`);
+    expect(host.querySelector('.nw-more')).toBeNull();
+    await openAll();
     expect(states()).toEqual(['ready', 'ready', 'ready', 'unknown']);
-    const first = host.querySelector('.nw-srv') as HTMLElement;
+    const first = host.querySelector('.nw-srv[data-state]') as HTMLElement;
     expect(first.textContent).toContain('relay.primal.net');
     expect(first.textContent).toContain(S.health.ready);
     expect(first.textContent).toContain(S.sendsAndReads);
@@ -185,7 +203,8 @@ describe('Message network view: states', () => {
 
   it('a full-name title on the host, the diagram slot and unknown as a hollow dot', async () => {
     await mount(answer());
-    const first = host.querySelector('.nw-srv') as HTMLElement;
+    await openAll();
+    const first = host.querySelector('.nw-srv[data-state]') as HTMLElement;
     expect(first.querySelector('.nw-host')?.getAttribute('title')).toBe('relay.primal.net');
     expect(host.querySelector('[data-slot="network-diagram"]')).not.toBeNull();
     expect(host.querySelector('[data-state="unknown"] .nw-dot')?.className).toContain(
@@ -198,7 +217,8 @@ describe('Message network view: states', () => {
 
   it('an old server is read only until a date, with no counts yet and not heard from', async () => {
     await mount(answer());
-    const old = host.querySelector('.nw-srv.is-old') as HTMLElement;
+    await openAll();
+    const old = host.querySelector('.nw-srv.is-old[data-state]') as HTMLElement;
     expect(old.textContent).toContain('nos.lol');
     expect(old.textContent).toContain('Old server, read only until');
     expect(old.textContent).toContain(S.health.unknown);
@@ -215,6 +235,7 @@ describe('Message network view: states', () => {
         ],
       }),
     );
+    await openAll();
     const banner = host.querySelector('.al-banner') as HTMLElement;
     expect(banner.className).toContain('al-tone-warning');
     expect(banner.textContent).toContain(S.oneSlowTitle);
@@ -240,6 +261,7 @@ describe('Message network view: states', () => {
         ],
       }),
     );
+    await openAll();
     const banner = host.querySelector('.al-banner') as HTMLElement;
     expect(banner.className).toContain('al-tone-warning');
     expect(banner.className).not.toContain('al-tone-danger');
@@ -283,6 +305,7 @@ describe('Message network view: states', () => {
         ],
       }),
     );
+    await openAll();
     expect(text()).toContain(S.needsSignIn);
     expect(text()).toContain(S.needsPayment);
   });
@@ -293,7 +316,7 @@ describe('Message network view: states', () => {
     expect(banner.textContent).toContain(S.offlineTitle);
     expect(banner.textContent).toContain('Nothing is lost');
     expect(banner.textContent).toContain('Showing what we knew at');
-    expect(host.querySelectorAll('.nw-srv')).toHaveLength(4);
+    expect(host.querySelectorAll('.nw-srv[data-state]')).toHaveLength(3);
   });
 
   it('not running, paused and needs setup', async () => {
@@ -375,7 +398,10 @@ describe('Message network view: contacts', () => {
     expect(text()).not.toContain(REF);
     expect(host.querySelector('.nw-contacts a')).toBeNull();
     // Each card now says how many contacts use that server too (derived from the expanded answer).
-    const cards = [...host.querySelectorAll('.nw-srv')].map((li) => li.textContent ?? '');
+    await openAll();
+    const cards = [...host.querySelectorAll('.nw-srv[data-state]')].map(
+      (li) => li.textContent ?? '',
+    );
     expect(cards[0]).toContain(S.usedBy(1));
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(toggle.textContent).toContain(S.hideContacts);
@@ -448,7 +474,7 @@ describe('Message network view: contacts', () => {
   it('no contacts: no expand, a plain line', async () => {
     await mount(answer({ contacts: { total: 0, sharing: 0 } }));
     expect(text()).toContain(S.noContacts);
-    expect(host.querySelector('button')).toBeNull();
+    expect(host.querySelector('.nw-reach button')).toBeNull();
   });
 });
 
@@ -573,7 +599,10 @@ describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-
     expect(host.querySelector('.al-banner')).toBeNull();
     expect(text()).not.toContain(S.allHealthy);
     expect(text()).toContain("1 old read-only server can't be reached");
-    const old = host.querySelector('.nw-srv.is-old') as HTMLElement;
+    // Folded, but the group line still says that one can't be reached.
+    expect(host.querySelector('.nw-srv.is-old')?.textContent).toContain(S.oldGroupDown(1));
+    await openAll();
+    const old = host.querySelector('.nw-srv.is-old[data-state]') as HTMLElement;
     expect(old.textContent).toContain("Sending doesn't use it.");
   });
 
@@ -587,6 +616,7 @@ describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-
         ],
       }),
     );
+    await openAll();
     const card = host.querySelector('[data-state="unreachable"]') as HTMLElement;
     expect(card.textContent).toContain('worked');
     expect(card.textContent).not.toContain(S.downNote);
@@ -606,5 +636,101 @@ describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-
     expect(chip.querySelector('.al-chip, .al-text-label')).toBeNull();
     expect(chip.className).not.toContain('al-text-label');
     expect(head.querySelector('button, a, [tabindex]')).toBeNull();
+  });
+});
+
+describe('Message network view: compact rows (NET-COMPACT, NET-BAR24)', () => {
+  const many = (n: number, over: (i: number) => Record<string, unknown> = () => ({})): unknown[] =>
+    Array.from({ length: n }, (_, i) => server({ host: `s${String(i)}.example.org`, ...over(i) }));
+  const rowsShown = (): string[] =>
+    [...host.querySelectorAll('.nw-srv[data-state] .nw-host')].map((e) => e.textContent ?? '');
+  const buttonFor = (hostName: string): HTMLButtonElement =>
+    [...host.querySelectorAll<HTMLButtonElement>('.nw-srv-btn')].find((b) =>
+      b.textContent?.includes(hostName),
+    ) as HTMLButtonElement;
+
+  it('a row is one line; the button opens and closes its details (aria-expanded, aria-controls)', async () => {
+    await mount(answer());
+    const b = buttonFor('relay.primal.net');
+    expect(b.tagName).toBe('BUTTON');
+    expect(b.type).toBe('button');
+    expect(b.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('.nw-more')).toBeNull();
+    await act(async () => b.click());
+    expect(b.getAttribute('aria-expanded')).toBe('true');
+    const more = host.querySelector(`[id="${b.getAttribute('aria-controls') ?? ''}"]`);
+    expect(more?.textContent).toContain(S.counts(3, 1, 7));
+    expect(more?.textContent).toContain(S.lastOk('1 min ago'));
+    await act(async () => b.click());
+    expect(b.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('.nw-more')).toBeNull();
+  });
+
+  it('your own servers: the first 5, then "Show all N servers", then "Show fewer servers"', async () => {
+    await mount(answer({ servers: many(12) }));
+    expect(rowsShown()).toHaveLength(5);
+    const all = [...host.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes(S.showAllServers(12)),
+    ) as HTMLButtonElement;
+    expect(all.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => all.click());
+    expect(rowsShown()).toHaveLength(12);
+    expect(all.textContent).toBe(S.showFewerServers);
+    await act(async () => all.click());
+    expect(rowsShown()).toHaveLength(5);
+  });
+
+  it('five or fewer servers: no "Show all"', async () => {
+    await mount(answer({ servers: many(5) }));
+    expect(text()).not.toContain('Show all');
+  });
+
+  it('problems are always first and never behind "Show all"', async () => {
+    const list = many(12, (i) =>
+      i === 9 ? { state: 'slow' } : i === 11 ? { state: 'unreachable' } : {},
+    );
+    await mount(answer({ servers: list }));
+    const shown = rowsShown();
+    expect(shown.slice(0, 2).sort()).toEqual(['s11.example.org', 's9.example.org']);
+    expect(shown).toHaveLength(5);
+    // More than five problems: every one of them is shown, and the fold holds only healthy servers.
+    await mount(answer({ servers: many(12, (i) => (i < 7 ? { state: 'blocked' } : {})) }));
+    expect(rowsShown()).toHaveLength(7);
+    expect(host.querySelectorAll('.nw-srv[data-state="blocked"]')).toHaveLength(7);
+    expect(text()).toContain(S.showAllServers(12));
+  });
+
+  it('old read-only servers sit in their own group, closed by default, with the date', async () => {
+    const olds = Array.from({ length: 3 }, (_, i) => ({
+      ...legacy(),
+      host: `old${String(i)}.example.org`,
+    }));
+    await mount(answer({ servers: [...many(2), ...olds] }));
+    expect(rowsShown()).toHaveLength(2);
+    const group = [...host.querySelectorAll<HTMLButtonElement>('.nw-srv-btn')].find((b) =>
+      b.textContent?.includes('Old servers (3)'),
+    ) as HTMLButtonElement;
+    expect(group.textContent).toContain('read only until');
+    expect(group.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => group.click());
+    expect(group.getAttribute('aria-expanded')).toBe('true');
+    expect(rowsShown()).toHaveLength(5);
+    expect(host.querySelectorAll('.nw-srv.is-old[data-state]')).toHaveLength(3);
+  });
+
+  it('draws the 24 h bar from the counts, with no inline style anywhere', async () => {
+    await mount(answer({ servers: [server({ publishedOk: 9, publishedFailed: 1 })] }));
+    expect(host.querySelector('[data-bar24]')).toBeNull();
+    await act(async () => buttonFor('relay.primal.net').click());
+    const rects = host.querySelectorAll('[data-bar24] rect');
+    expect(rects).toHaveLength(2);
+    expect(rects[0]?.getAttribute('width')).toBe('90');
+    expect(rects[1]?.getAttribute('width')).toBe('10');
+    expect(host.querySelector('[data-bar24]')?.getAttribute('aria-hidden')).toBe('true');
+    expect(host.querySelector('[style]')).toBeNull();
+    // Nothing counted: no bar.
+    await mount(answer({ servers: [server({ publishedOk: 0, publishedFailed: 0, received: 0 })] }));
+    await act(async () => buttonFor('relay.primal.net').click());
+    expect(host.querySelector('[data-bar24]')).toBeNull();
   });
 });
