@@ -61,6 +61,8 @@ let refuseAll = false;
 interface Agent extends TestAgent {
   /** The relays of every publish, in order. */
   readonly published: string[][];
+  /** IR F2: each publish with its gift wrap's recipient (the `p` tag). */
+  readonly sentTo: { readonly to: string; readonly relays: string[] }[];
   /** NET-ANNOUNCE-OPTOUT "fully quiet": the relays of every fetch, subscription and probe. */
   readonly reads: string[][];
   readonly live: string[][];
@@ -122,14 +124,16 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
   const cipher = new TestStoreCipher();
   const keyStore: KeyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const published: string[][] = [];
+  const sentTo: { to: string; relays: string[] }[] = [];
   const reads: string[][] = [];
   const live: string[][] = [];
   const probed: string[][] = [];
   const factory: TransportFactory = (deps) => ({
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
-    publish: (_event, to) => {
+    publish: (event, to) => {
       published.push([...to]);
+      sentTo.push({ to: event.tags.find((t) => t[0] === 'p')?.[1] ?? '', relays: [...to] });
       return Promise.resolve(
         refuseAll
           ? ({
@@ -200,6 +204,7 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
     owner: owner as unknown as TestOwner,
     id: client.agentId,
     published,
+    sentTo,
     reads,
     live,
     probed,
@@ -731,5 +736,60 @@ describe('IR F1: the publish sink filters every row kind with the opt-out on', (
     const sent = x.published.flat();
     expect(sent.some((r) => DEFAULT_RELAYS.slice(0, 2).includes(r))).toBe(true);
     expect(offLimits(sent).filter((r) => !DEFAULT_RELAYS.slice(0, 2).includes(r))).toEqual([]);
+  });
+});
+
+describe('IR F2: the contact exception is per recipient, never for the own copies', () => {
+  it("a contact's default servers carry only the rows to that contact; the own copies never", async () => {
+    // The own copies were built while the own list was the default set (the contact's servers
+    // among them); then the owner moves to its own servers with the opt-out.
+    const x = await agent(131, DEFAULT_RELAYS.slice(0, 3));
+    const c = await agent(132, DEFAULT_RELAYS.slice(0, 2));
+    await pairWith(clock, x, c);
+    refuseAll = true;
+    await x.client.sendMessage({ to: c.id, text: 'per recipient' });
+    clock.t += 60;
+    await change(x, OWN, false);
+    expect(await x.client.identity.announceDefault()).toBe(false);
+    refuseAll = false;
+    x.sentTo.length = 0;
+    clock.t += 3_600;
+    await x.client.outbox.processDue();
+    const card = (await x.client.identity.signedCard()).card;
+    const own = new Set([card.ownerNostr.slice(2), card.agentNostr.slice(2)]);
+    const theirCard = (await c.client.identity.signedCard()).card;
+    const theirs = new Set([theirCard.ownerNostr.slice(2), theirCard.agentNostr.slice(2)]);
+    expect(x.sentTo.some((s) => own.has(s.to))).toBe(true);
+    for (const s of x.sentTo.filter((s) => own.has(s.to))) expect(offLimits(s.relays)).toEqual([]);
+    expect(x.sentTo.some((s) => theirs.has(s.to) && s.relays.some((r) => OFF_LIMITS.has(r)))).toBe(
+      true,
+    );
+  });
+
+  it('the clean-up keeps a contact default server only on that contact rows', async () => {
+    const x = await agent(133, DEFAULT_RELAYS.slice(0, 3));
+    const c = await agent(134, DEFAULT_RELAYS.slice(0, 2));
+    await pairWith(clock, x, c);
+    refuseAll = true;
+    await x.client.sendMessage({ to: c.id, text: 'pending' });
+    clock.t += 60;
+    // A card-update built for the default list, then the move to its own servers with the opt-out.
+    await change(x, DEFAULT_RELAYS.slice(1, 4));
+    await x.client.sendCardUpdates();
+    clock.t += 60;
+    await change(x, OWN, false);
+    await x.client.cardUpdates.withdrawFromDefaultServers();
+    const rows = await x.store.transaction((tx) => tx.select('outbox', { state: 'pending' }));
+    const card = (await x.client.identity.signedCard()).card;
+    const own = new Set([card.ownerNostr.slice(2), card.agentNostr.slice(2)]);
+    for (const row of rows.filter((r) => own.has(r.recipient_key))) {
+      const relays = JSON.parse(
+        await x.cipher.open(
+          { table: 'outbox', column: 'relays', rowKey: rowKeyOf([row.wrap_id]) },
+          row.relays,
+        ),
+      ) as string[];
+      expect(offLimits(relays)).toEqual([]);
+    }
   });
 });
