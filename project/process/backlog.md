@@ -11645,5 +11645,6 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 
 #### WIN-MASTERCODE-TEST-SLOW · Master-code tests with room on the Windows runner (0.5.15)
 - **Status:** backlog (0.5.15 lane 12) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** `project/process/ci-cd.md`
-- **Goal:** three master-code tests run close to their time limit on the Windows runner; make them at least 3 times faster than the limit without raising any timeout.
-- **Done when:** the Windows job passes them with at least a 3× margin; no timeout raised, no test skipped.
+- **Repo/path:** agentlink · `packages/node/src/master-code-unsaved.test.ts`, `recovery-kit-restore.hardening.test.ts`, `local-ui/restore-server.test.ts`
+- **Goal:** on the Windows node-os job, master-code-unsaved.test.ts usually takes 40 to 58 s in total, with single tests at 2.4 to 6 s (main and 0.5.14 runs). In one 0.5.14 run, on a commit that changed only migration tests, the same tests took 12.7, 15.5, 19.4 and 21.1 s, and R2-CLASS-02 "the page went away before the answer" went past its 20 s timeout. In that run the hardening file went from 28 to 59 s and restore-server from 9 to 23 s. The slowdown came from runner load, not a code change, but these tests have too little margin.
+- **Done when:** the cost per test is measured and reduced (for example fewer key derivations or store opens per test, or shared setup), with no timeout raised and no test skipped; the Windows job runs these files with at least 3× margin.
