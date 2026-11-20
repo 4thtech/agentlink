@@ -62,12 +62,6 @@
   fill: var(--al-color-fg-default);
 }
 
-.act-sort {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-}
-
 /* Narrow: the pulse stays on the right; the word drops to its own line under the name. */
 @media (max-width: 479px) {
   .ct-row {

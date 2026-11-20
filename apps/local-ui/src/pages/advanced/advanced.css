@@ -6,19 +6,9 @@
   max-inline-size: 960px;
   margin-inline: auto;
 }
-.ad-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
-}
 .ad-head h1,
 .ad-head p {
   margin: 0;
-}
-.ad-eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--al-color-fg-subtle);
 }
 .ad-list,
 .nw-list,

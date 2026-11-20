@@ -38,11 +38,6 @@
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-surface);
 }
-.ap-card-head {
-  display: flex;
-  gap: var(--al-space-3);
-  align-items: center;
-}
 .ap-mark {
   display: inline-flex;
   align-items: center;
@@ -83,18 +78,7 @@
   text-decoration: underline;
   cursor: pointer;
 }
-.ap-sheet-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
-}
 .ap-sheet-body p {
-  margin: 0;
-}
-.ap-facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--al-space-2) var(--al-space-4);
   margin: 0;
 }
 .ap-facts dt {
