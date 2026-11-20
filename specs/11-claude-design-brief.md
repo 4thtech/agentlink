@@ -560,6 +560,62 @@ Proposed, owner confirms at merge. RESTORE-TRACES, DEVICES-INTERIM and RELAY-CAR
 - The other-computer notice never names the other computer, a time of its use or an install id.
 - Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
+### 5.14 Use your own servers (0.5.15)
+
+D-158 (decided by Tali in chat, 19–20 Nov 2026: the C1–C8 wireframes are the design, the diagram label, the test outcomes, the overlap and the opt-out); strings proposed, owner confirms at merge. NET-UI-B, NET-CLI, NET-BAR24. Under the hood and Advanced only; nothing here appears on Home or in a default screen.
+
+| Where | String |
+|---|---|
+| C1, entry (Message network footer card) | "Want to use servers you run or trust?" · "Most people never need this. AgentLink picks servers for you." · **Use your own servers** |
+| C1, current mode | "Your servers are automatic ({n})" · in custom mode the chip reads "Your servers" and **Use AgentLink's automatic servers** is active |
+| C2, add | "Your servers" · "Add 2 to 8 servers. We test each one here, on this computer, before you can use it." · "Step 1 of 3" · field "Server address" (placeholder "wss://") · **Add** |
+| C2, info line (always shown) | "Public servers only, starting with wss://. Only add servers you run or trust. AgentLink never asks you to add a server." |
+| C2, testing | "Testing…" |
+| Outcome: ready | "Ready · {ms} ms" · "Accepts and returns messages. Works." |
+| Outcome: slow | "Ready · slow {s} s" · "Works, but answers slowly. Messages may arrive a little later." |
+| Outcome: needs sign-in | "Needs sign-in to read" · "It accepts messages but asks for a sign-in before it lets anyone read them. AgentLink can't sign in there, so we can't confirm your messages arrive." |
+| Refused: not accepted | "Doesn't accept messages" · "It refused a test message from someone it doesn't know. Servers like this only take messages from approved people." |
+| Refused: not kept | "Didn't keep the test message" · "It said yes to the test message but couldn't give it back a moment later." |
+| Refused: unreachable | "Can't reach" · "No answer. Check the address, or whether the server is running." |
+| Refused: not allowed | "Not allowed" · "Only public internet servers (wss://) can be used. Addresses inside a home or office network are blocked for your safety." |
+| Refused: too small | "Messages too large for it" · "It only takes messages smaller than AgentLink's. Try another server." |
+| Refused: invalid | "Not a server address" · "Check the address. It starts with wss://." |
+| Paid server (warning) | "This server may charge for use. Check with whoever runs it." |
+| Retention note | "Servers should keep messages for at least 7 days." |
+| C3, list | "{n} of up to {max} added." · "Step 2 of 3" · role "Sends and receives" · **Remove** · **Review** |
+| C3, mix-in switch | "Also use AgentLink's automatic servers" · "We mix in two healthy ones, so your messages still arrive if yours go down." |
+| C3, mix-in off (warning) | "Only your servers will carry your messages" · "If all of yours are down, nothing gets through until one is back. Most people leave this on." · **Turn it back on** |
+| C3, needs sign-in allowed (warning) | "One server needs a sign-in to read" · "That's okay while at least two other servers work (they do). We can't confirm delivery on this one." |
+| C3, blocked: fewer than 2 ready | "Add at least one more server to continue" · "Two working servers are needed" · "One isn't enough: if it goes down, your messages stop. Add another, or go back to automatic." |
+| C3, opt-out switch (mix-in off only) | "Don't also announce on the default servers" · "For companies that run everything on their own servers." |
+| C3, opt-out on (warning) | "Only your servers will know this ID" · "Another computer can find it only with your owner link or a backup. Contacts still only on AgentLink's old servers may miss your new details." |
+| C4, review | "Review" · "Nothing changes until you approve." · "Step 3 of 3" · kind "Needs your approval" · title "Use these {n} message servers" · roles "Yours · {ms} ms" / "Automatic mix-in" |
+| C4, consequence: leaving servers | "Your old servers stay readable for 30 days" · "Until {date}, nothing sent to your old servers is missed: {hosts}." |
+| C4, consequence: contacts | "Your contacts get your new details once" · "AgentLink sends the update to all {n} for you." |
+| C4, consequence: what servers see | "What servers can see" · "That you're online, and scrambled messages. Never what's inside them." |
+| C4, confirm | **Use these servers with {sensor}** / **Use these servers with your master code** · **Back** |
+| C5, system prompt reason | "Use {n} message servers" · "AgentLink wants to change which servers carry your messages." |
+| C6, progress | "Servers changed" · "{time} · done" · "Telling your contacts… {sent} of {total}" · "The rest wait if they're offline and get it when they're back." · "Old servers readable until {date}" · per contact "Sent" / "Waiting" |
+| C7, done | "Done" · "All {n} contacts have your new details" · "Your messages now use your {n} servers. Old ones stay readable until {date}." · "Back to automatic any time" · toast "Servers updated" · "Your contacts have your new details." |
+| C7b, paused | "Paused · Resume to change servers" · "Your ID is paused. Resume it with {sensor} first." |
+| C7b, a change still finishing | "An earlier change of this ID is still finishing. Try again in a minute." |
+| C7b, recent change (info) | "You changed servers on {date}" · "Servers you left stay readable until {date}. You can change again or go back to automatic at any time." |
+| Refused: too many old servers | "Too many old servers are still being read" · "You can change again from {date}, or go back to automatic now." |
+| Refused: same list | "These are already your servers." |
+| Refused: changed since the test | "A server answered differently this time. Test again before you continue." |
+| C8, reset | "Use AgentLink's automatic servers?" · "Go back to the default. Takes one approval." · "AgentLink picks the servers for you again." · "Your own list is forgotten here." · "Your contacts get your new details once" · "Your custom servers stay readable for 30 days, until {date}." · **Use automatic servers with {sensor}** · **Keep my servers** |
+| Diagram, this computer | "{name} · this computer" |
+| Server row, previous | "Previous, read until {date}" |
+| Server row, 24 h bar (accessible text) | "Last 24 hours: {accepted} of {total} accepted" |
+| Terminal, `agentlink owner servers` † | "OK       Servers changed. Your contacts get your new details." · "Old servers stay readable until {date}." · "OK       Back to automatic servers." · "Problem  That didn't go through. Your servers didn't change." · "Problem  Run this yourself in a terminal. AgentLink never asks you to add a server." |
+
+**Rules.**
+- Say "server", "message network" and "sign-in", never "relay", "Nostr", "NIP", "AUTH" or "kind 1059" (§5.1). `--json` keys may say relay.
+- Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
+- A reason is always one of the fixed strings above, never text a server sent.
+- Never claim the app swaps servers on its own (D-158 (9)), and never say a change must wait: there is no wait between changes (D-158 (5)).
+- "AgentLink never asks you to add a server" appears on C2 and in every terminal refusal about adding servers, and no tool result, notification or message ever suggests a server.
+
 ## 6. Surfaces and information architecture
 
 ### 6.0 Surface map

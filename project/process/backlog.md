@@ -3081,28 +3081,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** `client.inbox.page(query)`, the core read behind the `agentlink_inbox` port (`inboxPage` in `apps/cli/src/tools/context.ts`, M1-9p): received messages from contacts that are not removed, accepted requests (D-72: `from: null` and the 04 §2.9 sender code, never a name) and, with `includeSent`, our own sent messages; per contact or across all; `limit` 1 to 100, `before`, `since`, `includeRead`, and the caller's byte bound (`sizeOf`, `maxBytes`). Order by (`createdAt`, envelopeId bytes); the newest matching items, listed oldest first. The returned unread inbound items are marked read in the transaction that commits the page; a page that changed since it was selected is read again, so concurrent reads never both return an item as unread. Sender-chosen values stay data for the CLI to wrap; no file URL, file key or inline bytes in any item; logs carry counts only. `dropOrigins` client option classifies file storage as `drop` or `own`.
 - **Acceptance:** tests first (RED commit): paging bounds and stable order across equal times; `before` and `since` at their edges; an unknown `before` reads and marks nothing; read marks only on returned items, none when the page fails; two concurrent reads never double-return; accepted requests without a sender name; sent items only on request; refused rows, queued requests, unprocessed rows and protocol types never appear.
 
-#### M1-7j · core: relay changes and the owner card-update (G-24) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (D-73 (5): it serves the owner surfaces and `relays set`, M1-9n; neither J8 nor J9 needs it)
-- **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7a, M1-7h, M1-5b; gap G-24 resolved (D-65)
-- **Spec:** 07 §3 (relay columns), §4.3; 04 §2.6, §3.4.1 (owner `card-update`); D-39, D-40
-- **Invariants:** I-4, I-9
+#### M1-7j · core: leaving servers stay readable, and the owner card-update (G-24; refreshed for 0.5.15, D-158)
+- **Status:** backlog (0.5.15 lane 3) · **Size:** M–L · **Tier:** Opus · **Security:** S2 (independent security review) · **Phase:** 0.5.15
+- **Repo/path:** agentlink · packages/core (identity rotate, `sync.ts`, `card-update.ts`, schema)
+- **Depends on:** STORE-CREATE-ONE-TX (before the schema step); D-158
+- **Spec:** 07 §3 (relay columns: `prev_relays`, `announce_default`), §4.3 "Leaving servers stay readable for 30 days", owner `card-update`, Counts; 04 §2.6; D-158 (5)
+- **Invariants:** I-4, I-7, I-9
 - **Scope:**
-  - Reconcile with M1-7a (PR #48): there, `identity.rotate` keeps the relay list fixed, the own list is checked with `checkRelays` (1–16), and the schema has no `prev_relays`. Target values: an own list of 2 to 8 relays (3 to 5 by default) when a card is built; `identity.relays`, `prev_relays` and `prev_relays_until` (07 §3).
-  - `identity.rotate({relays})`: a relay change is a rotation with owner presence, Advanced only. It is refused while an overlap runs (`prev_relays_until` > `now`); a rotation with the same list is always allowed. Entry points: CLI `relays set` (M1-9n) and the console (M2-2e).
-  - 30-day overlap: sync, subscribe and own-list publishing on the old list as well; pruning clears `prev_relays` after the end.
-  - Owner `card-update` on the owner channel at `init` and on every new card, even with no contacts; published to the old list, the new list and the release default set; re-published as a new wrap of the same stored envelope every 24 h during an overlap and every 7 days otherwise. Never creatable through an MCP tool (I-4).
-  - An unreadable `identity.relays` is named in the activity feed and in `doctor`.
-  - A same-list rotation leaves `prev_relays` and `prev_relays_until` unchanged (07 §3).
-  - Per-agent Advanced opt-out "don't announce this agent on the default relays" (07 §4.3, Privacy): the owner `card-update` then goes only to the agent's own lists.
-  - Owner surfaces (M2-2d) and the agent's own sync: the first sync on a relay with no cursor uses `since = now − 777 600` (9 days).
-- **Acceptance:**
-  - A card with 1 or 9 own relays is refused; 2 and 8 are built.
-  - A second relay change within 30 days is refused (fake clock); a same-list rotation in that window succeeds; after 30 days the change succeeds and the oldest list is gone.
-  - A contact that publishes to the old list during the overlap is read; an agent with no contacts still sends the owner `card-update`, and its re-publish is found by a surface with a 48 h look-back.
-  - No MCP tool can produce an owner-channel `card-update` (tool-surface test).
-  - A relay change, then a same-list rotation on day 10: contacts' envelopes still published to the first list are read until day 30 (fake clock).
-  - A surface with no cursor finds a re-publish made 6 days ago with a `created_at` back-dated by 2 days (9-day first look-back); with the opt-out set, nothing is published to the default set.
+  - `identity.prev_relays`: each change (list change, reset, "Update your contact details") moves every leaving server in with its own end (change time + 30 days); a server back in the list leaves it; ended entries pruned; at most 16, a change that needs more refused (`too_many_previous`) with the date it fits. No wait between changes; a same-list rotation (rename) leaves it unchanged.
+  - Catch-up and the live subscription read own ∪ prev ∪ legacy; login allowed on prev servers; publish there only the owner `card-update` and card-updates to contacts not yet confirmed.
+  - Owner `card-update` to the new list, prev and the default set (not the default set with `announce_default` false); re-published every 24 h while any prev entry runs, else every 7 days.
+  - `announce_default` column (default true) for NET-ANNOUNCE-OPTOUT; a recovery kit and restore keep both columns.
+- **Acceptance:** `RED (expected): M1-7j …` commit first. Fake clock: a contact on the old card publishes to the old list on day 29 → received; day 31 → that server no longer read. Three changes in 30 days all succeed, each leaving server with its own end; a change needing a 17th prev entry is refused with the right date. 1 or 9 own servers refused. No MCP tool can produce an owner-channel `card-update` (tool-surface test).
 
 #### M1-7k · core: send pipeline, Transport adapter and outbox persistence (new, D-73 (2))
 - **Status:** done (4thtech/agentlink#99, merged 2026-10-15; follow-ups in M1-7k-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3517,7 +3507,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L3: recovering from a fail-closed policy (G-6: `mark_mismatch`, `rolled_back`, `tampered`). `policy` refuses while the policy fails closed and never rebuilds it from the defaults; give the owner a deliberate recovery path (show the problem, then sign a complete policy above the mark after an explicit confirmation), with `doctor` naming it. Decided (D-100): `agentlink policy recover` † shows only the failure kind; when the stored policy parses and its signature verifies (`rolled_back`, `mark_mismatch`) the owner reviews it in full, otherwise the 06 §3 defaults in full; explicit `y` plus owner presence; it signs a complete policy at version mark + 1, amended by D-103 to max(mark, stored) + 1.
 
 #### M1-9n · CLI: `relays set` (†) (new, split from M1-9b, D-73 (5))
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** superseded by NET-CLI (`agentlink owner servers`, D-158) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/relays.ts`)
 - **Depends on:** M1-9b, M1-7j
 - **Spec:** 06 §8 (†); 07 §3, §4.3; 04 §2.6; G-24 (resolved, D-65)
@@ -11580,3 +11570,72 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Repo/path:** agentlink · `packages/node/src/sqlite-store.ts` (`#migrate`); tests
 - **Goal:** creating a new store runs every migration step as its own commit (23 today), which is slow on Windows (about 12 s seen in one test on the CI runner). A new, empty file gets the whole schema in one transaction; an existing file still migrates step by step as now.
 - **Done when:** `RED (expected):` commit first (a commit count, not wall time); the created file's schema, pragmas and version are identical to today's; the Windows store tests run well under their timeout.
+
+#### NET-PRECHECK · Test a server before it can be used (0.5.15)
+- **Status:** backlog (0.5.15 lane 4) · **Size:** M · **Tier:** Opus · **Security:** S2 (independent security review) · **Spec:** D-158 (3), (4); 07 §4.3 "Use your own servers"; 04 §4 "Servers the owner types"; 08 §1 `POST /api/ui/network/test`
+- **Repo/path:** agentlink · `packages/transport-nostr` (new pre-check), `packages/node` local-ui API
+- **Goal:** the app tests each typed server on this computer: URL rule and every DNS answer routable before any socket, pinned address, fresh connection, throwaway key, no login; one test event accepted without login, served back on a second connection by id and by the sync filter; NIP-11 flags; round trip. Fixed outcomes only (`ready`, `slow` > 1 s, `sign_in`, `refused` with a fixed reason). At most 8 URLs per test, 10 tests a minute, 10 s per server.
+- **Done when:** `RED (expected):` commit first; tests for private DNS answers, rebinding, IP literals, write-login servers, accept-then-drop, slow and sign-in servers; no relay text or address leaves the route.
+
+#### NET-OWNER-SET · Save your own servers with one owner approval (0.5.15)
+- **Status:** backlog (0.5.15 lane 5) · **Size:** M · **Tier:** Opus · **Security:** S2 (independent security review) · **Spec:** D-158; 04 §2.6 "Use your own servers"; 07 §4.3; 08 §1 `POST /api/ui/network/servers`, `/reset`, `GET /api/ui/network/progress`
+- **Repo/path:** agentlink · core list builder and owner session (generalised from the contact-details update); `packages/node` local-ui API
+- **Depends on:** M1-7j, NET-PRECHECK
+- **Goal:** review, then one presence gesture signs exactly one card at the next key epoch with the reviewed list (own servers plus the 2 mixed-in automatic ones, within 8); the server re-tests before signing; reset to automatic at any time; progress from the card-update outbox rows.
+- **Done when:** `RED (expected):` commit first; every refusal before signing (count, fewer than 2 own ready, sign-in without 2 others, same list, too many previous, rotation pending, paused); I-4 canary: no MCP tool, `nextStep` or config path reaches any route.
+
+#### NET-CLI · `agentlink owner servers` (0.5.15)
+- **Status:** backlog (0.5.15 lane 6) · **Size:** S · **Tier:** Opus · **Security:** S2 (independent review) · **Spec:** D-158; 06 §8; 04 §2.6
+- **Repo/path:** agentlink · `apps/cli` (owner servers commands)
+- **Depends on:** NET-OWNER-SET, NET-ANNOUNCE-OPTOUT
+- **Goal:** `list` and `test` without presence; `set [--no-automatic] [--no-announce]` and `reset` at an interactive terminal only, with owner presence, refusing piped input and an AI harness marker; prints when the leaving servers stop being read. Replaces M1-9n.
+- **Done when:** `RED (expected):` commit first; piped stdin and the harness marker refused; output follows 11 §5.14.
+
+#### NET-UI-B · "Use your own servers" screens (0.5.15)
+- **Status:** backlog (0.5.15 lane 8) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Spec:** D-158 (8); 08 §1; 11 §5.14
+- **Repo/path:** agentlink · `apps/local-ui` (Advanced › Message network, new servers screens)
+- **Depends on:** NET-PRECHECK, NET-OWNER-SET, NET-ANNOUNCE-OPTOUT (screens can start on mocked routes)
+- **Goal:** the C1–C8 wireframes (C7b included) styled from existing components: add and test, the list with the mix-in switch and its warning, the opt-out switch and its warning, review, presence, progress, done, paused and recent-change states, and "Use AgentLink's automatic servers". Strings exactly 11 §5.14.
+- **Done when:** browser journeys, layout-shift, accessibility and size budgets green; no new words outside 11 §5.
+
+#### NET-HOSTILE · Hostile tests for your own servers (0.5.15)
+- **Status:** backlog (0.5.15 lane 9) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Spec:** D-158; 04 §7; `project/process/ci-cd.md` (hostile suites)
+- **Repo/path:** agentlink · `e2e/hostile/`
+- **Depends on:** M1-7j, NET-PRECHECK, NET-OWNER-SET, NET-ANNOUNCE-OPTOUT
+- **Goal:** public suites for a malicious server (accepts then drops, serves garbage, floods, hostile notices, wants a login to accept), an unreachable server, a sign-in-to-read server, a name that resolves to a private address, DNS rebinding, a contact on the old card still received during the 30 days, three changes in 30 days, and the opt-out publishing nothing on the default set.
+- **Done when:** the suites run in the deterministic e2e job with the strict count check.
+
+#### NET-BAR24 · The 24-hour bar per server (0.5.15)
+- **Status:** backlog (0.5.15 lane 7) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 07 §4.3 "Message network view"; 08 §1; 11 §5.14
+- **Repo/path:** agentlink · `apps/local-ui` (Advanced › Message network view and its CSS)
+- **Depends on:** NET-VIEW-FIXES, CSS-CLEANUP
+- **Goal:** each server row shows a small 24 h bar from the per-server counters (accepted against available), with accessible text, still under reduced motion.
+- **Done when:** CSS, layout-shift, accessibility and motion budgets green.
+
+#### CSS-CLEANUP · Bring the app's CSS back under budget (0.5.15)
+- **Status:** backlog (0.5.15 lane 2) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Spec:** `project/process/ci-cd.md` (browser budgets)
+- **Repo/path:** agentlink · `apps/local-ui/**/*.css` (not the message network view)
+- **Goal:** remove dead and duplicated rules so the network view's new styles fit the existing CSS budget without raising it.
+- **Done when:** at or under the budget with the budget value unchanged; journeys look the same.
+
+#### NET-ANNOUNCE-OPTOUT · Don't also announce on the default servers (0.5.15)
+- **Status:** backlog (0.5.15 lane 13) · **Size:** M · **Tier:** Opus · **Security:** S2 (independent security review) · **Spec:** D-158 (7); 07 §4.3 "Privacy", "Card-update fan-out"; 04 §2.5.1 `network.announce`; 08 §1 `POST /api/ui/network/announce`
+- **Repo/path:** agentlink · core owner card-update targets; invite and restore paths
+- **Depends on:** M1-7j, NET-OWNER-SET
+- **Goal:** a per-ID owner choice, offered only with the mix-in off: the owner card-update then goes to the ID's own and leaving servers only, and the card-update fan-out to the old default servers stops too. Contacts' messages are unchanged; invites carry the card's list; a reset clears it.
+- **Done when:** `RED (expected):` commit first; with the opt-out on nothing is published to the default set; the short-invite path still reaches the ID; a restore from a backup on a new computer keeps the list and the choice and finds the ID.
+
+#### RELAY-PER-IP-LIMIT · A default server that refuses a third connection
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3; `project/runbooks/relay-vetting.md`
+- **Goal:** offchain.pub appears to refuse a third connection from one computer; with several AI apps connected (one connection each) a user could be refused there. Measure the limit, and if confirmed reconsider it as a default.
+
+#### NET-VIEW-FIXES · Message network view fixes (0.5.15)
+- **Status:** backlog (0.5.15 lane 1; takes in NET-PROBE-SLOTS and NET-CONTACT-REACH-COST) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 07 §4.3 "Message network view"; 08 §1; D-158 (8)
+- **Repo/path:** agentlink · transport probe; `packages/node` network health and API; `apps/local-ui` Advanced › Message network
+- **Goal:** a slow server document or busy check slots never show a server as "Can't reach"; checks never delay delivery read-backs; the banner says only what is true; an "Automatic" chip; the diagram label "{name} · this computer"; contact reach counts cached.
+- **Done when:** tests for each case; the view's budgets green.
+
+#### WIN-MASTERCODE-TEST-SLOW · Master-code tests with room on the Windows runner (0.5.15)
+- **Status:** backlog (0.5.15 lane 12) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** `project/process/ci-cd.md`
+- **Goal:** three master-code tests run close to their time limit on the Windows runner; make them at least 3 times faster than the limit without raising any timeout.
+- **Done when:** the Windows job passes them with at least a 3× margin; no timeout raised, no test skipped.
