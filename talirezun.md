@@ -119,3 +119,4 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - Decisions: reset/change allowed during the 30-day overlap (old lists stay readable, up to 16 servers); the 2 mixed-in automatic servers count toward the 8 (up to 6 own, ≥ 2 own ready); slow servers count as ready with a warning; wireframes C1–C8 are the design; the "don't also announce on the default servers" option is in 0.5.15.
 - Waiting for Tali's go to start the build wave.
 - 20 Nov: owner chose: the opt-out also stops the old-server update fan-out. Build wave started (rel0515/integration).
+- 20 Nov: Message network page stays compact: one-line server rows that open on tap, "Show all N" after 5, old servers folded, diagram capped at 5 servers / 5 contacts with "+N more", problems always on top; built with the 24-hour bar.
