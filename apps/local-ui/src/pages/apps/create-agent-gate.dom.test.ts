@@ -9,7 +9,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import agentsCss from '../agents/agents.css?raw';
+import appCss from '../../app.css?raw';
 import type { PasskeyStatus } from '../contacts/owner.js';
 import type { PasskeySwitchOutcome } from '../contacts/passkey-switch.js';
 import { PASSKEY_WHY } from '../contacts/strings.js';
@@ -256,7 +256,8 @@ describe('W8-F12/F11: the backup-code form', () => {
     await mount(READY);
     await click(NAME.backupInstead);
     expect(host.querySelector('form')?.classList.contains('ag-code-form')).toBe(true);
-    const squashed = agentsCss.replace(/\s+/g, ' ');
+    // CSS-CLEANUP (0.5.15): the shared flex-column rule lives once in app.css.
+    const squashed = appCss.replace(/\s+/g, ' ');
     const block = /([^{}]*\.ag-code-form[^{}]*)\{([^}]*)\}/.exec(squashed);
     expect(block?.[2]).toMatch(/display: flex/);
     expect(block?.[2]).toMatch(/flex-direction: column/);
