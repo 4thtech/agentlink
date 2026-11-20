@@ -28,20 +28,18 @@
 //
 // No MCP tool, tool argument, description or `nextStep` reaches these (I-4). Nothing is logged; no
 // answer carries a server's own text, an error's text or a key (I-7).
-import {
-  AUTOMATIC_SERVERS,
-  automaticServerPlan,
-  buildServerList,
-  holdsDefaultServer,
-  isAutomaticList,
-  parseOwnServers,
-  planLeaving,
-  type ServerListPlan,
-  type TestedServer,
-} from '@4thtech-io/core';
+import { AUTOMATIC_SERVERS, parseOwnServers, type ServerListPlan } from '@4thtech-io/core';
 import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
-import { precheckServers, relayOrigin, type PrecheckResult } from '@4thtech-io/transport-nostr';
-import type { LocalUiContext, LocalUiServerListState } from '../context.js';
+import { precheckServers } from '@4thtech-io/transport-nostr';
+import type { LocalUiContext } from '../context.js';
+import {
+  planServerChange,
+  planUnchanged,
+  samePlan,
+  serverStateRefusal,
+  type ServerPlanRefusalReason,
+  type ServerTestRun,
+} from '../../server-change-plan.js';
 import {
   NOT_AVAILABLE,
   UI_INVALID_QUERY,
@@ -127,33 +125,20 @@ const keyOf = (ask: Ask): string =>
     announce: ask.announce,
   });
 
-const hostOf = (url: string): string => relayOrigin(url).slice('wss://'.length);
-
-const sameList = (a: readonly string[], b: readonly string[]): boolean =>
-  a.length === b.length && a.every((x, i) => x === b[i]);
-
-/** Nothing would change: the same list in the same order and the same announce choice. */
-const unchanged = (plan: ServerListPlan, state: LocalUiServerListState): boolean =>
-  sameList(plan.relays, state.relays) && plan.announceDefault === state.announceDefault;
-
-/** The agent's state refusals (before and after presence), else undefined. */
-function stateRefusal(state: LocalUiServerListState): LocalUiResult | undefined {
-  if (state.paused) return refusal('agent_paused');
-  if (state.sendState === 'rotation_pending' || state.sendState === 'key_epoch_mismatch') {
-    return refusal('rotation_pending');
-  }
-  if (state.sendState !== 'ready') return refusal('not_applied');
-  return undefined;
-}
-
-const outcomeOf = (r: PrecheckResult | undefined): TestedServer['outcome'] =>
-  r === undefined ? 'refused' : r.outcome;
-
 /** A tested plan and what the review answers for it. */
 interface Planned {
   readonly plan: ServerListPlan;
   readonly body: JsonObject;
 }
+
+/** A planner refusal as the route's fixed answer. */
+const refusalOf = (reason: ServerPlanRefusalReason, fitsAt?: number): LocalUiResult => {
+  if (reason === 'busy') return BUSY;
+  if (reason === 'too_many_previous' && fitsAt !== undefined) {
+    return fixed(409, 'too_many_previous', { fitsFrom: fitsAt });
+  }
+  return refusal(reason);
+};
 
 const productionIo = (): NetworkTestIo => ({
   resolver: nodeHostResolver(),
@@ -193,11 +178,6 @@ class Remembered {
   }
 }
 
-const samePlan = (a: ServerListPlan, b: ServerListPlan): boolean =>
-  sameList(a.relays, b.relays) &&
-  a.announceDefault === b.announceDefault &&
-  a.servers.every((s, i) => s.role === b.servers[i]?.role);
-
 /**
  * The server-list routes over `io` (tests: a stub resolver and in-memory relays) and `budget`
  * (IR L1: the app shares the process budget with the Test, 10 tests a minute and one at a time; each
@@ -211,83 +191,37 @@ export function createNetworkServersRoutes(
   const reviewed = new Remembered(REVIEW_TTL_MS);
   const confirmed = new Remembered(CONFIRM_TTL_MS);
 
-  /** Tests the own servers again (and the default set for the mix-in), then builds the plan. */
-  async function tested(ask: Ask): Promise<ServerListPlan | LocalUiResult> {
-    if (ask.kind === 'reset') return automaticServerPlan();
-    if (ask.automatic && !ask.announce) return refusal('mix_in_on');
-    // IR L3 (04 §2.5.1, D-158 (7)): the opt-out only while the list holds no default server, also
-    // one the owner typed as an own server (NET-ANNOUNCE-OPTOUT: or an old default server).
-    if (!ask.announce && holdsDefaultServer(ask.own)) {
-      return refusal('mix_in_on');
-    }
-    const ran = await budget.run(() => {
+  /** One budgeted test of the own servers and, for the mix-in, the default set (IR L1). */
+  const test: ServerTestRun = (own, withDefaults) =>
+    budget.run(() => {
       const { resolver, connector, nip11 } = io();
       const options = { resolver, connector, ...(nip11 === undefined ? {} : { nip11 }) };
       return Promise.all([
-        precheckServers(ask.own, options),
-        ask.automatic ? precheckServers(AUTOMATIC_SERVERS, options) : Promise.resolve([]),
-      ]);
+        precheckServers(own, options),
+        withDefaults ? precheckServers(AUTOMATIC_SERVERS, options) : Promise.resolve([]),
+      ] as const);
     });
-    if (ran === 'busy') return BUSY;
-    const [own, defaults]: readonly (readonly PrecheckResult[])[] = ran;
-    const built = buildServerList({
-      own: ask.own.map((url, i) => ({
-        url,
-        outcome: outcomeOf(own[i]),
-        paid: own[i]?.paymentRequired === true,
-      })),
-      automatic: ask.automatic,
-      announce: ask.announce,
-      defaults: AUTOMATIC_SERVERS.map((url, i) => ({
-        url,
-        outcome: outcomeOf(defaults[i]),
-        paid: defaults[i]?.paymentRequired === true,
-      })),
-    });
-    if (built.status === 'refused') return refusal(built.reason);
-    return built.plan;
-  }
 
-  /** Every check before the gesture, then the tested plan with its review answer. */
+  /** Every check before the gesture (server-change-plan.ts), then the plan with its review answer. */
   async function planned(context: LocalUiContext, ask: Ask): Promise<Planned | LocalUiResult> {
     const port = context.serverList;
     if (port === undefined || context.client === undefined) return UI_NOT_SET_UP;
-    const state = await port.state();
-    const refused = stateRefusal(state);
-    if (refused !== undefined) return refused;
-    if (ask.kind === 'reset' && isAutomaticList(state.relays) && state.announceDefault) {
-      return refusal('same_list');
-    }
-    if (
-      ask.kind === 'servers' &&
-      !ask.automatic &&
-      ask.announce === state.announceDefault &&
-      sameList(ask.own, state.relays)
-    ) {
-      return refusal('same_list');
-    }
-    const plan = await tested(ask);
-    if (!('relays' in plan)) return plan;
-    if (unchanged(plan, state)) return refusal('same_list');
-    const now = Math.floor(context.now() / 1000);
-    const leaving = planLeaving(state.leaving, state.relays, plan.relays, now);
-    if (leaving.status === 'refused') {
-      return leaving.fitsAt === undefined
-        ? refusal('too_many_previous')
-        : fixed(409, 'too_many_previous', { fitsFrom: leaving.fitsAt });
-    }
-    const contacts = await port.contacts();
+    const got = await planServerChange({
+      ask,
+      state: await port.state(),
+      contacts: () => port.contacts(),
+      now: Math.floor(context.now() / 1000),
+      test,
+    });
+    if (got.status === 'refused') return refusalOf(got.reason, got.fitsAt);
+    const { review } = got;
     return Object.freeze({
-      plan,
+      plan: got.plan,
       body: {
-        servers: plan.servers.map((s) => ({
-          host: hostOf(s.url),
-          role: s.role,
-          outcome: s.outcome,
-        })),
-        leaving: leaving.leaving.map((e) => ({ host: hostOf(e.url), until: e.until })),
-        contacts,
-        warnings: [...plan.warnings],
+        servers: review.servers.map((s) => ({ host: s.host, role: s.role, outcome: s.outcome })),
+        leaving: review.leaving.map((e) => ({ host: e.host, until: e.until })),
+        contacts: review.contacts,
+        warnings: [...review.warnings],
       },
     });
   }
@@ -334,9 +268,9 @@ export function createNetworkServersRoutes(
     const plan = confirmed.take(keyOf(ask), context.now());
     if (plan === undefined) return refusal('changed');
     const state = await port.state();
-    const refused = stateRefusal(state);
-    if (refused !== undefined) return refused;
-    if (unchanged(plan, state)) return refusal('same_list');
+    const refused = serverStateRefusal(state);
+    if (refused !== undefined) return refusal(refused);
+    if (planUnchanged(plan, state)) return refusal('same_list');
     if (owner.changeServers === undefined) return NOT_AVAILABLE;
     const outcome = await owner.changeServers({
       relays: plan.relays,

@@ -162,6 +162,27 @@ export function createNetworkTestRoute(
   });
 }
 
+/**
+ * NET-CLI (06 §8 `agentlink owner servers test`; 04 §4): the same test at the owner's terminal,
+ * with the Node relay I/O and this process's one budget (`busy` over it). Takes 1 to 8 addresses of
+ * at most 256 characters (`invalid` otherwise, nothing tested) and answers one fixed result per
+ * address, in order. Changes nothing, signs nothing with an ID or owner key, needs no presence.
+ */
+export async function testOwnServers(
+  servers: readonly string[],
+): Promise<readonly PrecheckResult[] | 'busy' | 'invalid'> {
+  const addresses = addressesOf({ servers: [...servers] });
+  if (addresses === undefined) return 'invalid';
+  return processPrecheckBudget.run(() => {
+    const { resolver, connector, nip11 } = productionIo();
+    return precheckServers(addresses, {
+      resolver,
+      connector,
+      ...(nip11 === undefined ? {} : { nip11 }),
+    });
+  });
+}
+
 /** The route the app registers (routes.ts): the Node relay I/O, one limit for the process. */
 export const networkTestRoute: LocalUiNetworkTestRoute = createNetworkTestRoute(
   productionIo,

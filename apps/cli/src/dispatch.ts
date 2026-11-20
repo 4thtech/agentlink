@@ -110,11 +110,26 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
       'agentlink owner add-agent --id <name> [--label <name>]   †',
       'agentlink owner change-code              †',
       'agentlink owner update-contact-details [--id <name>]   †',
+      'agentlink owner servers [list] [--json] [--id <name>]',
+      'agentlink owner servers test <wss://…>… [--json]',
+      'agentlink owner servers set <wss://…>… [--no-automatic] [--no-announce] [--id <name>]   †',
+      'agentlink owner servers reset [--id <name>]   †',
     ],
     guard: 'owner',
+    // NET-CLI (06 §8): `owner servers list | test` are read-only and need no owner terminal;
+    // `owner servers set | reset` run the same owner guard in their handler (servers.ts), with the
+    // 11 §5.14 refusal. Every other owner subcommand keeps the guard here.
+    guardWhen: (parsed) => parsed.positionals[0] !== 'servers',
     // WP-1 (R-3): `--label` is the name the first card and the first label carry (default: the
-    // folder name), so contacts and the app show one name.
-    options: { ...AGENT, label: { type: 'string' } },
+    // folder name), so contacts and the app show one name. NET-CLI: `--json`, `--no-automatic` and
+    // `--no-announce` belong to `owner servers` only (the handler refuses them elsewhere).
+    options: {
+      ...AGENT,
+      label: { type: 'string' },
+      json: { type: 'boolean' },
+      'no-automatic': { type: 'boolean' },
+      'no-announce': { type: 'boolean' },
+    },
   },
   {
     name: 'status',

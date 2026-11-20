@@ -39,6 +39,8 @@ const FORBIDDEN = [
   'afterannounce',
   'withdrawfromdefaultservers',
   'owner-server',
+  'server-change-plan',
+  'planserverchange',
   'network-servers',
   'owner-relay-migration',
   'owner servers',
