@@ -52,6 +52,7 @@ import { activityRoutes } from './api/activity.js';
 import { attachRoute } from './api/attach.js';
 import { networkTestRoute } from './api/network-test.js';
 import { networkServersRoutes } from './api/network-servers.js';
+import { networkAnnounceRoute } from './api/network-announce.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
 import { eventsRoutes } from './api/events.js';
@@ -550,6 +551,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     [networkTestRoute],
     // NET-OWNER-SET: saving your own server list and the reset (owner presence), and the progress.
     networkServersRoutes,
+    // NET-ANNOUNCE-OPTOUT: "Don't also announce on the default servers" on its own (owner presence).
+    [networkAnnounceRoute],
     activityRoutes,
     // UX2-f1: the activity pulse, before the Messages routes so `pulse` never reaches :contactId.
     [pulseRoute],

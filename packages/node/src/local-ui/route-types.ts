@@ -209,6 +209,13 @@ export interface LocalUiOwnerRoute {
     context: LocalUiContext,
     request: LocalUiRequest,
   ) => Promise<LocalUiResult | undefined>;
+  /**
+   * NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6; 04 §2.6, 11 §5.14 C5): the one line the OS presence
+   * sheet names this operation with (Touch ID's prompt detail), read after the precheck let the
+   * request on. A fixed string of the route's own words and counts, never request or server text;
+   * undefined keeps the sheet's generic reason. Display only: it binds nothing (04 §2.3.4).
+   */
+  readonly sheetDetail?: (context: LocalUiContext, request: LocalUiRequest) => string | undefined;
   readonly handler: (
     context: LocalUiContext,
     request: LocalUiRequest,

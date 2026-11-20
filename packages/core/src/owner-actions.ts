@@ -53,7 +53,8 @@ import { isCommitmentAction } from './commitments.js';
 import { isPaidPendingAction } from './pay-confirm.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { removeContactTx, removedBlockedKeysTx, type ContactBook } from './contacts.js';
-import type { IdentityService } from './identity.js';
+import { holdsDefaultServer } from './announce-optout.js';
+import { readIdentity, type IdentityService } from './identity.js';
 import { isOwnIdName, isRestrictedAlias } from './names.js';
 import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
 import {
@@ -192,6 +193,10 @@ type Refused = Extract<OwnerActionOutcome, { status: 'refused' }>;
 type SelfView =
   | { readonly agent: string; readonly ownerNostr: string }
   | { readonly refusal: 'identity_missing' | 'identity_revoked' };
+
+/** A JSON array of strings (a stored relay list as opened). */
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 const refused = (
   op: string | null,
@@ -414,6 +419,8 @@ export class OwnerActions {
         return this.#applyResume(value, base);
       case 'file.save':
         return this.#applyFileSave(value, base);
+      case 'network.announce':
+        return this.#applyAnnounce(value, base);
       case 'credits.deposit':
       case 'credits.withdraw':
       case 'agent.revoke': {
@@ -775,6 +782,65 @@ export class OwnerActions {
       }
       tx.insert('local_owner_actions', { record, op, signed_json: sealed, applied_at: now });
       return { status: 'applied', op };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `network.announce` (NET-ANNOUNCE-OPTOUT, D-158 (7); 04 §2.5.1; 07 §3, §4.3 "Privacy"; proposed,
+   * owner confirms at merge): sets `identity.announce_default` without a rotation. The object checks
+   * and the nonce first (another owner, another agent in the body or in `params.agent`, a replay, an
+   * expired object or one outliving 600 s is refused and writes nothing). The stored list is read
+   * and, for `false`, must hold no default or old default server (`mix_in_on`). Then, in one store
+   * transaction, the nonce is checked again, no list change may be finishing (`rotation_pending`) and
+   * the list must still be the one checked (a compare-and-set on the sealed column, else
+   * `rotation_pending`); the nonce row is recorded and the choice written. The pending retries to the
+   * default servers are ended afterwards by the card-update sender (announce-optout.ts), also on every
+   * later sync pass. No envelope carries it.
+   */
+  async #applyAnnounce(value: unknown, base: OwnerActionCheckContext): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'network.announce' || body.params.agent !== base.agent) {
+      return this.#report(refused(body.op, 'agent_mismatch'));
+    }
+    const announce = body.params.announceDefault;
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined) return this.#report(refused('network.announce', 'identity_missing'));
+    let relays: unknown;
+    try {
+      relays = parseJson(
+        await open(this.#ctx, 'identity', 'relays', [got.row.agent_id], got.row.relays),
+      );
+    } catch {
+      relays = undefined;
+    }
+    // Fail closed: a list that does not open is never taken for one without default servers.
+    if (!announce && (!isStringList(relays) || holdsDefaultServer(relays))) {
+      return this.#report(refused('network.announce', 'mix_in_on'));
+    }
+    const sealedRelays = got.row.relays;
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused('network.announce', 'nonce_used');
+      }
+      const row = tx.get('identity', { agent_id: got.row.agent_id });
+      if (row === undefined || row.pending_card_json !== null) {
+        return refused('network.announce', 'rotation_pending');
+      }
+      const n = tx.update(
+        'identity',
+        { agent_id: got.row.agent_id, relays: sealedRelays },
+        { announce_default: announce ? 1 : 0, updated_at: now },
+      );
+      if (n !== 1) return refused('network.announce', 'rotation_pending');
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      return { status: 'applied', op: 'network.announce' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
@@ -1676,6 +1742,25 @@ export class OwnerActions {
     }
     if (!paused) return refuse('not_paused');
     return this.#build(signer, 'agent.resume', { agent: signer.agent });
+  }
+
+  /**
+   * The unsigned `network.announce` for this agent (NET-ANNOUNCE-OPTOUT, D-158 (7); 04 §2.5.1):
+   * `params.agent` is this agent's `agentId`, never a value from the page. `false` (the opt-out) is
+   * refused with `mix_in_on` while the stored list holds a default or an old default server, so the
+   * page asks for Touch ID only when apply would take it (apply checks the list again). Writes
+   * nothing.
+   */
+  async prepareAnnounce(announceDefault: boolean): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'network.announce', reason }) as const;
+    if (typeof announceDefault !== 'boolean') return refuse('params_invalid');
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!announceDefault && holdsDefaultServer(await this.#identity.relays())) {
+      return refuse('mix_in_on');
+    }
+    return this.#build(signer, 'network.announce', { agent: signer.agent, announceDefault });
   }
 
   /**

@@ -14,6 +14,8 @@ export const SERVERS_PATH = '/api/ui/network/servers';
 export const RESET_PATH = '/api/ui/network/reset';
 export const PROGRESS_PATH = '/api/ui/network/progress';
 export const STATUS_PATH = '/api/ui/network';
+/** NET-ANNOUNCE-OPTOUT: "Don't also announce on the default servers" on its own (presence). */
+export const ANNOUNCE_PATH = '/api/ui/network/announce';
 
 export type TestOutcome = 'ready' | 'slow' | 'sign_in' | 'refused';
 export type TestReason =
@@ -59,7 +61,9 @@ export type Refusal =
   | 'agent_paused'
   | 'mix_in_on'
   | 'changed'
-  | 'not_applied';
+  | 'not_applied'
+  /** NET-ANNOUNCE-OPTOUT: the announce choice is already the asked one. */
+  | 'same_choice';
 
 export type Fail =
   | { readonly kind: 'refused'; readonly code: Refusal; readonly fitsFrom?: number }
@@ -74,6 +78,11 @@ export interface NetworkStatus {
   readonly ownCount: number;
   readonly mixIn: boolean;
   readonly announceDefault: boolean;
+  /**
+   * NET-ANNOUNCE-OPTOUT: the opt-out can be switched on its own: custom mode, and the answer says
+   * the mix-in is off (`mixIn: false`). Never offered when the answer does not say so.
+   */
+  readonly optOutOffered: boolean;
   readonly change: ChangeState;
   readonly previousUntil: number | null;
 }
@@ -103,6 +112,15 @@ export interface ServersApi {
   reset(proof: PresenceProof): Promise<Out<Done>>;
   /** `undefined` when nothing changed yet (`{changedAt: null}`) or the read failed. */
   progress(): Promise<Out<Progress | undefined>>;
+  /**
+   * NET-ANNOUNCE-OPTOUT (08 §1 `POST /api/ui/network/announce`): an owner operation (presence) that
+   * signs `network.announce` on the server; `false` is "Don't also announce on the default servers".
+   */
+  announce(announceDefault: boolean, proof: PresenceProof): Promise<Out<AnnounceDone>>;
+}
+
+export interface AnnounceDone {
+  readonly announceDefault: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -136,6 +154,7 @@ const REFUSALS: ReadonlySet<string> = new Set([
   'mix_in_on',
   'changed',
   'not_applied',
+  'same_choice',
 ]);
 const MAX_NAME = 80;
 
@@ -203,6 +222,13 @@ export function parseDone(data: unknown): Done | undefined {
     : { contacts, leavingUntil: until };
 }
 
+/** NET-ANNOUNCE-OPTOUT: `{status: 'done', announceDefault: boolean}`, else undefined. */
+export function parseAnnounceDone(data: unknown): AnnounceDone | undefined {
+  const d = obj(data);
+  if (d?.['status'] !== 'done' || typeof d['announceDefault'] !== 'boolean') return undefined;
+  return { announceDefault: d['announceDefault'] };
+}
+
 export function parseProgress(data: unknown): Progress | undefined | 'bad' {
   const d = obj(data);
   if (d === undefined) return 'bad';
@@ -258,6 +284,7 @@ export function parseStatus(data: unknown): NetworkStatus | undefined {
     ownCount,
     mixIn: d?.['mixIn'] === true,
     announceDefault: d?.['announceDefault'] !== false,
+    optOutOffered: mode === 'custom' && d?.['mixIn'] === false,
     change: change === 'paused' || change === 'rotation_pending' ? change : null,
     previousUntil: count(until) ?? null,
   };
@@ -386,10 +413,19 @@ export function createServersApi(options: ServersApiOptions = {}): ServersApi {
   }
 
   async function confirm(path: string, input: unknown, proof: PresenceProof): Promise<Out<Done>> {
+    return ownerCall(path, input, proof, parseDone);
+  }
+
+  async function ownerCall<T>(
+    path: string,
+    input: unknown,
+    proof: PresenceProof,
+    parse: (data: unknown) => T | undefined,
+  ): Promise<Out<T>> {
     const res = await client.owner(path, input, presenceOf(proof));
     switch (res.kind) {
       case 'ok': {
-        const done = parseDone(res.data);
+        const done = parse(res.data);
         return done === undefined ? { kind: 'failed' } : { kind: 'ok', value: done };
       }
       case 'answer':
@@ -444,6 +480,8 @@ export function createServersApi(options: ServersApiOptions = {}): ServersApi {
         proof,
       ),
     resetReview: () => review(RESET_PATH, {}),
+    announce: (announceDefault, proof) =>
+      ownerCall(ANNOUNCE_PATH, { announce: announceDefault }, proof, parseAnnounceDone),
     reset: (proof) => confirm(RESET_PATH, {}, proof),
     async progress() {
       const res = await client.get(PROGRESS_PATH);

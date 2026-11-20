@@ -71,6 +71,12 @@ import {
   type ReadbackOptions,
   type RelayProbeResult,
 } from '@4thtech-io/transport-nostr';
+import {
+  DEFAULT_AND_LEGACY_SERVERS,
+  NO_PEER,
+  peerServersOf,
+  type PeerServers,
+} from './announce-optout.js';
 import { acksFor, type AckTarget } from './acks.js';
 import { agentNostrKey } from './card.js';
 import {
@@ -201,18 +207,30 @@ function updateDelivery(tx: StoreTx, envelopeId: string): void {
   );
 }
 
+/**
+ * NET-ANNOUNCE-OPTOUT (IR F1; D-158 (7), "fully quiet"): the publish targets a row may keep. With the
+ * opt-out on, every row kind drops each default or old default server that is not on that row's
+ * contact's own list. Undefined: no filter (the opt-out is off).
+ */
+export type PublishTargets = (
+  row: Row<'outbox'>,
+  relays: readonly string[],
+) => Promise<readonly string[]>;
+
 /** OutboxPersistence over the Store, with the per-row claim described above. */
 export class StoreOutboxPersistence implements OutboxPersistence {
   readonly #ctx: CoreContext;
   readonly #envelopeId: string | undefined;
+  readonly #targets: PublishTargets | undefined;
   /** wrap_id -> the next_attempt_at this process wrote when it claimed the row. */
   readonly #claims = new Map<string, number>();
   /** How many rows the last listDue claimed. */
   listed = 0;
 
-  constructor(ctx: CoreContext, envelopeId?: string) {
+  constructor(ctx: CoreContext, envelopeId?: string, targets?: PublishTargets) {
     this.#ctx = ctx;
     this.#envelopeId = envelopeId;
+    this.#targets = targets;
   }
 
   async listDue(nowSeconds: number): Promise<readonly OutboxRow[]> {
@@ -278,6 +296,15 @@ export class StoreOutboxPersistence implements OutboxPersistence {
       }
     } catch {
       relays = [];
+    }
+    // IR F1: the one place every row's targets are read before a publish. A row left with too few
+    // servers follows the worker's usual rules (retry, then not delivered); none means unreadable.
+    if (this.#targets !== undefined && relays.length > 0) {
+      try {
+        relays = await this.#targets(row, relays);
+      } catch {
+        relays = relays.filter((r) => !DEFAULT_AND_LEGACY_SERVERS.has(r)); // fail closed
+      }
     }
     const uncounted = await this.#uncountedOf(row, relays);
     return {
@@ -489,10 +516,76 @@ export class OutboxService {
     try {
       if (this.#pause !== undefined && (await this.#pause.paused())) return undefined;
       const own = checkList((await this.#identity.signedCard()).relays);
-      return await transport.relayProbe([...new Set([...own, ...LEGACY_READ_RELAYS])]);
+      // NET-ANNOUNCE-OPTOUT (fully quiet): with the opt-out on, no legacy server is probed.
+      return await transport.relayProbe([...new Set([...own, ...(await this.legacyReadRelays())])]);
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * NET-ANNOUNCE-OPTOUT (IR F1; "fully quiet", owner 20 Nov 2026): with the opt-out on, the publish
+   * filter for one pass (StoreOutboxPersistence): each row keeps a default or old default server only
+   * when it is on the own list, a leaving server kept by leavingRelays (never a default one then), or
+   * the own list of the row's contact (its agent and owner are reached there). Contact lists are read
+   * once per pass; an unreadable one allows none (fail closed). The row-rewrite clean-up
+   * (announce-optout.ts) stays as the second layer. Undefined while the opt-out is off. A choice that
+   * cannot be read counts as on (fail closed).
+   */
+  async #quietTargets(): Promise<PublishTargets | undefined> {
+    let announce: boolean;
+    try {
+      announce = await this.#identity.announceDefault();
+    } catch {
+      announce = false;
+    }
+    if (announce) return undefined;
+    let own: ReadonlySet<string>;
+    try {
+      own = new Set([
+        ...checkList((await this.#identity.signedCard()).relays),
+        ...(await this.leavingRelays()),
+      ]);
+    } catch {
+      own = new Set();
+    }
+    const lists = new Map<string, PeerServers>();
+    const listOf = async (contactId: string): Promise<PeerServers> => {
+      let got = lists.get(contactId);
+      if (got === undefined) {
+        try {
+          got = peerServersOf(await this.contactPeer(contactId));
+        } catch {
+          got = NO_PEER;
+        }
+        lists.set(contactId, got);
+      }
+      return got;
+    };
+    return async (row, relays) => {
+      if (!relays.some((r) => DEFAULT_AND_LEGACY_SERVERS.has(r))) return relays;
+      const env = await this.#ctx.store.transaction((tx) =>
+        tx.get('envelopes', { envelope_id: row.envelope_id }),
+      );
+      const contactId = env?.contact_id ?? null;
+      let peer: PeerServers;
+      if (contactId !== null) peer = await listOf(contactId);
+      else if (env?.type === 'handshake') {
+        // An accept: the inviter is reached on the list its invite named (the staged pairing).
+        try {
+          const staged = await this.#contacts.readStaged(row.envelope_id);
+          peer = staged === undefined ? NO_PEER : peerServersOf(staged);
+        } catch {
+          peer = NO_PEER;
+        }
+      } else peer = NO_PEER;
+      // IR F2: the contact's servers only for the rows to that contact's agent or owner key; the own
+      // owner and agent copies never get the exception.
+      const theirs = peer.keys.has(row.recipient_key) ? peer.relays : NO_PEER.relays;
+      return relays.filter(
+        (r) => !DEFAULT_AND_LEGACY_SERVERS.has(r) || own.has(r) || theirs.has(r),
+      );
+    };
   }
 
   /** The transport, or `transport_unavailable` before anything is stored. Internal (send.ts). */
@@ -510,7 +603,25 @@ export class OutboxService {
    */
   async leavingRelays(): Promise<readonly string[]> {
     try {
-      return (await this.#identity.leavingServers()).map((e) => e.url);
+      const leaving = (await this.#identity.leavingServers()).map((e) => e.url);
+      // NET-ANNOUNCE-OPTOUT (fully quiet, owner 20 Nov 2026; D-158 (7)): with the opt-out on, a
+      // leaving server that is a default or old default server is neither read nor published to; the
+      // ID's own previous servers still are, for their 30 days.
+      if (await this.#identity.announceDefault()) return leaving;
+      return leaving.filter((r) => !DEFAULT_AND_LEGACY_SERVERS.has(r));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * NET-ANNOUNCE-OPTOUT (fully quiet): the legacy servers read for the transition (fetch, live
+   * subscription, probe), or none while the opt-out is on. Fails closed: none when the choice cannot
+   * be read. Never throws.
+   */
+  async legacyReadRelays(): Promise<readonly string[]> {
+    try {
+      return (await this.#identity.announceDefault()) ? LEGACY_READ_RELAYS : [];
     } catch {
       return [];
     }
@@ -716,7 +827,11 @@ export class OutboxService {
     } catch {
       this.#ownRelays = new Set(); // no readable own list: no AUTH anywhere (07 §4.3)
     }
-    const persistence = new StoreOutboxPersistence(this.#ctx, envelopeId);
+    const persistence = new StoreOutboxPersistence(
+      this.#ctx,
+      envelopeId,
+      await this.#quietTargets(),
+    );
     this.#passes.add(persistence);
     try {
       return await this.#passWith(persistence, transport, ownKnown);

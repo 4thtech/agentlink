@@ -188,6 +188,18 @@ export const fileSaveParamsSchema = z.strictObject({
     .max(MAX_FILES_PER_PAYLOAD - 1),
 });
 
+/**
+ * `network.announce` params (NET-ANNOUNCE-OPTOUT, D-158 (7); 04 §2.5.1; 07 §4.3 "Privacy"; proposed,
+ * owner confirms at merge): exactly `{agent, announceDefault}`, the agent's `agentId` (equal to the
+ * body's `agent`) and the choice: `false` is "Don't also announce on the default servers". Never a
+ * list, a server or a URL; whether `false` is allowed (no default server in the list) is the core's
+ * check against the stored list.
+ */
+export const networkAnnounceParamsSchema = z.strictObject({
+  agent: evmAddress,
+  announceDefault: z.boolean(),
+});
+
 // --- own storage and the recovery kit (M1-9i-a, D-115) --------------------------------------------
 
 const MAX_ENDPOINT_LENGTH = 256;
@@ -550,6 +562,17 @@ export const fileSaveActionSchema = z
   .refine(expiring, EXPIRING_MSG)
   .refine(selfBound, SELF_BOUND_MSG);
 
+/** Turns the announce opt-out on or off (NET-ANNOUNCE-OPTOUT, D-158 (7)). Own machine only. */
+export const networkAnnounceActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('network.announce'),
+    params: networkAnnounceParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG)
+  .refine(selfBound, SELF_BOUND_MSG);
+
 /** `agent.revoke`: `expiresAt` is exactly 0 (permanent; the core skips expiry and lifetime checks). */
 export const agentRevokeActionSchema = z.strictObject({
   ...head,
@@ -585,6 +608,7 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   appDisconnectActionSchema,
   agentResumeActionSchema,
   fileSaveActionSchema,
+  networkAnnounceActionSchema,
   agentRevokeActionSchema,
 ]);
 
@@ -635,6 +659,7 @@ export type AgentLabelParams = z.infer<typeof agentLabelParamsSchema>;
 export type AppChangeParams = z.infer<typeof appChangeParamsSchema>;
 export type AgentResumeParams = z.infer<typeof agentResumeParamsSchema>;
 export type FileSaveParams = z.infer<typeof fileSaveParamsSchema>;
+export type NetworkAnnounceParams = z.infer<typeof networkAnnounceParamsSchema>;
 export type AgentLabelAction = z.infer<typeof agentLabelActionSchema>;
 export type SignedAgentLabel = z.infer<typeof signedAgentLabelSchema>;
 export type CreditsWithdrawParams = z.infer<typeof creditsWithdrawParamsSchema>;

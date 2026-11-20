@@ -7,7 +7,7 @@ import { createElement as h, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createOwnerClient } from '../../../contacts/owner.js';
-import type { ServersApi } from './api.js';
+import { createServersApi, type ServersApi } from './api.js';
 import { ServersEntry } from './entry.js';
 import { createMockServersApi, MOCK_STATUS, type MockOptions } from './mock.js';
 import { SERVERS_STRINGS as S } from './strings.js';
@@ -758,5 +758,132 @@ describe('mounted in Message network (Under the hood)', () => {
     expect(button(S.useOwn)).toBeTruthy();
     expect(children.at(-1)?.getAttribute('data-servers-entry')).toBe('running');
     vi.unstubAllGlobals();
+  });
+});
+
+describe('NET-ANNOUNCE-OPTOUT: the opt-out on its own (08 §1 `POST /api/ui/network/announce`)', () => {
+  const CUSTOM = {
+    ...MOCK_STATUS,
+    mode: 'custom' as const,
+    ownCount: 3,
+    mixIn: false,
+    optOutOffered: true,
+  };
+
+  it('is offered only in custom mode with the mix-in off', async () => {
+    await mount();
+    expect(text()).not.toContain(S.optOutLabel);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ status: { ...CUSTOM, mixIn: true, optOutOffered: false } });
+    expect(text()).not.toContain(S.optOutLabel);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ status: CUSTOM });
+    expect(text()).toContain(S.optOutLabel);
+    expect(text()).toContain(S.optOutBody);
+  });
+
+  it('turning it on shows the spec warning and signs with the existing presence step, once', async () => {
+    const api = createMockServersApi({ now: NOW, status: CUSTOM });
+    const announce = vi.fn(api.announce);
+    await mount({}, { api: { ...api, announce } });
+    const sw = switches()[0];
+    expect(on(sw)).toBe(false);
+    await click(sw);
+    expect(text()).toContain(S.optOutTitle);
+    expect(text()).toContain(S.optOut);
+    await confirmWithCode(S.announceConfirmCode);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce.mock.calls[0]?.[0]).toBe(false);
+    expect(announce.mock.calls[0]?.[1]).toEqual({ kind: 'code', code: '123456' });
+  });
+
+  it('turning it off again signs announce true', async () => {
+    const api = createMockServersApi({ now: NOW, status: { ...CUSTOM, announceDefault: false } });
+    const announce = vi.fn(api.announce);
+    await mount({}, { api: { ...api, announce } });
+    const sw = switches()[0];
+    expect(on(sw)).toBe(true);
+    await click(sw);
+    await confirmWithCode(S.announceConfirmCode);
+    expect(announce.mock.calls[0]?.[0]).toBe(true);
+  });
+
+  it('a list change keeps an opt-out that is on (the flow starts with the mix-in off and it on)', async () => {
+    const api = createMockServersApi({ now: NOW, status: { ...CUSTOM, announceDefault: false } });
+    const set = vi.fn(api.set);
+    await mount({}, { api: { ...api, set } });
+    await click(button(S.changeServers));
+    await toList();
+    await click(button(S.review));
+    await confirmWithCode(S.confirmCode);
+    expect(set.mock.calls[0]?.[0]).toMatchObject({ automatic: false, announce: false });
+  });
+});
+
+describe('NET-ANNOUNCE-OPTOUT: the real GET /api/ui/network answer drives the switch and C7b', () => {
+  /** What packages/node api/network.ts answers (NETWORK_SHAPE with the 0.5.15 additions). */
+  const answer = (over: Record<string, unknown> = {}) => ({
+    agent: 'running',
+    mode: 'custom',
+    checking: false,
+    checkedAt: NOW,
+    servers: [
+      { host: 'one.example-team.com', roles: ['send', 'read'], kind: 'own', state: 'ready' },
+      { host: 'two.example-team.com', roles: ['send', 'read'], kind: 'own', state: 'ready' },
+    ],
+    legacyReadUntil: null,
+    contacts: { total: 0, sharing: 0 },
+    updateWouldDrop: 0,
+    mixIn: false,
+    announceDefault: true,
+    change: null,
+    previousUntil: null,
+    ...over,
+  });
+  const realApi = (body: unknown): ServersApi =>
+    createServersApi({
+      token: 't',
+      fetch: (async (input: RequestInfo | URL) =>
+        new Response(
+          JSON.stringify(String(input).includes('progress') ? { changedAt: null } : body),
+          { status: 200 },
+        )) as typeof fetch,
+    });
+
+  it('custom mode with the mix-in off shows the switch, off', async () => {
+    await mount({}, { api: realApi(answer()) });
+    expect(text()).toContain(S.optOutLabel);
+    expect(on(switches()[0])).toBe(false);
+  });
+
+  it('the stored opt-out shows the switch on with the warning', async () => {
+    await mount({}, { api: realApi(answer({ announceDefault: false })) });
+    expect(on(switches()[0])).toBe(true);
+    expect(text()).toContain(S.optOutTitle);
+  });
+
+  it('the mix-in on, or automatic mode, shows no switch', async () => {
+    await mount({}, { api: realApi(answer({ mixIn: true })) });
+    expect(text()).not.toContain(S.optOutLabel);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({}, { api: realApi(answer({ mode: 'automatic', mixIn: true })) });
+    expect(text()).not.toContain(S.optOutLabel);
+  });
+
+  it('C7b: a change still finishing says so and turns the buttons off', async () => {
+    await mount({}, { api: realApi(answer({ change: 'rotation_pending' })) });
+    expect(text()).toContain(S.finishing);
+    expect(button(S.changeServers)?.disabled).toBe(true);
+  });
+
+  it('fully quiet (owner, 20 Nov): the warning says what stops at once and what stays 30 days', async () => {
+    expect(S.optOut).toMatch(/old public servers stop being used at once/);
+    expect(S.optOut).toMatch(/previous servers stay readable for 30 days/);
+    expect(S.optOut).toMatch(/old copy of your contact details/);
+    await mount({}, { api: realApi(answer({ announceDefault: false })) });
+    expect(text()).toContain(S.optOut);
   });
 });

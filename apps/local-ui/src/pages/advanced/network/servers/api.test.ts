@@ -2,6 +2,7 @@
 // the spec names (paths, JSON bodies, owner input header, CSRF) and nothing else.
 import { describe, expect, it } from 'vitest';
 import {
+  ANNOUNCE_PATH,
   PROGRESS_PATH,
   RESET_PATH,
   SERVERS_PATH,
@@ -237,6 +238,42 @@ describe('the production client', () => {
       kind: 'refused',
       code: 'rotation_pending',
     });
+  });
+
+  it('announce (NET-ANNOUNCE-OPTOUT): an owner operation of exactly {announce}; fixed refusals', async () => {
+    const { api, calls } = client({
+      [`POST ${ANNOUNCE_PATH}`]: { status: 200, body: { status: 'done', announceDefault: false } },
+    });
+    expect(ANNOUNCE_PATH).toBe('/api/ui/network/announce');
+    expect(await api.announce(false, { kind: 'code', code: '123456' })).toEqual({
+      kind: 'ok',
+      value: { announceDefault: false },
+    });
+    const sent = calls[0];
+    expect(sent?.headers.get('content-type')).toBe('application/octet-stream');
+    const raw = sent?.headers.get('X-AgentLink-Input') ?? '';
+    expect(JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')))).toEqual({
+      announce: false,
+    });
+    for (const code of ['mix_in_on', 'same_choice', 'agent_paused', 'rotation_pending']) {
+      const refused = client({ [`POST ${ANNOUNCE_PATH}`]: { status: 409, body: { error: code } } });
+      expect(await refused.api.announce(false, { kind: 'code', code: '123456' })).toEqual({
+        kind: 'refused',
+        code,
+      });
+    }
+    const odd = client({
+      [`POST ${ANNOUNCE_PATH}`]: { status: 200, body: { status: 'done', announceDefault: 'x' } },
+    });
+    expect((await odd.api.announce(true, { kind: 'code', code: '123456' })).kind).toBe('failed');
+  });
+
+  it('parseStatus offers the opt-out on its own only when the answer says the mix-in is off', () => {
+    const base = { agent: 'running', mode: 'custom', servers: [{ kind: 'own' }] };
+    expect(parseStatus(base)?.optOutOffered).toBe(false);
+    expect(parseStatus({ ...base, mixIn: false })?.optOutOffered).toBe(true);
+    expect(parseStatus({ ...base, mixIn: true })?.optOutOffered).toBe(false);
+    expect(parseStatus({ ...base, mode: 'automatic', mixIn: false })?.optOutOffered).toBe(false);
   });
 
   it('progress: {changedAt: null} is undefined; a bad body fails', async () => {

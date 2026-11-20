@@ -24,7 +24,9 @@
 //   ALSO published to the legacy relays (relay-migration.ts cardUpdateLegacyRelays), so a contact
 //   still listening there learns the new card (a moved relay list most of all). Only card-updates;
 //   every other message keeps to the own and the contact's lists. Bounded by MAX_RELAYS_PER_WRAP,
-//   and only until LEGACY_CARD_UPDATE_UNTIL (dated in transport-nostr legacy-relays.ts). A legacy
+//   and only until LEGACY_CARD_UPDATE_UNTIL (dated in transport-nostr legacy-relays.ts), and only
+//   while the announce opt-out is off (NET-ANNOUNCE-OPTOUT, D-158 (7): the owner accepted that a
+//   contact still listening only on the old servers may then miss the update). A legacy
 //   relay's OK never makes a card-update count as `sent`: only an OK from a relay of the contact's
 //   own list does; one accepted only by legacy relays (or by none yet) counts as `failed` for this
 //   pass. Its contact row does not end either: the outbox marks the legacy relays `uncounted`
@@ -36,7 +38,8 @@
 //   and the own agent, 04 §3.2 entries 3 and 4) go there too; no other message ever does.
 // - The owner `card-update` (M1-7j; D-65; 07 §4.3; 04 §3.4.1): one envelope on the owner channel
 //   (recipients exactly the agent and its own owner) for each current card, also at epoch 0 and with
-//   no contacts, published to the new list, the leaving servers and the release's default relay set
+//   no contacts, published to the new list, the leaving servers and, unless the owner opted out
+//   (`announce_default` false; NET-ANNOUNCE-OPTOUT), the release's default relay set
 //   (announceToOwner). It is re-published as a new gift wrap of the same stored envelope (the next
 //   outbox attempt) every 24 h while any leaving server runs, and every 7 days otherwise.
 // - Who may call it. The core only (sync, and the owner flow after a rotation). No MCP tool creates
@@ -44,6 +47,7 @@
 //
 // I-7: logs carry counts only, never a card, a signature or a key.
 import { decodeHex0x, encodeUtf8, parseEnvelope, type JsonValue } from '@4thtech-io/crypto';
+import { withdrawFromDefaultServers } from './announce-optout.js';
 import { kidOf } from './envelope-wraps.js';
 import type { SignedCard } from './card.js';
 import type { CoreContext } from './context.js';
@@ -454,9 +458,12 @@ export class CardUpdateSender {
       throw new CoreError('key_epoch_mismatch', 'The identity changed while sending. Try again.');
     }
     // M1-7j: the own copies also go to the leaving servers (the owner surface may still read them).
+    // NET-ANNOUNCE-OPTOUT (D-158 (7), 07 §4.3): the legacy fan-out only while the opt-out is off.
     const signed = await this.#deps.identity.signedCard();
+    const announce = await this.#deps.identity.announceDefault();
+    const contactRoutes = await outbox.routes(await outbox.contactPeer(contactId));
     const routes = withLeavingRelays(
-      withLegacyRelays(await outbox.routes(await outbox.contactPeer(contactId)), nowOf(this.#ctx)),
+      announce ? withLegacyRelays(contactRoutes, nowOf(this.#ctx)) : contactRoutes,
       ownKeysOf(signed),
       await outbox.leavingRelays(),
     );
@@ -472,6 +479,9 @@ export class CardUpdateSender {
       const contact = tx.get('contacts', { contact_id: contactId });
       // Another process sent it meanwhile, or the contact is no longer active: nothing stored.
       if (contact === undefined || !due(tx, contact, fromKey, catchUp)) return false;
+      // IR NET-ANNOUNCE-OPTOUT L2: an opt-out that committed after the routes were built stores
+      // nothing (the next pass builds them again without the default servers).
+      if (announce && optedOutTx(tx)) return false;
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
       return true;
@@ -496,7 +506,14 @@ export class CardUpdateSender {
    */
   async announceToOwner(): Promise<OwnerAnnounceResult> {
     const { identity, envelopes, outbox } = this.#deps;
+    // NET-ANNOUNCE-OPTOUT: first, with the opt-out on, no pending retry keeps a default server (also
+    // after a crash between the owner's `network.announce` and its clean-up). Store reads only.
+    // IR L3: it fails closed: when the clean-up fails, the pass stops here (nothing new is built or
+    // published) and the caller reports it; the next pass tries again.
+    await this.withdrawFromDefaultServers();
     outbox.requireTransport();
+    // IR L2: the choice the routes below are built for, checked again in the insert transaction.
+    const announce = await identity.announceDefault();
     // IR-M1-7j L-2: whether anything is due is decided from store reads only, so a pass with nothing
     // due makes no KeyStore (keychain) call; the send check comes after.
     const signed = await identity.signedCard();
@@ -517,7 +534,7 @@ export class CardUpdateSender {
       await outbox.routes(undefined),
       ownKeysOf(signed),
       leaving,
-      (await identity.announceDefault()) ? DEFAULT_RELAYS : [],
+      announce ? DEFAULT_RELAYS : [],
     );
     if (state.envelopeId === undefined || state.envelopeJson === undefined) {
       const { built, row } = await envelopes.prepare({
@@ -538,6 +555,7 @@ export class CardUpdateSender {
       const stored = await this.#ctx.store.transaction((tx) => {
         // Another process stored this card's owner card-update meanwhile: nothing stored.
         if (ownerCardUpdatesTx(tx, fromKey).length > 0) return false;
+        if (announce && optedOutTx(tx)) return false; // IR L2
         tx.insert('envelopes', row);
         for (const r of rows) tx.insert('outbox', r);
         return true;
@@ -558,12 +576,23 @@ export class CardUpdateSender {
       const current = tx.select('outbox', { envelope_id: envelopeId });
       if (current.some((r) => r.state === 'pending')) return false;
       if (current.some((r) => r.attempt > state.lastAttempt)) return false;
+      if (announce && optedOutTx(tx)) return false; // IR L2
       for (const r of rows) tx.insert('outbox', r);
       return true;
     });
     if (!stored) return 'pending';
     await this.#publish(envelopeId);
     return 'published';
+  }
+
+  /**
+   * NET-ANNOUNCE-OPTOUT (D-158 (7); 07 §4.3 "Privacy"): with the opt-out on, the pending card-update
+   * rows stop naming default or legacy servers that are on no own or contact route
+   * (announce-optout.ts). Run after the owner's `network.announce` and by every owner announce pass.
+   * Returns how many rows changed; 0 with the opt-out off.
+   */
+  withdrawFromDefaultServers(): Promise<number> {
+    return withdrawFromDefaultServers(this.#ctx, this.#deps);
   }
 
   /** The stored owner card-update of the current key and its wraps (attempts, times, pending). */
@@ -628,6 +657,11 @@ export class CardUpdateSender {
     }
     return false;
   }
+}
+
+/** IR NET-ANNOUNCE-OPTOUT L2: whether the opt-out is on, read inside the insert transaction. */
+function optedOutTx(tx: StoreTx): boolean {
+  return tx.select('identity')[0]?.announce_default === 0;
 }
 
 /** The stored owner card-updates (owner channel: no contact) of one key, newest first. */

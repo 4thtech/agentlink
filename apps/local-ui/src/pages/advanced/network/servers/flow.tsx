@@ -35,6 +35,8 @@ export interface ServersFlowProps {
   readonly api: ServersApi;
   readonly owner: OwnerClient;
   readonly onDone: (done: Done) => void;
+  /** NET-ANNOUNCE-OPTOUT: the opt-out is on now, so the flow starts with it on (mix-in off). */
+  readonly optedOut?: boolean;
 }
 
 export function ServersFlow({
@@ -43,13 +45,15 @@ export function ServersFlow({
   api,
   owner,
   onDone,
+  optedOut = false,
 }: ServersFlowProps): ReactElement | null {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [rows, setRows] = useState<readonly Row[]>([]);
   const [draft, setDraft] = useState('');
   const [note, setNote] = useState<string | undefined>(undefined);
-  const [mixIn, setMixIn] = useState(true);
-  const [optOut, setOptOut] = useState(false);
+  // NET-ANNOUNCE-OPTOUT: a change keeps an opt-out that is on (it implies the mix-in off).
+  const [mixIn, setMixIn] = useState(!optedOut);
+  const [optOut, setOptOut] = useState(optedOut);
   const [review, setReview] = useState<Review | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);

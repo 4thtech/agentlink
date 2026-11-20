@@ -436,6 +436,8 @@ export {
   type ServerTestOutcome,
   type TestedServer,
 } from './server-list.js';
+// NET-ANNOUNCE-OPTOUT (D-158 (7)): the default and old default servers the opt-out keeps this ID off.
+export { DEFAULT_AND_LEGACY_SERVERS, holdsDefaultServer } from './announce-optout.js';
 // M1-7j (D-158 (5)): the servers that left the own list stay readable for 30 days.
 export {
   LEAVING_SERVER_SECONDS,

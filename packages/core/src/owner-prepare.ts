@@ -30,6 +30,7 @@ import {
   type AppChangeParams,
   type BackupExportParams,
   type FileSaveParams,
+  type NetworkAnnounceParams,
   type ContactCheckParams,
   type ContactRule,
   type ContactBlockParams,
@@ -63,6 +64,7 @@ export type PreparableOp =
   | 'app.disconnect'
   | 'agent.resume'
   | 'file.save'
+  | 'network.announce'
   | 'backup.export';
 
 const PREPARABLE: readonly string[] = [
@@ -86,6 +88,8 @@ const PREPARABLE: readonly string[] = [
   'agent.resume',
   // W4-FILES-SAVE: the owner saves one received file into the Inbox folder from the local app.
   'file.save',
+  // NET-ANNOUNCE-OPTOUT (D-158 (7)): the owner turns the announce opt-out on or off (local app).
+  'network.announce',
   // WP-11 (D-117 A): the owner saves a recovery kit from the local app (04 §2.3.3).
   'backup.export',
 ];
@@ -104,6 +108,7 @@ interface ParamsOf {
   readonly 'app.disconnect': AppChangeParams;
   readonly 'agent.resume': AgentResumeParams;
   readonly 'file.save': FileSaveParams;
+  readonly 'network.announce': NetworkAnnounceParams;
   readonly 'backup.export': BackupExportParams;
 }
 
@@ -194,7 +199,9 @@ export type PrepareRefusal =
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
   | 'item_invalid'
   /** WP-11: `backup.export` params that are not a 16-byte base64url kitId and full/identity. */
-  | 'params_invalid';
+  | 'params_invalid'
+  /** NET-ANNOUNCE-OPTOUT: the opt-out while the list holds a default or an old default server. */
+  | 'mix_in_on';
 
 export type PreparedOwnerAction =
   | {

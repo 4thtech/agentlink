@@ -75,6 +75,7 @@ import {
   type SignedCard,
   type StoredCard,
 } from './card.js';
+import { holdsDefaultServer } from './announce-optout.js';
 import { STORAGE_PREFIX_BYTES } from './constants.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -520,6 +521,10 @@ export class IdentityService {
     const relaysChanged = !sameList(relays, storedRelays);
     // 07 §4.3 "Counts" (owner D2): a changed own list holds 2 to 8 relays.
     if (relaysChanged) checkOwnRelays(relays);
+    // NET-ANNOUNCE-OPTOUT (D-158 (7); 07 §4.3 "Privacy"): the opt-out holds only while the list has no
+    // default or old default server, so a change to a list with one (the mix-in back on) clears it.
+    const announceDefault =
+      relaysChanged && holdsDefaultServer(relays) ? true : input.announceDefault;
     // M1-7j (D-158 (5)): every server that leaves the list stays readable for 30 days; a change that
     // needs more than 16 leaving servers is refused here, before any key is previewed or signed.
     const storedLeaving = relaysChanged ? await openLeavingOrEmpty(ctx, current.row) : [];
@@ -565,13 +570,11 @@ export class IdentityService {
     // RELAY-CARD-MIGRATION: so does a pending card with a new relay list.
     // NET-OWNER-SET: and the announce choice, so an interrupted list change keeps it too.
     const text =
-      renamed || relaysChanged || input.announceDefault !== undefined
+      renamed || relaysChanged || announceDefault !== undefined
         ? pendingCardText(signed, {
             ...(renamed ? { name } : {}),
             ...(relaysChanged ? { relays } : {}),
-            ...(input.announceDefault === undefined
-              ? {}
-              : { announceDefault: input.announceDefault }),
+            ...(announceDefault === undefined ? {} : { announceDefault }),
           })
         : storedCardText(signed);
     // M1-4d-f: the current card joins the history. A card stored before M1-4d-d gets its `cardPop`
@@ -639,9 +642,9 @@ export class IdentityService {
       updated_at: now,
       ...(sealedName === undefined ? {} : { name: sealedName }),
       ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
-      ...(input.announceDefault === undefined
+      ...(announceDefault === undefined
         ? {}
-        : { announce_default: input.announceDefault ? (1 as const) : (0 as const) }),
+        : { announce_default: announceDefault ? (1 as const) : (0 as const) }),
     };
     // M1-7j: the leaving servers are written in the same transaction as the card, as of the clock
     // read inside it (an entry that ended meanwhile is not stored).
