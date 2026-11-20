@@ -759,7 +759,6 @@ describe('IR F2: the contact exception is per recipient, never for the own copie
     const own = new Set([card.ownerNostr.slice(2), card.agentNostr.slice(2)]);
     const theirCard = (await c.client.identity.signedCard()).card;
     const theirs = new Set([theirCard.ownerNostr.slice(2), theirCard.agentNostr.slice(2)]);
-    expect(x.sentTo.some((s) => own.has(s.to))).toBe(true);
     for (const s of x.sentTo.filter((s) => own.has(s.to))) expect(offLimits(s.relays)).toEqual([]);
     expect(x.sentTo.some((s) => theirs.has(s.to) && s.relays.some((r) => OFF_LIMITS.has(r)))).toBe(
       true,
@@ -779,9 +778,15 @@ describe('IR F2: the contact exception is per recipient, never for the own copie
     clock.t += 60;
     await change(x, OWN, false);
     await x.client.cardUpdates.withdrawFromDefaultServers();
-    const rows = await x.store.transaction((tx) => tx.select('outbox', { state: 'pending' }));
     const card = (await x.client.identity.signedCard()).card;
     const own = new Set([card.ownerNostr.slice(2), card.agentNostr.slice(2)]);
+    // The clean-up's layer: pending card-update rows (every other row is the publish filter's).
+    const rows = await x.store.transaction((tx) =>
+      tx
+        .select('outbox', { state: 'pending' })
+        .filter((r) => tx.get('envelopes', { envelope_id: r.envelope_id })?.type === 'card-update'),
+    );
+    expect(rows.some((r) => own.has(r.recipient_key))).toBe(true);
     for (const row of rows.filter((r) => own.has(r.recipient_key))) {
       const relays = JSON.parse(
         await x.cipher.open(

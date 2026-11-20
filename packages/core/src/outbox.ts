@@ -71,7 +71,12 @@ import {
   type ReadbackOptions,
   type RelayProbeResult,
 } from '@4thtech-io/transport-nostr';
-import { DEFAULT_AND_LEGACY_SERVERS } from './announce-optout.js';
+import {
+  DEFAULT_AND_LEGACY_SERVERS,
+  NO_PEER,
+  peerServersOf,
+  type PeerServers,
+} from './announce-optout.js';
 import { acksFor, type AckTarget } from './acks.js';
 import { agentNostrKey } from './card.js';
 import {
@@ -544,14 +549,14 @@ export class OutboxService {
     } catch {
       own = new Set();
     }
-    const lists = new Map<string, ReadonlySet<string>>();
-    const listOf = async (contactId: string): Promise<ReadonlySet<string>> => {
+    const lists = new Map<string, PeerServers>();
+    const listOf = async (contactId: string): Promise<PeerServers> => {
       let got = lists.get(contactId);
       if (got === undefined) {
         try {
-          got = new Set((await this.contactPeer(contactId)).relays);
+          got = peerServersOf(await this.contactPeer(contactId));
         } catch {
-          got = new Set();
+          got = NO_PEER;
         }
         lists.set(contactId, got);
       }
@@ -563,16 +568,20 @@ export class OutboxService {
         tx.get('envelopes', { envelope_id: row.envelope_id }),
       );
       const contactId = env?.contact_id ?? null;
-      let theirs: ReadonlySet<string>;
-      if (contactId !== null) theirs = await listOf(contactId);
+      let peer: PeerServers;
+      if (contactId !== null) peer = await listOf(contactId);
       else if (env?.type === 'handshake') {
         // An accept: the inviter is reached on the list its invite named (the staged pairing).
         try {
-          theirs = new Set((await this.#contacts.readStaged(row.envelope_id))?.relays ?? []);
+          const staged = await this.#contacts.readStaged(row.envelope_id);
+          peer = staged === undefined ? NO_PEER : peerServersOf(staged);
         } catch {
-          theirs = new Set();
+          peer = NO_PEER;
         }
-      } else theirs = new Set();
+      } else peer = NO_PEER;
+      // IR F2: the contact's servers only for the rows to that contact's agent or owner key; the own
+      // owner and agent copies never get the exception.
+      const theirs = peer.keys.has(row.recipient_key) ? peer.relays : NO_PEER.relays;
       return relays.filter(
         (r) => !DEFAULT_AND_LEGACY_SERVERS.has(r) || own.has(r) || theirs.has(r),
       );

@@ -16,13 +16,14 @@
 //   a concurrent attempt or another process is never overwritten. It runs right after the owner's
 //   `network.announce` and at the start of every owner announce pass (each sync), so a crash in
 //   between leaves nothing behind. A row whose relays do not open is left to the outbox (it ends it
-//   as unreadable). A row that would keep no relay is left unchanged (it cannot happen: the own list
-//   and a contact's list hold at least 2 servers that are never removed).
+//   as unreadable). A row that would keep no server keeps none, and the outbox ends it (IR F2).
 //
 // I-7: counts only; never a list, a host or a key in a log.
 import { canonicalize, parseJson } from '@4thtech-io/crypto';
 import { DEFAULT_RELAYS, LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
+import { agentNostrKey } from './card.js';
 import { open, seal, type CoreContext } from './context.js';
+import type { AgentCard } from '@4thtech-io/crypto';
 import type { IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
 import type { Row } from './store/schema.js';
@@ -32,6 +33,30 @@ export const DEFAULT_AND_LEGACY_SERVERS: ReadonlySet<string> = new Set([
   ...DEFAULT_RELAYS,
   ...LEGACY_READ_RELAYS,
 ]);
+
+/**
+ * IR NET-ANNOUNCE-OPTOUT F2: a contact (or a staged inviter) as the exception sees it: its servers,
+ * and the only recipients they are allowed for, its agent key and its owner key (Nostr, x-only hex).
+ */
+export interface PeerServers {
+  readonly keys: ReadonlySet<string>;
+  readonly relays: ReadonlySet<string>;
+}
+
+export const NO_PEER: PeerServers = Object.freeze({
+  keys: new Set<string>(),
+  relays: new Set<string>(),
+});
+
+export function peerServersOf(peer: {
+  readonly card: AgentCard;
+  readonly relays: readonly string[];
+}): PeerServers {
+  return {
+    keys: new Set([agentNostrKey(peer.card), peer.card.ownerNostr.slice(2)]),
+    relays: new Set(peer.relays),
+  };
+}
 
 /** Whether a list holds a default or an old default server (the opt-out is then refused). */
 export function holdsDefaultServer(relays: readonly string[]): boolean {
@@ -66,25 +91,28 @@ export async function withdrawFromDefaultServers(
   );
   if (rows.length === 0) return 0;
   const own = new Set([...(await deps.identity.relays()), ...(await deps.outbox.leavingRelays())]);
-  const contactLists = new Map<string, ReadonlySet<string> | undefined>();
-  const contactList = async (contactId: string): Promise<ReadonlySet<string> | undefined> => {
-    if (!contactLists.has(contactId)) {
+  const contactLists = new Map<string, PeerServers>();
+  const contactList = async (contactId: string): Promise<PeerServers> => {
+    let got = contactLists.get(contactId);
+    if (got === undefined) {
       try {
-        contactLists.set(contactId, new Set((await deps.outbox.contactPeer(contactId)).relays));
+        got = peerServersOf(await deps.outbox.contactPeer(contactId));
       } catch {
         // IR L3, fail closed: an unreadable contact list allows none of the default servers.
-        contactLists.set(contactId, new Set());
+        got = NO_PEER;
       }
+      contactLists.set(contactId, got);
     }
-    return contactLists.get(contactId);
+    return got;
   };
   let changed = 0;
   for (const { row, env } of rows) {
     // The owner channel: the own list and the leaving servers. A contact's envelope: those and the
     // contact's own list (its agent and its owner are reached there, whatever servers they are).
     const contactId = env?.contact_id ?? null;
-    const theirs = contactId === null ? new Set<string>() : await contactList(contactId);
-    if (theirs === undefined) continue;
+    const peer = contactId === null ? NO_PEER : await contactList(contactId);
+    // IR F2: the contact's servers only on the rows to its agent or owner key, never the own copies.
+    const theirs = peer.keys.has(row.recipient_key) ? peer.relays : NO_PEER.relays;
     if (await rewrite(ctx, row, new Set([...own, ...theirs]))) changed += 1;
   }
   if (changed > 0) ctx.log.info('card updates kept off the default servers', { rows: changed });
@@ -106,7 +134,9 @@ async function rewrite(
     return false;
   }
   const next = kept(relays, allowed);
-  if (next.length === relays.length || next.length === 0) return false;
+  // A row left with no server (own copies built for a list of default servers only) keeps none:
+  // the outbox then ends it by its usual rules (no relays: not delivered), never publishing there.
+  if (next.length === relays.length) return false;
   const sealed = await seal(ctx, 'outbox', 'relays', [row.wrap_id], canonicalize([...next]));
   return ctx.store.transaction(
     (tx) =>
