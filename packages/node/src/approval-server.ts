@@ -356,6 +356,7 @@ import {
 import { attachDesk } from './local-ui/attach-desk.js';
 import { revealOwnSendFolder } from './send-folder-reveal.js';
 import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
+import { NETWORK_TEST_MAX_BODY_BYTES } from './local-ui/route-types.js';
 import {
   creditsPort,
   fileSavePort,
@@ -381,6 +382,7 @@ import { HOST_SHOW_PATH, HOST_YIELD_PATH, JOIN_PAGE_PATH } from './local-ui/invi
 import type {
   LocalUiInviteRoute,
   LocalUiAttachRoute,
+  LocalUiNetworkTestRoute,
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
@@ -7316,6 +7318,71 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * NET-PRECHECK (08 §1 `POST /api/ui/network/test`; 04 §4): the net-test kind, run after the
+   * session, CSRF, Origin, fetch-metadata, octet-stream and generation checks of every write. It
+   * refuses a query, an operation input and a presence header; refuses a body without a declared
+   * length (411) or declared over NETWORK_TEST_MAX_BODY_BYTES (413) before reading; parses one
+   * strict JSON object and hands the handler only that object. The handler applies the rate limit
+   * (api/network-test.ts). No owner presence, no owner store, no ID key, nothing signed or written.
+   */
+  async function netTestGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiNetworkTestRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const declaredText = header(req, 'content-length');
+    const declared = declaredText === undefined ? Number.NaN : Number(declaredText);
+    if (!Number.isSafeInteger(declared) || declared < 0) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 411, { error: 'length_required' });
+      return;
+    }
+    if (declared > NETWORK_TEST_MAX_BODY_BYTES) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 413, { error: 'too_large' });
+      return;
+    }
+    const body = await boundedBody(req, res, NETWORK_TEST_MAX_BODY_BYTES);
+    if (body === undefined) return;
+    let parsed: JsonValue;
+    try {
+      parsed = parseJson(decodeUtf8(body));
+    } catch {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, parsed as JsonObject);
+    } catch {
+      // Never the error's text: it could name a host or an address (I-7).
+      sendJson(res, 503, { error: 'unavailable' });
+      return;
+    }
+    sendResult(res, result);
+  }
+
+  /**
    * U3-invite (08 §4): opens the join screen through the OS opener, or first run while no owner
    * exists (it ends on the join screen). A fixed path and a one-shot session link; the invite is
    * never in it. At most one open per JOIN_OPEN_INTERVAL_MS for a handoff (`limited`).
@@ -7677,6 +7744,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'attach') {
       // ATT-APP-ATTACH: the owner's attached files have their own gate; ownerGate never runs it.
       await attachGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'net-test') {
+      // NET-PRECHECK: the server Test has its own gate; ownerGate never runs it (no presence).
+      await netTestGate(req, res, url, route);
       return;
     }
     if (route.presence === 'setup') {

@@ -22,6 +22,8 @@ export interface MockRelayConfig {
    * limits connections from one address, as offchain.pub does: the extra one is refused at once).
    */
   maxConnections?: number;
+  /** NET-PRECHECK: the connection fails before it opens, reported through `onFailure` then a close. */
+  failure?: 'tls' | 'connect' | 'upgrade';
   /** Accepts the connection but never answers an EVENT. */
   silent?: boolean;
   /** W6-SEND-LATENCY: stores the EVENT at once but answers OK only after this many ms (a slow relay). */
@@ -125,6 +127,16 @@ export class MockSocket implements RelaySocket {
         config.maxConnections
     ) {
       this.dropFromRelay();
+      return;
+    }
+    const failure = config.failure;
+    if (failure !== undefined) {
+      microtask(() => {
+        if (this.closed) return;
+        this.closed = true;
+        handlers.onFailure?.(failure);
+        handlers.onClose();
+      });
       return;
     }
     microtask(() => {

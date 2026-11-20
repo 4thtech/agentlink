@@ -464,6 +464,26 @@ export interface LocalUiAttachRoute {
   ) => Promise<LocalUiResult>;
 }
 
+/**
+ * NET-PRECHECK (08 §1 `POST /api/ui/network/test`; 04 §4; 07 §4.3): the server Test under Advanced ›
+ * Message network › Your servers. Only that path, registered once (routes.ts). The server's
+ * net-test gate runs after the same session, CSRF, Origin, fetch-metadata and octet-stream checks
+ * as every write, refuses a query, an operation input or a presence header, reads at most
+ * NETWORK_TEST_MAX_BODY_BYTES, parses one strict JSON object and hands the handler only that
+ * object. No owner presence: it changes nothing, signs nothing with an ID key and writes nothing;
+ * it only opens outbound connections under the relay URL rule (api/network-test.ts). Never MCP.
+ */
+export const NETWORK_TEST_PATH = '/api/ui/network/test';
+/** The largest body the net-test gate reads: 8 addresses of at most 256 characters, with room. */
+export const NETWORK_TEST_MAX_BODY_BYTES = 8192;
+
+export interface LocalUiNetworkTestRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'net-test';
+  readonly handler: (context: LocalUiContext, body: JsonObject) => Promise<LocalUiResult>;
+}
+
 /** U3-c: the fixed path of the switch kind (08 §1). */
 export const AGENTS_SWITCH_PATH = '/api/ui/agents/switch';
 
@@ -683,7 +703,8 @@ export type LocalUiRoute =
   | LocalUiHistoryRoute
   | LocalUiInboxRevealRoute
   | LocalUiInviteRoute
-  | LocalUiAttachRoute;
+  | LocalUiAttachRoute
+  | LocalUiNetworkTestRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A

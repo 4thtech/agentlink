@@ -11585,6 +11585,10 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** the app tests each typed server on this computer: URL rule and every DNS answer routable before any socket, pinned address, fresh connection, throwaway key, no login; one test event accepted without login, served back on a second connection by id and by the sync filter; NIP-11 flags; round trip. Fixed outcomes only (`ready`, `slow` > 1 s, `sign_in`, `refused` with a fixed reason). At most 8 URLs per test, 10 tests a minute, 10 s per server.
 - **Done when:** `RED (expected):` commit first; tests for private DNS answers, rebinding, IP literals, write-login servers, accept-then-drop, slow and sign-in servers; no relay text or address leaves the route.
 
+#### NET-PRECHECK-FOLLOWUPS · Smaller server-test improvements
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 07 §4.3 "The test (pre-check)"
+- **Goal:** (1) try the next checked address when the first one cannot connect (a dual-stack server on a computer without IPv6 reads as unreachable today); (2) end the NIP-11 request itself when the test stops waiting for it (it ends on the fetcher's own deadline now); (3) bound how many name lookups one test starts at once, so a slow resolver cannot delay other app work; (4) say in the page copy that an address that resolves only inside a home or office network is refused, which is expected.
+
 #### NET-OWNER-SET · Save your own servers with one owner approval (0.5.15)
 - **Status:** backlog (0.5.15 lane 5) · **Size:** M · **Tier:** Opus · **Security:** S2 (independent security review) · **Spec:** D-158; 04 §2.6 "Use your own servers"; 07 §4.3; 08 §1 `POST /api/ui/network/servers`, `/reset`, `GET /api/ui/network/progress`
 - **Repo/path:** agentlink · core list builder and owner session (generalised from the contact-details update); `packages/node` local-ui API

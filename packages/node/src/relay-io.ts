@@ -25,6 +25,7 @@ import {
   isGloballyRoutable,
   type HostResolver,
   type Nip11Fetcher,
+  type RelayConnectFailure,
   type RelayConnector,
   type RelaySocket,
   type RelaySocketHandlers,
@@ -113,6 +114,25 @@ function refused(handlers: RelaySocketHandlers): RelaySocket {
   return { send: () => undefined, close: () => undefined };
 }
 
+/** OpenSSL and Node certificate error codes: the TLS handshake or the certificate failed. */
+const TLS_CODE = /^(?:ERR_TLS_|ERR_SSL_|ERR_OSSL_|CERT_|UNABLE_TO_|DEPTH_ZERO_|SELF_SIGNED_)/;
+
+/**
+ * NET-PRECHECK: why a connection never opened, from the error's `code` (or `ws`'s fixed handshake
+ * message), as a fixed class. The error's text is never kept or passed on.
+ */
+function connectFailure(error: unknown): RelayConnectFailure {
+  const code =
+    typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+  if (typeof code === 'string' && TLS_CODE.test(code)) return 'tls';
+  const message =
+    typeof error === 'object' && error !== null ? (error as { message?: unknown }).message : '';
+  if (typeof message === 'string' && message.startsWith('Unexpected server response')) {
+    return 'upgrade';
+  }
+  return 'connect';
+}
+
 /** The connector with test seams. Production: nodeRelayConnector(). */
 export function createRelayConnectorWith(options: RelayIoOptions = {}): RelayConnector {
   return {
@@ -136,11 +156,18 @@ export function createRelayConnectorWith(options: RelayIoOptions = {}): RelayCon
         return refused(handlers);
       }
       let closed = false;
+      let opened = false;
+      let failure: RelayConnectFailure | undefined;
       // Errors carry relay text and addresses: they are swallowed here and end as a close. A non-101
       // answer to the upgrade (a redirect, say) makes `ws` abort the handshake, because nothing
       // listens for 'unexpected-response' and followRedirects is off: never read, never followed.
-      ws.on('error', () => undefined);
+      // NET-PRECHECK: before the open, the error's kind is kept as a fixed class (connectFailure),
+      // never its text, and reported through the optional onFailure just before the close.
+      ws.on('error', (error: unknown) => {
+        if (!opened && failure === undefined) failure = connectFailure(error);
+      });
       ws.on('open', () => {
+        opened = true;
         if (!closed) handlers.onOpen();
       });
       ws.on('message', (data: WebSocket.RawData, isBinary: boolean) => {
@@ -155,6 +182,13 @@ export function createRelayConnectorWith(options: RelayIoOptions = {}): RelayCon
       ws.on('close', () => {
         if (closed) return;
         closed = true;
+        if (!opened) {
+          try {
+            handlers.onFailure?.(failure ?? 'connect');
+          } catch {
+            // the caller's handler fault is not ours to report
+          }
+        }
         handlers.onClose();
       });
       return {
