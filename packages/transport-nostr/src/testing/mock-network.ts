@@ -17,6 +17,8 @@ import type {
 export interface MockRelayConfig {
   /** Never completes the WebSocket upgrade (a black hole). */
   blackHole?: boolean;
+  /** NET-PRECHECK: the connection fails before it opens, reported through `onFailure` then a close. */
+  failure?: 'tls' | 'connect' | 'upgrade';
   /** Accepts the connection but never answers an EVENT. */
   silent?: boolean;
   /** W6-SEND-LATENCY: stores the EVENT at once but answers OK only after this many ms (a slow relay). */
@@ -114,6 +116,16 @@ export class MockSocket implements RelaySocket {
     this.challenge = `challenge-${network.sockets.length}`;
     const config = this.config;
     if (config.blackHole === true) return;
+    const failure = config.failure;
+    if (failure !== undefined) {
+      microtask(() => {
+        if (this.closed) return;
+        this.closed = true;
+        handlers.onFailure?.(failure);
+        handlers.onClose();
+      });
+      return;
+    }
     microtask(() => {
       if (this.closed) return;
       handlers.onOpen();
