@@ -624,7 +624,9 @@ export function fileSavePort(client: AgentLinkClient): LocalUiFileSavePort {
  * NET-OWNER-SET (D-158; 08 §1 `/api/ui/network/servers`, `/reset`, `/progress`): the reads the server
  * list routes need of the open agent: the own list, the leaving servers, the announce choice, the
  * pause and send state, the contact count and the card-update progress. Reads only: nothing here
- * rotates, signs or writes (the change is the gate's one-use `changeServers`, I-4).
+ * rotates, signs or writes (the change is the gate's one-use `changeServers`, I-4). NET-ANNOUNCE-OPTOUT
+ * adds the unsigned `network.announce` (prepare only) and the clean-up after core applied a signed
+ * one (`/api/ui/network/announce`).
  */
 export interface LocalUiServerListState {
   readonly relays: readonly string[];
@@ -653,6 +655,16 @@ export interface LocalUiServerListPort {
   /** Active, paired contacts (the ones a change tells). */
   contacts(): Promise<number>;
   progress(): Promise<LocalUiServerProgress>;
+  /**
+   * NET-ANNOUNCE-OPTOUT (D-158 (7); 04 §2.5.1): core's unsigned `network.announce` for the open agent
+   * (prepare only; `mix_in_on` while the list holds a default server). Optional for older doubles.
+   */
+  prepareAnnounce?(announceDefault: boolean): Promise<PreparedOwnerAction>;
+  /**
+   * NET-ANNOUNCE-OPTOUT: after an applied `network.announce`, core's clean-up (pending retries to the
+   * default servers end) and its card-update pass, best effort; signs nothing.
+   */
+  afterAnnounce?(): Promise<void>;
 }
 
 /** At most this many progress items (08 §1). */
@@ -681,6 +693,11 @@ export function serverListPort(client: AgentLinkClient): LocalUiServerListPort {
       (await client.contacts.list()).filter(
         (c) => c.status === 'active' && c.pairing === 'complete',
       ).length,
+    prepareAnnounce: (announceDefault) => client.ownerActions.prepareAnnounce(announceDefault),
+    afterAnnounce: async () => {
+      await client.cardUpdates.withdrawFromDefaultServers().catch(() => 0);
+      await client.sendCardUpdates().catch(() => undefined);
+    },
     progress: async () => {
       const [progress, leaving, contacts] = await Promise.all([
         client.cardUpdates.progress(),
@@ -697,15 +714,13 @@ export function serverListPort(client: AgentLinkClient): LocalUiServerListPort {
         sent: progress.sent,
         waiting: progress.waiting,
         items: Object.freeze(
-          progress.items
-            .slice(0, SERVER_PROGRESS_MAX_ITEMS)
-            .map((i) =>
-              Object.freeze({
-                ref: i.contactId,
-                name: names.get(i.contactId) ?? '',
-                state: i.state,
-              }),
-            ),
+          progress.items.slice(0, SERVER_PROGRESS_MAX_ITEMS).map((i) =>
+            Object.freeze({
+              ref: i.contactId,
+              name: names.get(i.contactId) ?? '',
+              state: i.state,
+            }),
+          ),
         ),
         leavingUntil,
       });

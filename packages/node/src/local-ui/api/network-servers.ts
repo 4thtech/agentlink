@@ -32,6 +32,7 @@ import {
   AUTOMATIC_SERVERS,
   automaticServerPlan,
   buildServerList,
+  holdsDefaultServer,
   isAutomaticList,
   parseOwnServers,
   planLeaving,
@@ -215,8 +216,8 @@ export function createNetworkServersRoutes(
     if (ask.kind === 'reset') return automaticServerPlan();
     if (ask.automatic && !ask.announce) return refusal('mix_in_on');
     // IR L3 (04 §2.5.1, D-158 (7)): the opt-out only while the list holds no default server, also
-    // one the owner typed as an own server.
-    if (!ask.announce && ask.own.some((url) => isAutomaticList([url]))) {
+    // one the owner typed as an own server (NET-ANNOUNCE-OPTOUT: or an old default server).
+    if (!ask.announce && holdsDefaultServer(ask.own)) {
       return refusal('mix_in_on');
     }
     const ran = await budget.run(() => {
@@ -353,6 +354,19 @@ export function createNetworkServersRoutes(
     };
   }
 
+  /**
+   * NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6; 04 §2.6, 11 §5.14 C5): the OS sheet names the change,
+   * "Use {n} message servers", from the plan the confirm's precheck just tested (a count only).
+   */
+  const sheetDetail =
+    (parse: (input: JsonValue | undefined) => Ask | LocalUiResult) =>
+    (context: LocalUiContext, request: LocalUiRequest): string | undefined => {
+      const ask = parse(request.input);
+      if (!('kind' in ask) || ask.review) return undefined;
+      const plan = confirmed.get(keyOf(ask), context.now());
+      return plan === undefined ? undefined : `Use ${String(plan.relays.length)} message servers`;
+    };
+
   const ownerRoute = (
     path: string,
     parse: (input: JsonValue | undefined) => Ask | LocalUiResult,
@@ -362,6 +376,7 @@ export function createNetworkServersRoutes(
       path,
       presence: true,
       precheck: (context, request) => precheck(context, request, parse),
+      sheetDetail: sheetDetail(parse),
       handler: (context, request, owner) => confirm(context, request, owner, parse),
     });
 

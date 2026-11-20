@@ -52,6 +52,8 @@ const BL = list('b', 2);
 /** Every server the opt-out keeps this ID off: the release's default set and the old one. */
 const OFF_LIMITS: ReadonlySet<string> = new Set([...DEFAULT_RELAYS, ...LEGACY_READ_RELAYS]);
 const offLimits = (relays: readonly string[]): string[] => relays.filter((r) => OFF_LIMITS.has(r));
+const sameList = (x: readonly string[], y: readonly string[]): boolean =>
+  x.length === y.length && x.every((r, i) => r === y[i]);
 
 /** While true, every relay refuses every publish (rows stay pending). */
 let refuseAll = false;
@@ -110,11 +112,7 @@ function platform(drop: Drop): FilesPlatform {
   };
 }
 
-async function agent(
-  n: number,
-  relays: readonly string[],
-  drop?: Drop,
-): Promise<Agent> {
+async function agent(n: number, relays: readonly string[], drop?: Drop): Promise<Agent> {
   const owner = new MemoryOwnerKeyStore(seed(n + 100), passphrase());
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
@@ -182,7 +180,10 @@ async function signAndApply(x: Agent, body: unknown) {
   const session = await x.owner.unlock(passphrase());
   try {
     const plain = JSON.parse(JSON.stringify(body)) as Parameters<typeof session.signOwnerAction>[0];
-    return await x.client.ownerActions.apply({ body: plain, sig: await session.signOwnerAction(plain) });
+    return await x.client.ownerActions.apply({
+      body: plain,
+      sig: await session.signOwnerAction(plain),
+    });
   } finally {
     await session.close();
   }
@@ -336,7 +337,9 @@ describe('with the opt-out on, nothing about this ID goes to the default servers
     clock.t += DAY;
     await change(a, OWN2);
     await a.client.cardUpdates.announceToOwner();
-    const owner = (await outboxRows(a)).filter((r) => r.type === 'card-update' && r.contact === null);
+    const owner = (await outboxRows(a)).filter(
+      (r) => r.type === 'card-update' && r.contact === null,
+    );
     expect(owner.length).toBeGreaterThan(0);
     for (const row of owner) {
       expect(offLimits(row.relays)).toEqual([]);
@@ -385,8 +388,13 @@ describe('with the opt-out on, nothing about this ID goes to the default servers
     const toC = rows.filter((r) => r.contact !== null && r.role === 'contact');
     expect(toC.length).toBeGreaterThan(0);
     for (const row of toC) expect(row.relays).toEqual(DEFAULT_RELAYS.slice(0, 2));
-    // Its own copies (the own owner and agent) and the owner card-update stay off the default set.
+    // Every other wrap is either the contact's owner (on the contact's list) or an own copy, which
+    // stays off the default set; the owner card-update (no contact) too.
     for (const row of rows.filter((r) => r.role === 'owner')) {
+      if (row.contact !== null && sameList(row.relays, DEFAULT_RELAYS.slice(0, 2))) continue;
+      expect(offLimits(row.relays)).toEqual([]);
+    }
+    for (const row of rows.filter((r) => r.contact === null)) {
       expect(offLimits(row.relays)).toEqual([]);
     }
   });
@@ -415,7 +423,8 @@ describe('turned on without a rotation: pending retries to the default servers e
     for (const row of after) {
       expect(offLimits(row.relays)).toEqual([]);
       if (row.role === 'contact') expect(row.relays).toEqual(BL);
-      else for (const relay of row.relays) expect([...OWN, ...OWN2]).toContain(relay);
+      // The contact's owner is reached on the contact's list; the own copies on the own lists.
+      else for (const relay of row.relays) expect([...OWN, ...OWN2, ...BL]).toContain(relay);
     }
     // The next attempts publish nowhere off limits.
     a.published.length = 0;

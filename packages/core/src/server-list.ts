@@ -16,6 +16,7 @@
 //   change that needs more is refused with the time from which it fits.
 import { DEFAULT_RELAYS, relayOrigin } from '@4thtech-io/transport-nostr';
 import { isAllowedRelayUrl } from '@4thtech-io/types';
+import { holdsDefaultServer } from './announce-optout.js';
 import { TooManyPreviousError, nextLeaving, type LeavingServer } from './leaving-servers.js';
 
 /** A list holds at most this many servers, the mixed-in ones included (D-158 (2)). */
@@ -97,10 +98,8 @@ export function buildServerList(input: {
 }): ServerListBuild {
   // D-158 (7), 04 §2.5.1: the opt-out only while the list holds no default server, the mix-in's or
   // one the owner typed as an own server.
-  if (
-    !input.announce &&
-    (input.automatic || input.own.some((s) => DEFAULT_RELAYS.includes(s.url)))
-  ) {
+  // NET-ANNOUNCE-OPTOUT: the old default servers count as default ones here too.
+  if (!input.announce && (input.automatic || holdsDefaultServer(input.own.map((s) => s.url)))) {
     return Object.freeze({ status: 'refused', reason: 'mix_in_on' });
   }
   const notReady = Object.freeze({ status: 'refused', reason: 'not_ready' } as const);

@@ -11,6 +11,7 @@ import { createOwnerClient, type OwnerClient } from '../../../contacts/owner.js'
 import { usePresenceMode } from '../../../contacts/presence-button.js';
 import { NETWORK_CHANGED } from '../data.js';
 import { createServersApi, type NetworkStatus, type Progress, type ServersApi } from './api.js';
+import { AnnounceSwitch } from './announce.js';
 import { ServersFlow } from './flow.js';
 import { dayText } from './messages.js';
 import { ProgressCard } from './progress.js';
@@ -143,12 +144,26 @@ export function ServersEntry({
           ) : null}
         </div>
         {custom && !off ? <p className="al-text-body-sm al-muted">{S.anyTime}</p> : null}
+        {/* NET-ANNOUNCE-OPTOUT: the opt-out on its own, only with the mix-in off (D-158 (7)). */}
+        {status.optOutOffered ? (
+          <AnnounceSwitch
+            api={api}
+            owner={owner}
+            announceDefault={status.announceDefault}
+            disabled={off}
+            onDone={(announceDefault) => {
+              notify({ text: announceDefault ? S.announceOnToast : S.announceOffToast });
+              void refresh();
+            }}
+          />
+        ) : null}
       </section>
       {flow === 'own' ? (
         <ServersFlow
           open
           api={api}
           owner={owner}
+          optedOut={!status.announceDefault}
           onClose={() => setFlow(undefined)}
           onDone={finished(S.toast)}
         />

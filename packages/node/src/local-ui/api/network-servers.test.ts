@@ -472,13 +472,13 @@ describe('NET-ANNOUNCE-OPTOUT: the old default servers and the OS sheet (IR L6)'
   it('the OS sheet names the change: "Use {n} message servers" for the confirmed plan', async () => {
     const w = setup({ relays: own(2, 'old') });
     const input = { servers: own(3), automatic: false, announce: true };
-    expect(w.servers.sheetDetail?.(w.req(input))).toBeUndefined();
+    expect(w.servers.sheetDetail?.(w.context, w.req(input))).toBeUndefined();
     await w.review(w.servers, input);
     expect(await w.servers.precheck?.(w.context, w.req(input))).toBeUndefined();
-    expect(w.servers.sheetDetail?.(w.req(input))).toBe('Use 3 message servers');
+    expect(w.servers.sheetDetail?.(w.context, w.req(input))).toBe('Use 3 message servers');
     await w.review(w.reset, {});
     expect(await w.reset.precheck?.(w.context, w.req({}))).toBeUndefined();
-    expect(w.reset.sheetDetail?.(w.req({}))).toBe(
+    expect(w.reset.sheetDetail?.(w.context, w.req({}))).toBe(
       `Use ${String(DEFAULT_RELAYS.length)} message servers`,
     );
   });

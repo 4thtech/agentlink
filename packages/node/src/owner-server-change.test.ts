@@ -183,17 +183,28 @@ describe('signServerChange: one gesture signs the next card with exactly the pla
 
   it('IR L3: the same list with another announce choice rotates; a reset clears the opt-out', async () => {
     const w = await world();
+    // NET-ANNOUNCE-OPTOUT (D-158 (7)): core never keeps the opt-out on a list that holds a default
+    // server, so a default list signed with `false` stores `true` (the routes refuse it earlier).
     await changeTo(w, DEFAULT_RELAYS, false);
+    expect(await w.client.identity.announceDefault()).toBe(true);
+    now += 60;
+    await changeTo(w, own(2), false);
     expect(await w.client.identity.announceDefault()).toBe(false);
     now += 60;
-    const { outcome } = await changeTo(w, DEFAULT_RELAYS, true);
+    const { outcome } = await changeTo(w, own(2), true);
     expect(outcome.status).toBe('changed');
     expect(await w.client.identity.announceDefault()).toBe(true);
-    expect((await w.client.identity.get())?.keyEpoch).toBe(2);
-    expect((await changeTo(w, DEFAULT_RELAYS, true)).outcome).toEqual({
+    expect((await w.client.identity.get())?.keyEpoch).toBe(3);
+    expect((await changeTo(w, own(2), true)).outcome).toEqual({
       status: 'refused',
       reason: 'same_list',
     });
+    // A reset (the default set with the choice on) clears an opt-out that is on.
+    now += 60;
+    await changeTo(w, own(2), false);
+    now += 60;
+    expect((await changeTo(w, DEFAULT_RELAYS, true)).outcome.status).toBe('changed');
+    expect(await w.client.identity.announceDefault()).toBe(true);
   });
 
   it('the same list is refused before anything is signed', async () => {

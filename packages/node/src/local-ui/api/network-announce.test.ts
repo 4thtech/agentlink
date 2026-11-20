@@ -13,6 +13,7 @@ import { DEFAULT_RELAYS } from '@4thtech-io/transport-nostr';
 import { describe, expect, it } from 'vitest';
 import type { LocalUiContext, LocalUiServerListPort } from '../context.js';
 import type { LocalUiOwnerOperation, LocalUiOwnerRoute, LocalUiResult } from '../route-types.js';
+import { isPromptDetail } from '../../owner-native-helper.js';
 import type { OwnerReview, OwnerSignRequest } from '../../owner-operation.js';
 import { NETWORK_ANNOUNCE_PATH, networkAnnounceRoute } from './network-announce.js';
 
@@ -160,11 +161,13 @@ describe('POST /api/ui/network/announce (NET-ANNOUNCE-OPTOUT)', () => {
   });
 
   it('refuses nothing-to-change and the agent state before the gesture', async () => {
+    expect(errorOf(await route.precheck?.(setup().context, request({ announce: true })))).toBe(
+      'same_choice',
+    );
     expect(
-      errorOf(await route.precheck?.(setup().context, request({ announce: true }))),
-    ).toBe('same_choice');
-    expect(
-      errorOf(await route.precheck?.(setup({ paused: true }).context, request({ announce: false }))),
+      errorOf(
+        await route.precheck?.(setup({ paused: true }).context, request({ announce: false })),
+      ),
     ).toBe('agent_paused');
     expect(
       errorOf(
@@ -234,15 +237,13 @@ describe('POST /api/ui/network/announce (NET-ANNOUNCE-OPTOUT)', () => {
   });
 
   it('the OS sheet names the action (sheetDetail), a plain single line', () => {
-    const on = route.sheetDetail?.(request({ announce: false }));
-    const off = route.sheetDetail?.(request({ announce: true }));
+    const on = route.sheetDetail?.(setup().context, request({ announce: false }));
+    const off = route.sheetDetail?.(setup().context, request({ announce: true }));
     expect(on).toMatch(/default servers/);
     expect(off).toMatch(/default servers/);
     expect(on).not.toBe(off);
-    for (const d of [on, off]) {
-      expect([...(d ?? '')].length).toBeLessThanOrEqual(64);
-      expect(d).not.toMatch(/[\u0000-\u001f]/u);
-    }
-    expect(route.sheetDetail?.(request({ announce: 'x' }))).toBeUndefined();
+    // What the gate passes to the helper: only a plain single line (owner-native-helper.ts).
+    for (const d of [on, off]) expect(isPromptDetail(d)).toBe(true);
+    expect(route.sheetDetail?.(setup().context, request({ announce: 'x' }))).toBeUndefined();
   });
 });

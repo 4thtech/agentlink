@@ -112,7 +112,16 @@ beforeEach(async () => {
   await session.close();
   await owner.close();
 
-  const source = fakeSource(world);
+  // The app's source applies owner actions through core (apps/cli ui-source.ts `apply`); the
+  // fixture's own apply knows approvals only, so `network.announce` goes to this client's core.
+  const fake = fakeSource(world);
+  const source: typeof fake = {
+    ...fake,
+    apply: (signed) =>
+      signed.body['op'] === 'network.announce'
+        ? client.ownerActions.apply(signed)
+        : fake.apply(signed),
+  };
   const epochKeys = epochKeysOf(keyStore);
   if (epochKeys === undefined) throw new Error('test: no epoch keys');
   const initial: AppHostAgent = {

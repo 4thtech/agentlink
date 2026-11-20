@@ -274,6 +274,7 @@ import { OwnerCodeChanges } from './local-ui/api/owner-presence.js';
 import { ownerCodeProofAllowed, type LocalUiOwnerCodeStep } from './local-ui/owner-code-paths.js';
 import {
   NativeHelperError,
+  isPromptDetail,
   type NativeHelper,
   type NativeReason,
   type NativeUiState,
@@ -3811,6 +3812,12 @@ export async function startApprovalServerWith(
        */
       readonly history?: true;
       /**
+       * NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6): the route's one-line name of this operation for
+       * the OS sheet (route-types.ts `sheetDetail`; a fixed string of the route's own words and
+       * counts). Display only: it binds nothing (04 §2.3.4).
+       */
+      readonly detail?: string;
+      /**
        * WIN-BROKEN-ID: "Remove this ID from this computer" for an ID whose key is missing. Presence
        * is verified as for every owner route and nothing is signed (as `history`): the handler marks
        * its one owner operation with `presenceChecked`. The owner is the open ID's owner; with no ID
@@ -3958,6 +3965,7 @@ export async function startApprovalServerWith(
             codeStep === 'replace' ? 'code' : 'approve',
             req,
             res,
+            codeStep === 'replace' ? undefined : gate.detail,
           );
           if (!('presence' in got)) {
             finishOwner(res, got.http, 'presence_rejected', { native: got.state });
@@ -7854,6 +7862,19 @@ export async function startApprovalServerWith(
       route.historyFinish === true
         ? Object.freeze({ ...uiContext, historySession: historyDesk.forSession(cookie) })
         : uiContext;
+    // NET-ANNOUNCE-OPTOUT (IR NET-OWNER-SET L6): the OS sheet names the operation when the route
+    // gives a line; a line that is not plain is dropped (the generic reason stays).
+    let detail: string | undefined;
+    try {
+      const line = route.sheetDetail?.(uiContext, {
+        params,
+        query: url.searchParams,
+        ...(input === undefined ? {} : { input }),
+      });
+      detail = isPromptDetail(line) ? line : undefined;
+    } catch {
+      detail = undefined;
+    }
     await ownerGate(
       req,
       res,
@@ -7869,7 +7890,9 @@ export async function startApprovalServerWith(
           ? { ownerCode: route.ownerCode, session: cookie }
           : route.historyFinish === true
             ? { history: true }
-            : {},
+            : detail === undefined
+              ? {}
+              : { detail },
     );
   }
 

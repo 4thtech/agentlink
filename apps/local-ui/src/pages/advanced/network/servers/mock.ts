@@ -4,6 +4,7 @@
 // each state: "slow", "members" (needs sign-in), "write-only", "lossy", "gone", "paid", "tiny",
 // a private address (not allowed) or anything not starting with wss:// (invalid).
 import type {
+  AnnounceDone,
   Done,
   NetworkStatus,
   Out,
@@ -49,6 +50,8 @@ export interface MockOptions {
   readonly progress?: Progress | undefined;
   /** Fixes the answer of the next calls (an error path). */
   readonly confirm?: Out<Done>;
+  /** NET-ANNOUNCE-OPTOUT: fixes the answer of the opt-out route. */
+  readonly announce?: Out<AnnounceDone>;
   readonly review?: Out<Review>;
   readonly test?: Out<readonly TestResult[]>;
   /** Waits before answering (ms), so a "testing" or "reading" state can be seen. */
@@ -64,6 +67,7 @@ export const MOCK_STATUS: NetworkStatus = {
   ownCount: 5,
   mixIn: true,
   announceDefault: true,
+  optOutOffered: false,
   change: null,
   previousUntil: null,
 };
@@ -141,6 +145,10 @@ export function createMockServersApi(options: MockOptions = {}): ServersApi {
     async progress() {
       await wait();
       return { kind: 'ok', value: options.progress };
+    },
+    async announce(announceDefault) {
+      await wait();
+      return options.announce ?? { kind: 'ok', value: { announceDefault } };
     },
   };
 }

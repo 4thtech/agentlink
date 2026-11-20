@@ -271,6 +271,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/network/servers',
       '/api/ui/network/reset',
       '/api/ui/network/progress',
+      // NET-ANNOUNCE-OPTOUT: the opt-out on its own (api/network-announce.test.ts).
+      '/api/ui/network/announce',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

@@ -103,6 +103,25 @@ export const SERVERS_STRINGS = {
   optOutTitle: 'Only your servers will know this ID',
   optOut:
     "Another computer can find it only with your owner link or a backup. Contacts still only on AgentLink's old servers may miss your new details.",
+  // NET-ANNOUNCE-OPTOUT: the opt-out on its own (C3's switch and warning, 11 §5.14). Proposed:
+  // the sheet's titles, confirm buttons, statements, toasts and two refusals.
+  announceOffTitle: "Don't also announce on the default servers?",
+  announceOnTitle: 'Announce on the default servers again?',
+  announceOnBody:
+    'Other computers and owner surfaces can find this ID on the default servers again. Your servers stay the same.',
+  announceSame: 'Your servers stay the same',
+  announceSameBody: 'Only where this ID is announced changes.',
+  announceConfirmSensor: (sensor: string): string => `Change this with ${sensor}`,
+  announceConfirmCode: 'Change this with your master code',
+  announceKeep: 'Keep it as it is',
+  announceOffReason:
+    "Don't also announce on the default servers. Only your servers will know this ID.",
+  announceOnReason: 'Announce on the default servers again.',
+  announceOffToast: 'Only your servers announce this ID now.',
+  announceOnToast: 'This ID is announced on the default servers again.',
+  sameChoice: 'That is already your choice.',
+  optOutMixIn:
+    "Turn off AgentLink's automatic servers first: change servers and switch the mix-in off.",
   // C4, review
   reviewTitle: 'Review',
   reviewBody: 'Nothing changes until you approve.',

@@ -30,7 +30,10 @@ export function failMessage(fail: Fail): string {
         return S.pausedTitle;
       case 'changed':
         return S.changed;
+      case 'same_choice':
+        return S.sameChoice;
       case 'mix_in_on':
+        return S.optOutMixIn;
       case 'not_applied':
         return S.failed;
     }
