@@ -567,7 +567,7 @@ D-158 (decided by Tali in chat, 19–20 Nov 2026: the C1–C8 wireframes are the
 | Where | String |
 |---|---|
 | C1, entry (Message network footer card) | "Want to use servers you run or trust?" · "Most people never need this. AgentLink picks servers for you." · **Use your own servers** |
-| C1, current mode | "Your servers are automatic ({n})" · in custom mode the chip reads "Your servers" and **Use AgentLink's automatic servers** is active |
+| C1, current mode | "Your servers are automatic ({n})" · in custom mode the chip reads "Your servers" and **Change servers** and **Use AgentLink's automatic servers** are active, with "Back to automatic any time" under them |
 | C2, add | "Your servers" · "Add 2 to 8 servers. We test each one here, on this computer, before you can use it." · "Step 1 of 3" · field "Server address" (placeholder "wss://") · **Add** |
 | C2, info line (always shown) | "Public servers only, starting with wss://. Only add servers you run or trust. AgentLink never asks you to add a server." |
 | C2, testing | "Testing…" |

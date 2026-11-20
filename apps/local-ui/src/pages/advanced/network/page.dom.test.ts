@@ -51,6 +51,9 @@ describe('Advanced › Message network', () => {
     );
     expect(host.querySelector('.nw')).not.toBeNull();
     expect(fetchSpy).toHaveBeenCalled();
+    // The old summary card is left out there: the live view says it (and never "Relays").
+    expect(host.querySelector('.ad-list')).toBeNull();
+    expect(host.textContent).not.toContain('Relays');
   });
 });
 
