@@ -122,3 +122,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 20 Nov: Message network page stays compact: one-line server rows that open on tap, "Show all N" after 5, old servers folded, diagram capped at 5 servers / 5 contacts with "+N more", problems always on top; built with the 24-hour bar.
 - 20 Nov: Tali approved the compact Message network layout (screenshots with 12 servers / 30 contacts).
 - 20 Nov: opt-out is "fully quiet": with it on, AgentLink also stops reading and probing the old public servers and sends nothing to public servers during the 30-day overlap; own previous servers stay readable 30 days; warning names that contacts with very old details may miss you until updated.
+
+## 2026-11-20 — 0.5.15 released
+- 0.5.15 LIVE: npm latest, GitHub release v0.5.15, signed desktop update (Mac, Windows). Release PR #856, version PR #857.
+- Contents: use your own message servers end to end (Test button, own list 2–8 with automatic mix-in, owner approval, 30-day overlap, fully quiet option that sends nothing to and reads nothing from public servers, `agentlink owner servers` CLI); compact Message network view with diagram and 24-hour bar; fixes from the owner's test; faster database setup.
+- Next: on-chain spending allowance and signed Mac helper before mainnet.
