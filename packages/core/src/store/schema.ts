@@ -85,6 +85,13 @@ export const TABLES = {
       revoked_at: opt('int'),
       created_at: int,
       updated_at: int,
+      // M1-7j (D-158 (5), (7); 07 §3; schema version 24, appended): prev_relays (`enc` json, null
+      // when empty), the servers that left the own list and are still read, each {url, until}, at
+      // most 16; announce_default (null or 1: announce on the default set, the default; 0: the
+      // owner's opt-out). Written only with the card (a list change or reset) or, for
+      // announce_default, the owner's signed opt-out; null on the row from before version 24.
+      prev_relays: opt('enc'),
+      announce_default: opt('flag'),
     },
     primaryKey: ['agent_id'],
     maxRows: 1,

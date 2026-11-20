@@ -31,11 +31,19 @@
 //   (outbox.ts #uncountedOf), so their OKs never count toward MIN_ACKS, and the row stays pending and
 //   retries within the usual backoff until relays of the contact's own list accept it (or is
 //   `not_delivered` at give_up_at, and then sent again by the next pass) (07 §3.2, §4.3).
+// - Leaving servers (M1-7j, D-158 (5); 07 §4.3). After a change of the own list, the servers that
+//   left it are still read for 30 days. The own copies of a card-update (the wraps for the own owner
+//   and the own agent, 04 §3.2 entries 3 and 4) go there too; no other message ever does.
+// - The owner `card-update` (M1-7j; D-65; 07 §4.3; 04 §3.4.1): one envelope on the owner channel
+//   (recipients exactly the agent and its own owner) for each current card, also at epoch 0 and with
+//   no contacts, published to the new list, the leaving servers and the release's default relay set
+//   (announceToOwner). It is re-published as a new gift wrap of the same stored envelope (the next
+//   outbox attempt) every 24 h while any leaving server runs, and every 7 days otherwise.
 // - Who may call it. The core only (sync, and the owner flow after a rotation). No MCP tool creates
 //   or passes a `card-update` (04 §3.4.1, I-4): the payload is built here from the own stored card.
 //
 // I-7: logs carry counts only, never a card, a signature or a key.
-import { decodeHex0x, encodeUtf8, type JsonValue } from '@4thtech-io/crypto';
+import { decodeHex0x, encodeUtf8, parseEnvelope, type JsonValue } from '@4thtech-io/crypto';
 import { kidOf } from './envelope-wraps.js';
 import type { SignedCard } from './card.js';
 import type { CoreContext } from './context.js';
@@ -44,7 +52,12 @@ import { CoreError } from './errors.js';
 import { openOwnCard, readIdentity, type IdentityService } from './identity.js';
 import { nowOf, open } from './context.js';
 import type { OutboxRoute, OutboxService } from './outbox.js';
-import { LEGACY_READ_RELAYS, MAX_RELAYS_PER_WRAP } from '@4thtech-io/transport-nostr';
+import {
+  DEFAULT_RELAYS,
+  LEGACY_READ_RELAYS,
+  MAX_RELAYS_PER_WRAP,
+} from '@4thtech-io/transport-nostr';
+import { OWNER_CARD_UPDATE_OVERLAP_SECONDS, OWNER_CARD_UPDATE_SECONDS } from './leaving-servers.js';
 import { cardUpdateLegacyRelays } from './relay-migration.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
@@ -66,6 +79,13 @@ export interface CardUpdateSendResult {
    */
   readonly failed: number;
 }
+
+/**
+ * What one owner `card-update` pass did: `published` (stored and published, or a new wrap of the
+ * stored one), `not_due` (published less than the interval ago), `pending` (a wrap of it is still
+ * being delivered). Fixed codes only.
+ */
+export type OwnerAnnounceResult = 'published' | 'not_due' | 'pending';
 
 export interface CardUpdateSenderDeps {
   readonly identity: IdentityService;
@@ -192,6 +212,33 @@ export function withLegacyRelays(routes: readonly OutboxRoute[], now: number): O
     }
     return { ...route, relays };
   });
+}
+
+/**
+ * M1-7j (07 §4.3): the routes of the own owner and the own agent also name the leaving servers, as
+ * many as fit in one wrap's relay limit. Only for card-updates; other routes are unchanged.
+ */
+export function withLeavingRelays(
+  routes: readonly OutboxRoute[],
+  ownKeys: ReadonlySet<string>,
+  leaving: readonly string[],
+  extra: readonly string[] = [],
+): OutboxRoute[] {
+  if (leaving.length === 0 && extra.length === 0) return [...routes];
+  return routes.map((route) => {
+    if (!ownKeys.has(route.recipient)) return route;
+    const relays = [...route.relays];
+    for (const relay of [...leaving, ...extra]) {
+      if (relays.length >= MAX_RELAYS_PER_WRAP) break;
+      if (!relays.includes(relay)) relays.push(relay);
+    }
+    return { ...route, relays };
+  });
+}
+
+/** The own owner key and the own agent key of a card (64 lowercase hex, as routes name them). */
+function ownKeysOf(signed: SignedCard): ReadonlySet<string> {
+  return new Set([signed.card.ownerNostr.slice(2), signed.card.agentNostr.slice(2)]);
 }
 
 export class CardUpdateSender {
@@ -329,9 +376,12 @@ export class CardUpdateSender {
     if (row.from_key !== fromKey) {
       throw new CoreError('key_epoch_mismatch', 'The identity changed while sending. Try again.');
     }
-    const routes = withLegacyRelays(
-      await outbox.routes(await outbox.contactPeer(contactId)),
-      nowOf(this.#ctx),
+    // M1-7j: the own copies also go to the leaving servers (the owner surface may still read them).
+    const signed = await this.#deps.identity.signedCard();
+    const routes = withLeavingRelays(
+      withLegacyRelays(await outbox.routes(await outbox.contactPeer(contactId)), nowOf(this.#ctx)),
+      ownKeysOf(signed),
+      await outbox.leavingRelays(),
     );
     const keys = routes.map((r) => r.recipient);
     if (
@@ -358,6 +408,131 @@ export class CardUpdateSender {
     return (await this.#acceptedOffLegacy(built.envelope.id)) ? 'sent' : 'unconfirmed';
   }
 
+  /**
+   * M1-7j (07 §4.3; D-65): the owner `card-update` for the current card. Stores it once per card
+   * (recipients exactly the agent and its own owner) and publishes it to the own list, the leaving
+   * servers and the release's default relay set; then, each time the interval has passed since the
+   * last wrap (24 h while any leaving server runs, 7 days otherwise) and no wrap of it is pending,
+   * publishes a new gift wrap of the same stored envelope as the next attempt. Built here from the
+   * own stored card only; no MCP tool can create or pass it (I-4). Throws before anything is stored
+   * when the agent cannot send.
+   */
+  async announceToOwner(): Promise<OwnerAnnounceResult> {
+    const { identity, envelopes, outbox } = this.#deps;
+    outbox.requireTransport();
+    // IR-M1-7j L-2: whether anything is due is decided from store reads only, so a pass with nothing
+    // due makes no KeyStore (keychain) call; the send check comes after.
+    const signed = await identity.signedCard();
+    const fromKey = signed.card.agentNostr.slice(2);
+    const leaving = await outbox.leavingRelays();
+    const interval =
+      leaving.length > 0 ? OWNER_CARD_UPDATE_OVERLAP_SECONDS : OWNER_CARD_UPDATE_SECONDS;
+    const now = nowOf(this.#ctx);
+    const state = await this.#ownerState(fromKey);
+    if (state.pending) return 'pending';
+    if (state.envelopeId !== undefined && state.lastAcceptedAt !== undefined) {
+      if (now >= state.lastAcceptedAt && now - state.lastAcceptedAt < interval) return 'not_due';
+    }
+    await identity.assertCanSend();
+    // The new list, the leaving servers and, unless the owner opted out (`announce_default` false,
+    // IR-M1-7j L-1; 07 §4.3 "Privacy"), the release's default set.
+    const routes = withLeavingRelays(
+      await outbox.routes(undefined),
+      ownKeysOf(signed),
+      leaving,
+      (await identity.announceDefault()) ? DEFAULT_RELAYS : [],
+    );
+    if (state.envelopeId === undefined || state.envelopeJson === undefined) {
+      const { built, row } = await envelopes.prepare({
+        to: { owner: true },
+        payload: cardUpdatePayloadOf(signed),
+      });
+      if (row.from_key !== fromKey) {
+        throw new CoreError('key_epoch_mismatch', 'The identity changed while sending. Try again.');
+      }
+      const keys = routes.map((r) => r.recipient);
+      if (
+        keys.length !== built.recipientNostrKeys.length ||
+        !built.recipientNostrKeys.every((k) => keys.includes(k))
+      ) {
+        throw new CoreError('key_epoch_mismatch', 'The identity changed while sending. Try again.');
+      }
+      const rows = await outbox.prepareRows(built.envelope, routes);
+      const stored = await this.#ctx.store.transaction((tx) => {
+        // Another process stored this card's owner card-update meanwhile: nothing stored.
+        if (ownerCardUpdatesTx(tx, fromKey).length > 0) return false;
+        tx.insert('envelopes', row);
+        for (const r of rows) tx.insert('outbox', r);
+        return true;
+      });
+      if (!stored) return 'pending';
+      await this.#publish(built.envelope.id);
+      this.#ctx.log.info('owner card update stored', { keyEpoch: signed.card.keyEpoch });
+      return 'published';
+    }
+    // A new gift wrap of the same stored envelope: the next attempt of each recipient (07 §3.2).
+    const envelopeId = state.envelopeId;
+    const envelope = parseEnvelope(JSON.parse(state.envelopeJson) as unknown);
+    const rows = (await outbox.prepareRows(envelope, routes)).map((r) => ({
+      ...r,
+      attempt: state.lastAttempt + 1,
+    }));
+    const stored = await this.#ctx.store.transaction((tx) => {
+      const current = tx.select('outbox', { envelope_id: envelopeId });
+      if (current.some((r) => r.state === 'pending')) return false;
+      if (current.some((r) => r.attempt > state.lastAttempt)) return false;
+      for (const r of rows) tx.insert('outbox', r);
+      return true;
+    });
+    if (!stored) return 'pending';
+    await this.#publish(envelopeId);
+    return 'published';
+  }
+
+  /** The stored owner card-update of the current key and its wraps (attempts, times, pending). */
+  async #ownerState(fromKey: string): Promise<{
+    readonly envelopeId: string | undefined;
+    readonly envelopeJson: string | undefined;
+    /**
+     * When the last wrap that relays accepted (`sent`) was made. A wrap that ended `not_delivered`
+     * does not count, so the next pass tries again at once (IR-M1-7j L-5): its rows had the
+     * outbox's own backoff until give_up_at.
+     */
+    readonly lastAcceptedAt: number | undefined;
+    readonly lastAttempt: number;
+    readonly pending: boolean;
+  }> {
+    return this.#ctx.store.transaction((tx) => {
+      const [latest] = ownerCardUpdatesTx(tx, fromKey);
+      if (latest === undefined) {
+        return {
+          envelopeId: undefined,
+          envelopeJson: undefined,
+          lastAcceptedAt: undefined,
+          lastAttempt: 0,
+          pending: false,
+        };
+      }
+      const wraps = tx.select('outbox', { envelope_id: latest.envelope_id });
+      const sent = wraps.filter((r) => r.state === 'sent');
+      return {
+        envelopeId: latest.envelope_id,
+        envelopeJson: latest.envelope_json ?? undefined,
+        lastAcceptedAt: sent.length === 0 ? undefined : Math.max(...sent.map((r) => r.created_at)),
+        lastAttempt: wraps.length === 0 ? 0 : Math.max(...wraps.map((r) => r.attempt)),
+        pending: wraps.some((r) => r.state === 'pending'),
+      };
+    });
+  }
+
+  async #publish(envelopeId: string): Promise<void> {
+    try {
+      await this.#deps.outbox.publishEnvelope(envelopeId);
+    } catch {
+      // The rows stay pending; the outbox retries (07 §3.2).
+    }
+  }
+
   /** Whether a relay that is not a legacy relay acknowledged a contact wrap of this envelope. */
   async #acceptedOffLegacy(envelopeId: string): Promise<boolean> {
     const rows = await this.#ctx.store.transaction((tx) =>
@@ -376,4 +551,15 @@ export class CardUpdateSender {
     }
     return false;
   }
+}
+
+/** The stored owner card-updates (owner channel: no contact) of one key, newest first. */
+function ownerCardUpdatesTx(tx: StoreTx, fromKey: string): Row<'envelopes'>[] {
+  return tx
+    .select(
+      'envelopes',
+      { direction: 'out', type: 'card-update', from_key: fromKey },
+      { orderBy: [['created_at', 'desc']] },
+    )
+    .filter((row) => row.contact_id === null);
 }

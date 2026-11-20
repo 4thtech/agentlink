@@ -503,6 +503,19 @@ export class OutboxService {
     return this.#transport;
   }
 
+  /**
+   * M1-7j (D-158 (5); 07 §4.3): the servers that left the own list and are still read (never more
+   * than 16). Read with the own list and the legacy relays, logged in on as the own list; published
+   * to only for card-updates. Empty when none runs or the stored value does not open. Never throws.
+   */
+  async leavingRelays(): Promise<readonly string[]> {
+    try {
+      return (await this.#identity.leavingServers()).map((e) => e.url);
+    } catch {
+      return [];
+    }
+  }
+
   /** The counterparty of a contact: its current card and its list (contact row, `enc`). */
   async contactPeer(contactId: string): Promise<OutboxPeer> {
     const view = await this.#contacts.get(contactId);
@@ -529,7 +542,8 @@ export class OutboxService {
   async routes(peer: OutboxPeer | undefined): Promise<OutboxRoute[]> {
     const own = await this.#identity.signedCard();
     const ownRelays = checkList(own.relays);
-    this.#ownRelays = new Set(ownRelays);
+    // M1-7j (07 §4.3): it logs in on a leaving server as on its own, since that was its own server.
+    this.#ownRelays = new Set([...ownRelays, ...(await this.leavingRelays())]);
     const bundle = await this.#ctx.keyStore.getPublicBundle();
     const routes = new Map<string, { role: 'contact' | 'owner'; relays: string[] }>();
     const add = (key: string, role: 'contact' | 'owner', relays: readonly string[]): void => {
@@ -694,7 +708,10 @@ export class OutboxService {
     }
     let ownKnown = false;
     try {
-      this.#ownRelays = new Set(checkList((await this.#identity.signedCard()).relays));
+      this.#ownRelays = new Set([
+        ...checkList((await this.#identity.signedCard()).relays),
+        ...(await this.leavingRelays()),
+      ]);
       ownKnown = true;
     } catch {
       this.#ownRelays = new Set(); // no readable own list: no AUTH anywhere (07 §4.3)

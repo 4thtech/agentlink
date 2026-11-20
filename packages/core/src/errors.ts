@@ -20,6 +20,8 @@ export type CoreErrorCode =
   | 'rotation_pending'
   /** W4-RENAME-REACHES-CONTACTS (D-141): more than RENAMES_PER_DAY renames in 24 h. */
   | 'rename_limited'
+  /** M1-7j (D-158 (5)): a list change that would keep more than 16 leaving servers. */
+  | 'too_many_previous'
   | 'owner_keys_changed'
   | 'card_invalid'
   | 'card_owner_signature_invalid'

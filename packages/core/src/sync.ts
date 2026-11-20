@@ -402,7 +402,14 @@ export class SyncService {
     const subscribe = transport.subscribe.bind(transport);
     // The own list (07 §4.3), as for a fetch; routes() marks it as the only list for AUTH.
     const routes = await outbox.routes(undefined);
-    const relays = [...new Set([...routes.flatMap((r) => r.relays), ...LEGACY_READ_RELAYS])];
+    // M1-7j (07 §4.3): own + the leaving servers (30 days after each change) + legacy.
+    const relays = [
+      ...new Set([
+        ...routes.flatMap((r) => r.relays),
+        ...(await outbox.leavingRelays()),
+        ...LEGACY_READ_RELAYS,
+      ]),
+    ];
     const identities = await this.#identities();
     const keyEpoch = identities[0]?.epoch ?? 0;
     const ctx = this.#ctx;
@@ -549,7 +556,14 @@ export class SyncService {
     try {
       const routes = await outbox.routes(undefined);
       // RELAY-DEFAULTS-SWAP: the legacy relays are read for a transition period, never published to.
-      relays = [...new Set([...routes.flatMap((r) => r.relays), ...LEGACY_READ_RELAYS])];
+      // M1-7j (07 §4.3): and the leaving servers, each for 30 days after the change that dropped it.
+      relays = [
+        ...new Set([
+          ...routes.flatMap((r) => r.relays),
+          ...(await outbox.leavingRelays()),
+          ...LEGACY_READ_RELAYS,
+        ]),
+      ];
       identities = await this.#identities();
     } catch {
       this.#ctx.log.warn('inbox fetch failed', {});
