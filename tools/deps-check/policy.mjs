@@ -64,6 +64,24 @@ export const RELATIVE_ESCAPES = [
   },
   {
     zone: 'e2e',
+    target: 'packages/node/dist/local-ui/api/network-test.js',
+    reason:
+      'E2E-HOSTILE server Test: the real route (createNetworkTestRoute) over a stub resolver and local stand-in servers; the package entry binds the production relay I/O only',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/relay-io.js',
+    reason:
+      'E2E-HOSTILE server Test: the real Node relay connector and NIP-11 fetcher routed to local stand-in servers by a stub address route; never a real server',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/src/relay-io.fixture.js',
+    reason:
+      'E2E-HOSTILE server Test: local TLS stand-in servers on 127.0.0.1 with a throwaway certificate (test helper source, never built)',
+  },
+  {
+    zone: 'e2e',
     target: 'packages/node/dist/owner-setup.js',
     reason:
       'M1-11b-6 first-run smoke: ownerSetupAvailableWith and defaultOwnerFiles against a temp home and a keychain stand-in, never the OS keychain or the real home',
