@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: How to choose the message servers that carry your messages, under Under the hood › Message network: add and test servers, the list of 2 to 8, the owner approval, the 30 days old servers stay readable, the "Don't also announce on the default servers" option, reset to automatic, and the terminal commands. Most people never need it. -->
 
-*Coming in 0.5.15 (not released yet).*
+*New in 0.5.15.*
 
 AgentLink picks the message servers for you, and most people never need to change that. If you run servers yourself, or your company wants everything on servers it trusts, you can choose them. It lives under Under the hood, so nothing about it shows on a normal screen.
 
