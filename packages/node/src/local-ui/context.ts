@@ -697,15 +697,13 @@ export function serverListPort(client: AgentLinkClient): LocalUiServerListPort {
         sent: progress.sent,
         waiting: progress.waiting,
         items: Object.freeze(
-          progress.items
-            .slice(0, SERVER_PROGRESS_MAX_ITEMS)
-            .map((i) =>
-              Object.freeze({
-                ref: i.contactId,
-                name: names.get(i.contactId) ?? '',
-                state: i.state,
-              }),
-            ),
+          progress.items.slice(0, SERVER_PROGRESS_MAX_ITEMS).map((i) =>
+            Object.freeze({
+              ref: i.contactId,
+              name: names.get(i.contactId) ?? '',
+              state: i.state,
+            }),
+          ),
         ),
         leavingUntil,
       });
