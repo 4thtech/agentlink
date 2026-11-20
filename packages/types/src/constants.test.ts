@@ -193,6 +193,8 @@ describe('constants (04, 05, 06)', () => {
         'agent.resume',
         // W4-FILES-SAVE (proposed, owner confirms at merge): save a received file from the app.
         'file.save',
+        // NET-ANNOUNCE-OPTOUT (D-158 (7)): "Don't also announce on the default servers".
+        'network.announce',
       ].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
@@ -278,6 +280,7 @@ describe('constants (04, 05, 06)', () => {
       'agent.resume': 600,
       'agent.revoke': null,
       'file.save': 600,
+      'network.announce': 600,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);
     expect(MAX_OWNER_ACTION_LIFETIME_SECONDS).toBe(604_800);

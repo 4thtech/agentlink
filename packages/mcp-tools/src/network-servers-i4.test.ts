@@ -14,7 +14,7 @@ import { ADVANCED_TOOLS, TOOLS } from './registry.js';
 
 /** The server-list change's routes, owner pieces and words (never in a tool). */
 const FORBIDDEN =
-  /\/api\/ui\/network\/(servers|reset|announce|progress)|changeServers|signServerChange|serverList|owner servers|use your own servers|automatic servers/i;
+  /\/api\/ui\/network\/(servers|reset|announce|progress)|changeServers|signServerChange|serverList|network\.announce|prepareAnnounce|owner servers|use your own servers|automatic servers/i;
 
 type ChangeMember = Extract<
   keyof ToolClient,
@@ -39,6 +39,8 @@ describe('no MCP path to a server-list change (NET-OWNER-SET, I-4)', () => {
       { servers: ['wss://a.example.org'], review: true },
       { automatic: true },
       { announce: false },
+      { announce: true },
+      { announceDefault: false },
     ];
     for (const tool of [...TOOLS, ...ADVANCED_TOOLS]) {
       for (const body of bodies)

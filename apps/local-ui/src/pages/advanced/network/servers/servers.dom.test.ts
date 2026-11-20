@@ -760,3 +760,64 @@ describe('mounted in Message network (Under the hood)', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('NET-ANNOUNCE-OPTOUT: the opt-out on its own (08 §1 `POST /api/ui/network/announce`)', () => {
+  const CUSTOM = {
+    ...MOCK_STATUS,
+    mode: 'custom' as const,
+    ownCount: 3,
+    mixIn: false,
+    optOutOffered: true,
+  };
+
+  it('is offered only in custom mode with the mix-in off', async () => {
+    await mount();
+    expect(text()).not.toContain(S.optOutLabel);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ status: { ...CUSTOM, mixIn: true, optOutOffered: false } });
+    expect(text()).not.toContain(S.optOutLabel);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ status: CUSTOM });
+    expect(text()).toContain(S.optOutLabel);
+    expect(text()).toContain(S.optOutBody);
+  });
+
+  it('turning it on shows the spec warning and signs with the existing presence step, once', async () => {
+    const api = createMockServersApi({ now: NOW, status: CUSTOM });
+    const announce = vi.fn(api.announce);
+    await mount({}, { api: { ...api, announce } });
+    const sw = switches()[0];
+    expect(on(sw)).toBe(false);
+    await click(sw);
+    expect(text()).toContain(S.optOutTitle);
+    expect(text()).toContain(S.optOut);
+    await confirmWithCode(S.announceConfirmCode);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce.mock.calls[0]?.[0]).toBe(false);
+    expect(announce.mock.calls[0]?.[1]).toEqual({ kind: 'code', code: '123456' });
+  });
+
+  it('turning it off again signs announce true', async () => {
+    const api = createMockServersApi({ now: NOW, status: { ...CUSTOM, announceDefault: false } });
+    const announce = vi.fn(api.announce);
+    await mount({}, { api: { ...api, announce } });
+    const sw = switches()[0];
+    expect(on(sw)).toBe(true);
+    await click(sw);
+    await confirmWithCode(S.announceConfirmCode);
+    expect(announce.mock.calls[0]?.[0]).toBe(true);
+  });
+
+  it('a list change keeps an opt-out that is on (the flow starts with the mix-in off and it on)', async () => {
+    const api = createMockServersApi({ now: NOW, status: { ...CUSTOM, announceDefault: false } });
+    const set = vi.fn(api.set);
+    await mount({}, { api: { ...api, set } });
+    await click(button(S.changeServers));
+    await toList();
+    await click(button(S.review));
+    await confirmWithCode(S.confirmCode);
+    expect(set.mock.calls[0]?.[0]).toMatchObject({ automatic: false, announce: false });
+  });
+});
