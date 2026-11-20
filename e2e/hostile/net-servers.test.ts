@@ -12,13 +12,32 @@
 // own list stays readable for 30 days after the change that dropped it, each to its own end, and
 // a change that would keep more than 16 of them is refused with the date it fits.
 //
+// Part 3, saving your own list: the real server-list routes (createNetworkServersRoutes) over the same
+// local stand-in servers and stub resolver, the real core rotation behind the owner part.
+//
+// Part 4, fully quiet: with the opt-out on, a full cycle on the in-memory relay network sends nothing
+// to and reads nothing from any default or legacy server (the spy records every connection and frame
+// of the victim), and a restore on a clean HOME keeps the list and the choice.
+//
 // No Docker, no keychain, no real server and no real DNS.
-import { verifyNostrEvent, type JsonObject, type NostrEvent } from '@4thtech-io/crypto';
+import { AgentLinkClient, CoreError, TooManyPreviousError } from '@4thtech-io/core';
+import {
+  encodeUtf8,
+  verifyNostrEvent,
+  type JsonObject,
+  type JsonValue,
+  type NostrEvent,
+} from '@4thtech-io/crypto';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
+import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { createNetworkServersRoutes } from '../../packages/node/dist/local-ui/api/network-servers.js';
 import {
   createNetworkTestRoute,
   type NetworkTestIo,
 } from '../../packages/node/dist/local-ui/api/network-test.js';
+import { serverListPort } from '../../packages/node/dist/local-ui/context.js';
+import { createNetworkReader } from '../../packages/node/dist/local-ui/network-view.js';
 import {
   createNip11FetcherWith,
   createRelayConnectorWith,
@@ -30,7 +49,27 @@ import {
   type TestRelay,
   type TestRelayOptions,
 } from '../../packages/node/src/relay-io.fixture.js';
-import { presence } from '../prompt-injection/harness.js';
+import { DEFAULT_RELAYS, LEGACY_READ_RELAYS } from '../../packages/transport-nostr/dist/index.js';
+import { createRestoreEngine } from '../../packages/node/src/recovery-kit-restore.js';
+import {
+  FAST,
+  MemoryKeychain,
+  makeAgent as makeFixtureAgent,
+  makeKit,
+  makeOwner,
+  tempRoot,
+  webauthnCreate,
+} from '../../packages/node/src/recovery-kit-restore.fixture.js';
+import { VirtualPrfAuthenticator } from '../../packages/node/src/passkey-authenticator.fixture.js';
+import { openAgentStoreWith } from '../../packages/node/dist/agent-store.js';
+import { openRecordedKeyStore } from '../../packages/node/dist/keychain-keystore.js';
+import {
+  editPolicy,
+  makeAgent,
+  pair,
+  presence,
+  type PiAgent,
+} from '../prompt-injection/harness.js';
 import { scene, type Scene } from './support.js';
 
 // ---- part 1: the server Test -------------------------------------------------------------------
@@ -50,11 +89,24 @@ type Result = {
   paymentRequired: boolean | null;
 };
 
+type LocalUiOwnerRoute = Extract<
+  ReturnType<typeof createNetworkServersRoutes>[number],
+  { presence: true }
+>;
+type LocalUiResult = Awaited<ReturnType<LocalUiOwnerRoute['handler']>>;
+
+/** Servers of the saved lists (part 3): eight hosts under each tag, all behind one stand-in. */
+const TAGS = ['own', 'a', 'b', 'c', 'd', 'e', 'f'] as const;
+const listHost = (tag: string, i: number): string => `n${String(i)}.${tag}.nostr-test.dev`;
+const LIST_HOSTS = TAGS.flatMap((tag) => Array.from({ length: 8 }, (_, i) => listHost(tag, i + 1)));
+const eight = (tag: string, n = 8): string[] =>
+  Array.from({ length: n }, (_, i) => `wss://${listHost(tag, i + 1)}`);
+
 let certificate: TestCertificate;
 const relays: TestRelay[] = [];
 
 beforeAll(() => {
-  certificate = makeTestCertificate([HOST, HOST_2]);
+  certificate = makeTestCertificate([HOST, HOST_2, ...LIST_HOSTS]);
 }, 60_000);
 
 afterEach(async () => {
@@ -392,14 +444,20 @@ afterEach(async () => {
   current = undefined;
 });
 
-async function changeList(s: Scene, relays: readonly string[]): Promise<void> {
-  const session = await s.ana.memoryOwner.unlock(presence());
+async function changeList(
+  s: Scene,
+  relays: readonly string[],
+  announceDefault?: boolean,
+  who: PiAgent = s.ana,
+): Promise<void> {
+  const session = await who.memoryOwner.unlock(presence());
   try {
-    await s.ana.client.identity.rotate({
+    await who.client.identity.rotate({
       owner: session,
-      ownerKeys: await s.ana.memoryOwner.getPublicKeys(),
-      epochControl: s.ana.memoryOwner.epochControl(s.ana.keys),
+      ownerKeys: await who.memoryOwner.getPublicKeys(),
+      epochControl: who.memoryOwner.epochControl(who.keys),
       relays,
+      ...(announceDefault === undefined ? {} : { announceDefault }),
     });
   } finally {
     await session.close();
@@ -505,4 +563,586 @@ describe('a server that left the own list stays readable for 30 days', () => {
     await changeList(s, eight('relay-zeta'));
     expect(await s.ana.client.identity.relays()).toEqual(eight('relay-zeta'));
   });
+});
+
+// ---- part 3: saving your own list ----------------------------------------------------------------
+
+const MINUTE = 60;
+const NOT_THE_OWNER = { kind: 'passphrase' as const, secret: encodeUtf8('not the owner') };
+const START_LIST = ['wss://one.relay-beta.net', 'wss://two.relay-beta.net'];
+
+interface Body {
+  error?: string;
+  status?: string;
+  fitsFrom?: number;
+  servers?: { outcome: string; role: string }[];
+}
+
+/** The real server-list routes over local stand-in servers, for one scene's victim. */
+async function desk(s: Scene, behaviour: Behaviour = {}) {
+  const { relay } = await standIn(behaviour);
+  const dns: Record<string, string[][]> = {};
+  for (const host of LIST_HOSTS) dns[host] = [[PUBLIC_A]];
+  const w = stage(dns, { [PUBLIC_A]: relay.port });
+  const [servers, reset] = createNetworkServersRoutes(() => w.io) as readonly LocalUiOwnerRoute[];
+  if (servers === undefined || reset === undefined) throw new Error('test: no routes');
+  const context = {
+    client: s.ana.client,
+    serverList: serverListPort(s.ana.client),
+    now: () => s.world.clock() * 1000,
+  } as never;
+  const request = (input: JsonValue) => ({ params: {}, query: new URLSearchParams(), input });
+  const asBody = (r: LocalUiResult): Body => r.body as Body;
+  const input = (servers: readonly string[], announce = true): JsonObject => ({
+    servers: [...servers],
+    automatic: false,
+    announce,
+  });
+
+  /** What the gate's one-use owner part does: unlock with the presence, rotate, tell the contacts. */
+  const owner = (secret = presence()) =>
+    ({
+      changeServers: async (plan: { relays: readonly string[]; announceDefault: boolean }) => {
+        const session = await s.ana.memoryOwner.unlock(secret);
+        try {
+          await s.ana.client.identity.rotate({
+            owner: session,
+            ownerKeys: await s.ana.memoryOwner.getPublicKeys(),
+            epochControl: s.ana.memoryOwner.epochControl(s.ana.keys),
+            relays: plan.relays,
+            announceDefault: plan.announceDefault,
+          });
+        } catch (error) {
+          if (error instanceof TooManyPreviousError) {
+            return { status: 'refused', reason: 'too_many_previous', fitsAt: error.fitsAt };
+          }
+          if ((error as { code?: string }).code === 'epoch_conflict') {
+            return { status: 'refused', reason: 'rotation_pending' };
+          }
+          if (
+            error instanceof CoreError &&
+            ['concurrent_rotation', 'key_epoch_mismatch', 'rotation_pending'].includes(error.code)
+          ) {
+            return { status: 'refused', reason: 'rotation_pending' };
+          }
+          throw error;
+        } finally {
+          await session.close();
+        }
+        await s.ana.client.sendCardUpdates().catch(() => undefined);
+        const leaving = await s.ana.client.identity.leavingServers();
+        return {
+          status: 'changed',
+          contacts: 0,
+          leavingUntil: leaving.length === 0 ? null : Math.max(...leaving.map((e) => e.until)),
+        };
+      },
+    }) as never;
+
+  const review = async (route: LocalUiOwnerRoute, body: JsonObject): Promise<LocalUiResult> => {
+    const answer = await route.precheck?.(context, request({ ...body, review: true }));
+    if (answer === undefined) throw new Error('test: a review answers');
+    return answer;
+  };
+  /** The confirm's precheck (before the gate): a refusal, or undefined to let it on to presence. */
+  const precheck = (route: LocalUiOwnerRoute, body: JsonObject) =>
+    route.precheck?.(context, request(body));
+  const run = (route: LocalUiOwnerRoute, body: JsonObject, op = owner()) =>
+    route.handler(context, request(body), op);
+  /** Precheck, then the gate: a refusal stops it; the owner part runs only with a presence. */
+  const save = async (
+    route: LocalUiOwnerRoute,
+    body: JsonObject,
+    op = owner(),
+  ): Promise<LocalUiResult> => (await precheck(route, body)) ?? (await run(route, body, op));
+  return { servers, reset, review, precheck, run, save, input, asBody, owner };
+}
+
+describe('saving your own list needs the owner, a fresh test and the reviewed list', () => {
+  it('a change without owner presence is refused: nothing is signed or changed', async () => {
+    const s = (current = await scene());
+    const d = await desk(s);
+    // Both owner routes sit behind the presence gate; the review is only a precheck.
+    expect(d.servers.presence).toBe(true);
+    expect(d.reset.presence).toBe(true);
+    const list = eight('own', 2);
+    expect((await d.review(d.servers, d.input(list))).status).toBe(200);
+    const before = [
+      await s.ana.client.identity.relays(),
+      (await s.ana.client.identity.get())?.keyEpoch,
+    ];
+    // A wrong presence signs nothing; no owner part at all is not available.
+    await expect(d.save(d.servers, d.input(list), d.owner(NOT_THE_OWNER))).rejects.toThrow();
+    await d.review(d.servers, d.input(list));
+    expect(await d.precheck(d.servers, d.input(list))).toBeUndefined();
+    expect((await d.run(d.servers, d.input(list), {} as never)).status).not.toBe(200);
+    expect([
+      await s.ana.client.identity.relays(),
+      (await s.ana.client.identity.get())?.keyEpoch,
+    ]).toEqual(before);
+    // Control: with the presence, the same list is saved.
+    await d.review(d.servers, d.input(list));
+    const done = await d.save(d.servers, d.input(list));
+    expect(done.status).toBe(200);
+    expect(await s.ana.client.identity.relays()).toEqual(list);
+  }, 60_000);
+
+  it('a change whose servers fail the server-side test is refused, whatever the client claims', async () => {
+    const s = (current = await scene());
+    const behaviour: Behaviour = {};
+    const d = await desk(s, behaviour);
+    const list = eight('own', 3);
+    const reviewed = await d.review(d.servers, d.input(list));
+    expect(d.asBody(reviewed).servers?.map((x) => x.outcome)).toEqual(['ready', 'ready', 'ready']);
+    // The servers went bad after the review; the page still says ready.
+    behaviour.dropEvents = true;
+    const claimed = { ...d.input(list), results: [{ outcome: 'ready' }], ready: true };
+    expect((await d.save(d.servers, claimed as JsonObject)).status).toBe(400);
+    const refused = await d.save(d.servers, d.input(list));
+    expect([refused.status, d.asBody(refused).error]).toEqual([409, 'not_ready']);
+    expect(d.asBody(await d.review(d.servers, d.input(list))).error).toBe('not_ready');
+    expect(await s.ana.client.identity.relays()).toEqual(START_LIST);
+  }, 60_000);
+
+  it('the confirm must match the review: another list, none, or an old one is refused', async () => {
+    const s = (current = await scene());
+    const d = await desk(s);
+    const [a, b] = [d.input(eight('a', 2)), d.input(eight('b', 2))];
+    const err = (r: LocalUiResult): [number, string | undefined] => [r.status, d.asBody(r).error];
+    expect(err(await d.save(d.servers, a))).toEqual([409, 'changed']);
+    await d.review(d.servers, a);
+    expect(err(await d.save(d.servers, b))).toEqual([409, 'changed']);
+    await d.review(d.servers, a);
+    s.advance(11 * MINUTE);
+    expect(err(await d.save(d.servers, a))).toEqual([409, 'changed']);
+    expect(await s.ana.client.identity.relays()).toEqual(START_LIST);
+    await d.review(d.servers, a);
+    expect((await d.save(d.servers, a)).status).toBe(200);
+    expect(await s.ana.client.identity.relays()).toEqual(eight('a', 2));
+  }, 60_000);
+
+  it('two changes at once: one wins, the other gets a clear error', async () => {
+    const s = (current = await scene());
+    const d = await desk(s);
+    const [x, y] = [d.input(eight('a', 2)), d.input(eight('b', 2))];
+    await d.review(d.servers, x);
+    await d.review(d.servers, y);
+    expect(await d.precheck(d.servers, x)).toBeUndefined();
+    expect(await d.precheck(d.servers, y)).toBeUndefined();
+    const [rx, ry] = await Promise.all([d.run(d.servers, x), d.run(d.servers, y)]);
+    expect([rx.status, ry.status].sort()).toEqual([200, 409]);
+    const loser = rx.status === 409 ? rx : ry;
+    expect(d.asBody(loser).error).toBe('rotation_pending');
+    expect((await s.ana.client.identity.get())?.keyEpoch).toBe(1);
+    expect(await s.ana.client.identity.relays()).toEqual(
+      rx.status === 200 ? eight('a', 2) : eight('b', 2),
+    );
+    expect(await s.ana.client.identity.sendState()).toBe('ready');
+  }, 60_000);
+
+  it('the 17th previous server is refused with the date it fits, nothing signed', async () => {
+    const s = (current = await scene());
+    const d = await desk(s);
+    const t0 = s.world.clock();
+    for (const tag of ['a', 'b']) {
+      await d.review(d.servers, d.input(eight(tag)));
+      expect((await d.save(d.servers, d.input(eight(tag)))).status).toBe(200);
+      s.advance(5 * DAY);
+    }
+    const third = d.input(eight('c'));
+    const refused = await d.review(d.servers, third);
+    expect([refused.status, d.asBody(refused).error]).toEqual([409, 'too_many_previous']);
+    expect(Math.abs((d.asBody(refused).fitsFrom ?? 0) - (t0 + LEAVING_DAYS * DAY))).toBeLessThan(
+      15,
+    );
+    expect(await s.ana.client.identity.relays()).toEqual(eight('b'));
+    expect((await s.ana.client.identity.get())?.keyEpoch).toBe(2);
+    // From that date the same list fits.
+    s.advance(21 * DAY);
+    expect((await d.review(d.servers, third)).status).toBe(200);
+    expect((await d.save(d.servers, third)).status).toBe(200);
+    expect(await s.ana.client.identity.relays()).toEqual(eight('c'));
+  }, 90_000);
+
+  it('reset to automatic restores the default servers and clears the opt-out', async () => {
+    const s = (current = await scene());
+    const d = await desk(s);
+    const list = eight('own', 2);
+    await d.review(d.servers, d.input(list, false));
+    expect((await d.save(d.servers, d.input(list, false))).status).toBe(200);
+    expect(await s.ana.client.identity.announceDefault()).toBe(false);
+    expect((await d.review(d.reset, {})).status).toBe(200);
+    expect((await d.save(d.reset, {})).status).toBe(200);
+    expect(await s.ana.client.identity.relays()).toEqual(DEFAULT_RELAYS);
+    expect(await s.ana.client.identity.announceDefault()).toBe(true);
+    // Already automatic with the choice on: nothing to do.
+    const again = await d.review(d.reset, {});
+    expect([again.status, d.asBody(again).error]).toEqual([409, 'same_list']);
+  }, 60_000);
+
+  it('no MCP tool can change servers: none names it, and calling every one with the change changes nothing', async () => {
+    const s = (current = await scene());
+    const tools = (await s.ana.mcp.listTools()).tools;
+    expect(tools.length).toBeGreaterThan(5);
+    const named =
+      /\/api\/ui\/network|changeServers|signServerChange|serverList|network\.announce|prepareAnnounce|use your own servers|automatic servers/i;
+    for (const tool of tools) {
+      const text = `${tool.name} ${tool.description ?? ''} ${JSON.stringify(tool.inputSchema)}`;
+      expect(text, tool.name).not.toMatch(named);
+      expect(JSON.stringify(tool.inputSchema), tool.name).not.toMatch(
+        /announce|automatic|servers/i,
+      );
+    }
+    const state = async () => [
+      await s.ana.client.identity.relays(),
+      (await s.ana.client.identity.get())?.keyEpoch,
+      await s.ana.client.identity.announceDefault(),
+    ];
+    const before = await state();
+    const bodies = [
+      { servers: eight('own', 2), automatic: false, announce: true },
+      { relays: eight('own', 2) },
+      { automatic: true },
+      { announce: false },
+      { announceDefault: false },
+    ];
+    for (const tool of tools) {
+      for (const args of bodies) {
+        // Refused or ignored: either way no tool acts on it.
+        await s.ana.mcp.callTool({ name: tool.name, arguments: args }).catch(() => undefined);
+      }
+    }
+    expect(await state()).toEqual(before);
+  }, 60_000);
+});
+
+// ---- part 4: fully quiet -------------------------------------------------------------------------
+
+const OFF_LIMITS: ReadonlySet<string> = new Set([...DEFAULT_RELAYS, ...LEGACY_READ_RELAYS]);
+
+interface Seen {
+  readonly url: string;
+  readonly kind: string;
+  readonly frame?: readonly unknown[] | undefined;
+}
+
+/** Records every connection and frame while the victim acts, and can make every publish fail. */
+function spyOn(s: Scene) {
+  const net = s.net;
+  return {
+    spy: {
+      set refuse(on: boolean) {
+        net.refuseEvents = on;
+      },
+    },
+    /** Only what the victim does inside `fn` is recorded (the contact's own traffic is not). */
+    during: async <T>(fn: () => Promise<T>): Promise<T> => {
+      net.recording = true;
+      try {
+        return await fn();
+      } finally {
+        net.recording = false;
+      }
+    },
+    /** Every connection or frame to a default or legacy server, less what `allow` lets through. */
+    leaks: (allow: (seen: Seen) => boolean = () => false): Seen[] =>
+      net.traffic.filter((f) => OFF_LIMITS.has(f.url) && !allow(f)),
+    kinds: (kind: string): Seen[] => net.traffic.filter((f) => f.kind === kind),
+  };
+}
+
+/** The owner's `network.announce`, prepared by core, signed and applied (what the app does). */
+async function setOptOut(s: Scene, announceDefault: boolean) {
+  const prepared = await s.ana.client.ownerActions.prepareAnnounce(announceDefault);
+  if (prepared.status !== 'prepared') return prepared;
+  const session = await s.ana.memoryOwner.unlock(presence());
+  try {
+    const body = JSON.parse(JSON.stringify(prepared.body)) as Parameters<
+      typeof session.signOwnerAction
+    >[0];
+    return await s.ana.client.ownerActions.apply({
+      body,
+      sig: await session.signOwnerAction(body),
+    });
+  } finally {
+    await session.close();
+  }
+}
+
+/** Puts a copy of every stored message on each default and legacy server (what a tempted read would find). */
+function seedOffLimits(s: Scene): void {
+  const all = [...s.net.stored.values()].flat();
+  for (const url of OFF_LIMITS) s.net.stored.set(url, [...all]);
+}
+
+/** One pass of everything that reads or probes: sync, live subscription, probe, due retries. */
+async function quietPass(s: Scene): Promise<void> {
+  await s.ana.client.syncInbox();
+  const sub = await s.ana.client.subscribeInbox();
+  await sub.close();
+  await s.ana.client.network.probe();
+  await s.ana.client.outbox.processDue();
+}
+
+const keysOf = async (agent: PiAgent): Promise<Set<string>> => {
+  const { card } = await agent.client.identity.signedCard();
+  return new Set([card.ownerNostr.slice(2), card.agentNostr.slice(2)]);
+};
+const recipientOf = (seen: Seen): string | undefined =>
+  ((seen.frame?.[1] as NostrEvent | undefined)?.tags ?? []).find((t) => t[0] === 'p')?.[1];
+const isLookup = (seen: Seen): boolean =>
+  seen.kind === 'REQ' && (seen.frame?.[2] as { ids?: string[] }).ids !== undefined;
+
+describe('with the opt-out on, a full cycle touches no default or legacy server', () => {
+  it('send, receive and a card-update: nothing sent to and nothing read from any of them', async () => {
+    const s = (current = await scene());
+    const w = spyOn(s);
+    expect(await setOptOut(s, false)).toMatchObject({ status: 'applied' });
+    // Receive: a message sits on every default and legacy server too, and is also on the own ones.
+    await s.mallory.call('agentlink_send', { to: 'Ana', text: 'in, one' });
+    seedOffLimits(s);
+    await w.during(() => s.ana.client.syncInbox());
+    expect((await s.ana.call('agentlink_inbox', {})).text).toContain('in, one');
+    // Send.
+    const sent = await w.during(() => s.ana.call('agentlink_send', { to: 'Mallory', text: 'out' }));
+    expect(sent.structured['status']).toBe('ok');
+    // Card-update, after a change of the own list.
+    await w.during(async () => {
+      await changeList(s, list('relay-gamma'), false);
+      await s.ana.client.sendCardUpdates();
+      await s.ana.client.syncInbox();
+    });
+    expect(w.kinds('EVENT').length).toBeGreaterThan(2);
+    expect(w.kinds('REQ').length).toBeGreaterThan(0);
+    expect(w.leaks()).toEqual([]);
+  }, 60_000);
+
+  it('control: without the opt-out the same reads reach the default servers', async () => {
+    const s = (current = await scene());
+    const w = spyOn(s);
+    await changeList(s, DEFAULT_RELAYS.slice(0, 3));
+    await w.during(() => quietPass(s));
+    expect(w.leaks().length).toBeGreaterThan(0);
+  }, 60_000);
+
+  it('the owner card-update, the retries and the network view probe touch none of them either', async () => {
+    const s = (current = await scene());
+    const w = spyOn(s);
+    expect(await setOptOut(s, false)).toMatchObject({ status: 'applied' });
+    w.spy.refuse = true;
+    await w.during(async () => {
+      await s.ana.client.cardUpdates.announceToOwner();
+      await s.ana.call('agentlink_send', { to: 'Mallory', text: 'waits for a retry' });
+      await changeList(s, list('relay-gamma'), false);
+      await s.ana.client.sendCardUpdates();
+    });
+    expect(w.kinds('EVENT').length).toBeGreaterThan(0);
+    w.spy.refuse = false;
+    s.advance(2 * 3_600);
+    await w.during(async () => {
+      await s.ana.client.outbox.processDue();
+      const view = createNetworkReader(s.ana.client, { now: () => s.world.clock() * 1000 });
+      await view.read({ contactHosts: false });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await view.read({ contactHosts: false });
+      await s.ana.client.network.probe();
+    });
+    // The retries went out (to the contact and to the own servers) and the probe ran.
+    expect(w.kinds('open').length).toBeGreaterThan(0);
+    expect(w.leaks()).toEqual([]);
+  }, 60_000);
+
+  it('a contact whose card lists a default server is reached there, but your own copies are not', async () => {
+    const s = (current = await scene());
+    const w = spyOn(s);
+    const carolList = DEFAULT_RELAYS.slice(0, 2);
+    const carol = await makeAgent(s.world, {
+      n: 20,
+      label: 'carol',
+      name: 'Carol',
+      relays: carolList,
+    });
+    await editPolicy(s.ana, (p) => {
+      p.contacts.acceptInvites = 'auto';
+    });
+    await pair(carol, s.ana);
+    await editPolicy(s.ana, (p) => {
+      p.contacts.acceptInvites = 'approval';
+    });
+    expect(await setOptOut(s, false)).toMatchObject({ status: 'applied' });
+    const theirs = await keysOf(carol);
+    const sent = await w.during(async () => {
+      const result = await s.ana.call('agentlink_send', { to: 'Carol', text: 'hello Carol' });
+      await quietPass(s);
+      return result;
+    });
+    expect(sent.structured['status']).toBe('ok');
+    // Reached on her list: messages for her only.
+    const toCarol = w.kinds('EVENT').filter((f) => carolList.includes(f.url));
+    expect(toCarol.length).toBeGreaterThan(0);
+    expect(toCarol.every((f) => theirs.has(recipientOf(f) ?? ''))).toBe(true);
+    // Nothing else there: no copy for the owner or the agent itself, no read of the inbox, no probe.
+    const allowed = (f: Seen): boolean =>
+      carolList.includes(f.url) &&
+      (f.kind === 'open' ||
+        f.kind === 'CLOSE' ||
+        isLookup(f) ||
+        (f.kind === 'EVENT' && theirs.has(recipientOf(f) ?? '')));
+    expect(w.leaks(allowed)).toEqual([]);
+  }, 60_000);
+
+  it('a change from the default servers to its own, with the opt-out, sends nothing to the old ones during the overlap', async () => {
+    const s = (current = await scene());
+    const w = spyOn(s);
+    await changeList(s, DEFAULT_RELAYS.slice(0, 3));
+    await s.ana.client.cardUpdates.announceToOwner();
+    // A message still waiting, built while the own list was the default one.
+    w.spy.refuse = true;
+    await s.ana.call('agentlink_send', { to: 'Mallory', text: 'pending across the change' });
+    s.advance(MINUTE);
+    await w.during(async () => {
+      await changeList(s, list('relay-gamma'), false);
+      expect(await s.ana.client.identity.announceDefault()).toBe(false);
+      await s.ana.client.cardUpdates.withdrawFromDefaultServers();
+      await s.ana.client.sendCardUpdates();
+    });
+    w.spy.refuse = false;
+    for (const days of [0, 2, 20]) {
+      s.advance(days * DAY + 3_600);
+      await w.during(async () => {
+        await quietPass(s);
+        await s.ana.client.cardUpdates.announceToOwner();
+      });
+    }
+    // The retries went out, to the contact's servers and the own ones, and to no old default one.
+    expect(w.kinds('EVENT').length).toBeGreaterThan(0);
+    expect(w.leaks()).toEqual([]);
+  }, 60_000);
+
+  it('your own non-default previous server is still read for 30 days, and no default one is', async () => {
+    const s = (current = await scene());
+    const w = spyOn(s);
+    expect(await setOptOut(s, false)).toMatchObject({ status: 'applied' });
+    await changeList(s, list('relay-gamma'), false);
+    s.advance(29 * DAY);
+    // The contact has not seen the new card and still publishes to the old own servers.
+    await s.mallory.call('agentlink_send', { to: 'Ana', text: 'late but in time' });
+    seedOffLimits(s);
+    await w.during(() => s.ana.client.syncInbox());
+    const read = w.kinds('REQ').map((f) => f.url);
+    for (const url of OLD) expect(read).toContain(url);
+    expect((await s.ana.call('agentlink_inbox', {})).text).toContain('late but in time');
+    expect(w.leaks()).toEqual([]);
+    // Day 31: the old servers have ended.
+    s.advance(2 * DAY);
+    s.net.traffic.length = 0;
+    await w.during(() => s.ana.client.syncInbox());
+    for (const url of OLD) expect(w.kinds('REQ').map((f) => f.url)).not.toContain(url);
+    expect(w.leaks()).toEqual([]);
+  }, 60_000);
+
+  it('a restore on a clean HOME keeps the own list and the opt-out', async () => {
+    const t = await tempRoot('al-hostile-optout-');
+    try {
+      const own = ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'];
+      const owner = await makeOwner();
+      const made = await makeFixtureAgent(t.root, owner, 'helper', { announceDefault: false });
+      const kit = await makeKit(t.root, owner, [made], undefined, join(t.home, 'Downloads'));
+      const keychain = new MemoryKeychain();
+      const origin = 'http://localhost:47821';
+      const engine = createRestoreEngine({
+        home: t.home,
+        keychain: () => keychain,
+        origin,
+        kdf: FAST,
+        now: () => 1_800_000_000_000,
+        knownOwnerNostr: () => Promise.resolve(undefined),
+      });
+      const body = (a: { body: unknown }): Record<string, unknown> =>
+        a.body as Record<string, unknown>;
+      try {
+        const found = await engine.found('S1');
+        const handle = (body(found)['kits'] as { handle: string }[])[0]?.handle as string;
+        const opened = await engine.open('S1', { handle }, encodeUtf8(kit.code));
+        const begun = await engine.applyBegin('S1', {
+          kit: body(opened)['kit'] as string,
+          selection: [made.agentId],
+          names: {},
+        });
+        expect(body(begun)['status']).toBe('gesture');
+        const authenticator = new VirtualPrfAuthenticator({
+          credential: newWebauthnTestCredential(),
+        });
+        const pk = body(begun)['publicKey'] as {
+          challenge: string;
+          userId: string;
+          prfSalt: string;
+        };
+        const done = await engine.applyFinish(
+          'S1',
+          { nonce: body(begun)['nonce'] as JsonValue },
+          webauthnCreate(authenticator, pk, origin),
+        );
+        expect(done.status).toBe(200);
+        expect(body(done)['ids']).toMatchObject([{ agentId: made.agentId, outcome: 'restored' }]);
+      } finally {
+        await engine.close();
+      }
+      // The ID as the app opens it on the new computer.
+      const path = join(t.home, '.agentlink', 'agents', 'helper', 'store.sqlite');
+      const store = await openAgentStoreWith('keychain', made.agentId, path, { keychain });
+      const keyStore = await openRecordedKeyStore('keychain', made.agentId, { keychain });
+      try {
+        const client = await AgentLinkClient.create({
+          keyStore,
+          store: store.store,
+          cipher: store.cipher,
+          approvals: {
+            request: (request) => Promise.resolve({ approvalId: request.approvalId }),
+            status: () => Promise.resolve({ state: 'pending' }),
+          },
+          policyMark: store.policyMark,
+        });
+        expect(await client.identity.relays()).toEqual(own);
+        expect(await client.identity.announceDefault()).toBe(false);
+      } finally {
+        await keyStore.close();
+        await store.close();
+      }
+    } finally {
+      await t.cleanup();
+    }
+  }, 120_000);
+
+  it('the opt-out with the mix-in on is refused, in the route and in the owner action', async () => {
+    const s = (current = await scene());
+    const d = await desk(s);
+    const refusal = async (body: JsonObject): Promise<[number, string | undefined]> => {
+      const r = await d.review(d.servers, body);
+      return [r.status, d.asBody(r).error];
+    };
+    // The automatic servers (the mix-in) with the opt-out; an own list that holds a default server.
+    expect(await refusal({ servers: eight('own', 1), automatic: true, announce: false })).toEqual([
+      409,
+      'mix_in_on',
+    ]);
+    expect(
+      await refusal({
+        servers: [...eight('own', 2), DEFAULT_RELAYS[0] as string],
+        automatic: false,
+        announce: false,
+      }),
+    ).toEqual([409, 'mix_in_on']);
+    expect(
+      await refusal({
+        servers: [...eight('own', 2), LEGACY_READ_RELAYS[0] as string],
+        automatic: false,
+        announce: false,
+      }),
+    ).toEqual([409, 'mix_in_on']);
+    // The owner action itself, on an ID that holds a default server.
+    await changeList(s, DEFAULT_RELAYS.slice(0, 2));
+    expect(await setOptOut(s, false)).toMatchObject({ status: 'refused', reason: 'mix_in_on' });
+    expect(await s.ana.client.identity.announceDefault()).toBe(true);
+  }, 60_000);
 });
