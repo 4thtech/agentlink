@@ -3,34 +3,37 @@
 // server addresses; this module says, per address, whether AgentLink could use it, before anything
 // is saved or signed.
 //
-// Per address, in order, and nothing further once a step refuses:
+// Per address, in order, and nothing further once a step refuses (D-158 (4); 07 §4.3 "The test"):
 //   1. The relay URL rule on the raw string (04 §4): `wss://` only, no IP literal, no userinfo,
-//      query or fragment, the 256-character cap. Local names (localhost, .local, .internal, ...)
-//      are private addresses. Nothing is looked up for a refused address.
+//      query or fragment, the 256-character cap; local names (localhost, .local, .internal, ...)
+//      too. A refused address is `not_allowed`, and nothing is looked up for it.
 //   2. One DNS lookup; EVERY answer must be globally routable (relay-address.ts) before any socket
-//      opens: no private, loopback, link-local, CGNAT, multicast or metadata address, IPv4 or IPv6.
+//      opens: no private, loopback, link-local, CGNAT, multicast or metadata address, IPv4 or IPv6
+//      (`not_allowed`).
 //   3. The first answer is pinned: both WebSocket connections and the NIP-11 fetch go to that
 //      address, with SNI, certificate checks and `Host` on the name (the RelayConnector and
 //      Nip11Fetcher contracts, relay-io.ts). The name is never resolved again (DNS rebinding).
 //   4. NIP-11, bounded: 3 s, 64 KiB, no redirects (the fetcher's contract). Only
-//      `limitation.auth_required` and `limitation.payment_required` are read, each only as a JSON
-//      `true`; a huge, slow or malformed document is ignored.
+//      `limitation.auth_required`, `payment_required` (each only as a JSON `true`) and
+//      `max_message_length` are read; a limit below the largest wrap is `too_small`; a huge, slow
+//      or malformed document is ignored.
 //   5. Connection 1 publishes one tiny kind 1059 event signed by a THROWAWAY key made and wiped
-//      inside @4thtech-io/crypto (createThrowawayEvent). No ID key is ever used, and an AUTH
-//      challenge is never answered, with any key.
-//   6. Connection 2, fresh, reads the event back with the sync filter AgentLink uses (`#p`, kind
-//      1059) and its id. A server that answers OK but does not serve the event to a new connection
-//      (it drops events, or serves only the session that sent them) is refused: contacts publish
-//      from their own connections and this ID reads from its own.
+//      inside @4thtech-io/crypto (createThrowawayEvent), with a NIP-40 expiration. It must be
+//      accepted (`OK`) without a login, because contacts publish without one: a refusal, or a
+//      demand to log in first, is `not_accepted`. No ID key is ever used, and an AUTH challenge is
+//      never answered, with any key.
+//   6. Connection 2, fresh and unauthenticated, makes the two reads: the event's id (`limit: 1`)
+//      and the sync filter AgentLink uses (`kinds: [1059]`, `#p` the throwaway key). Both must
+//      serve it, else `not_kept`; a read that wants a login is `sign_in`.
 // Why the test EVENT and not only a REQ: a REQ shows the server speaks Nostr, not that it takes an
-// event from someone who has not signed in, which is what every contact's delivery needs (a server
-// that wants a sign-in to write cannot receive from contacts). The event is a throwaway: it names no
-// ID and carries no message.
+// event from someone who has not signed in, which is what every contact's delivery needs. The
+// event is a throwaway: it names no ID and carries no message.
 //
-// Outcomes are a fixed enum and refusals a fixed class; no server text (OK messages, NOTICE, CLOSED
-// reasons, NIP-11 fields, error text) ever reaches a result, and nothing here logs. Bounded: at most
-// 8 addresses, tested in parallel, the whole run at most 15 s. PrecheckRateLimit is the per-process
-// limit (10 tests a minute) the caller applies.
+// Outcomes and reasons are the fixed sets of 07 §4.3 and 08 §1; `signInRequired` and
+// `paymentRequired` are the warning flags beside the outcome. No server text (OK messages, NOTICE,
+// CLOSED reasons, NIP-11 fields, error text) ever reaches a result, and nothing here logs.
+// Bounded: at most 8 addresses (duplicates tested once), in parallel, each at most 10 s.
+// PrecheckRateLimit is the rate limit (10 tests a minute) the caller applies.
 import {
   NOSTR_KIND_GIFT_WRAP,
   createThrowawayEvent,
@@ -57,8 +60,15 @@ import { CONNECT_TIMEOUT_MS, MAX_FRAME_BYTES, NIP11_MAX_BYTES } from './relay-po
 
 /** At most this many addresses per test (07 §4.3: an own list is 2 to 8 servers). */
 export const PRECHECK_MAX_SERVERS = 8;
-/** The whole test, every address in parallel, ends by this bound. */
-export const PRECHECK_TOTAL_MS = 15_000;
+/** Each address's test ends by this bound (07 §4.3: 10 s per server); all run in parallel. */
+export const PRECHECK_SERVER_TIMEOUT_MS = 10_000;
+/**
+ * The smallest NIP-11 `max_message_length` that carries AgentLink's largest valid gift wrap as an
+ * EVENT frame (about 88 KB; 04 §3.1.1). Below it: `too_small`.
+ */
+export const PRECHECK_MIN_MESSAGE_LENGTH = 90_112;
+/** The test event's NIP-40 expiration, after its created_at: servers may drop it then. */
+export const PRECHECK_EVENT_EXPIRY_SECONDS = 600;
 /** The NIP-11 document's own bound (07 §4.2); its size bound is NIP11_MAX_BYTES (64 KiB). */
 export const PRECHECK_NIP11_TIMEOUT_MS = 3_000;
 /** A round trip above this is `slow` (still usable: it counts as ready). */
@@ -67,37 +77,37 @@ export const PRECHECK_SLOW_MS = 1_000;
 export const PRECHECK_RATE_LIMIT = 10;
 export const PRECHECK_RATE_WINDOW_MS = 60_000;
 
-/** The outcome of one address. `slow` counts as ready; the owner sees a warning. */
-export type PrecheckOutcome = 'ready' | 'slow' | 'needs_sign_in' | 'needs_payment' | 'refused';
+/** The outcome of one address (07 §4.3). `slow` counts as ready; `sign_in` is allowed with a warning. */
+export type PrecheckOutcome = 'ready' | 'slow' | 'sign_in' | 'refused';
 
-/** Why an address is refused: a fixed class, never server text. */
+/** Why an address is refused (07 §4.3, 08 §1): a fixed class, never server text. */
 export type PrecheckRefusal =
-  /** Not a `wss://` address. */
-  | 'not_wss'
-  /** An IP address instead of a name. */
-  | 'ip_literal'
-  /** A local name, or a DNS answer that is not publicly routable. */
-  | 'private_address'
-  /** Any other break of the relay URL rule (userinfo, query, fragment, length, characters). */
-  | 'invalid_url'
-  | 'dns_failed'
-  | 'tls_failed'
-  | 'connect_failed'
-  | 'timeout'
+  /** It refused the test event, or wants a login to accept it (contacts publish without one). */
+  | 'not_accepted'
+  /** It accepted the test event but did not serve it back to a new connection. */
+  | 'not_kept'
+  /** No lookup, connection or answer within the bound (DNS, TLS, connect, timeout). */
+  | 'unreachable'
+  /** The relay URL rule or the address check (IP literal, local name, private DNS answer). */
+  | 'not_allowed'
+  /** Its NIP-11 message limit is below the largest wrap. */
+  | 'too_small'
   /** It answered, but not as a Nostr server (no WebSocket upgrade, or no Nostr frame at all). */
-  | 'not_nostr'
-  /** It refused the test event, or did not serve it back to a new connection. */
-  | 'rejected_events';
+  | 'invalid';
 
 /** One address's answer. Built field by field: nothing from the server. */
 export interface PrecheckResult {
-  /** The host name, only when the address passed the relay URL rule; else null. */
+  /** The origin host (`:port` only when not 443), only when the address passed the URL rule. */
   readonly host: string | null;
   readonly outcome: PrecheckOutcome;
   /** Set exactly when `outcome` is `refused`. */
   readonly reason: PrecheckRefusal | null;
-  /** Whole milliseconds of the slower of the publish and the read-back; null unless measured. */
+  /** Whole milliseconds of the slower of the publish and the reads; null unless measured. */
   readonly roundTripMs: number | null;
+  /** A read wanted a login, or NIP-11 `auth_required`; null when nothing could tell. */
+  readonly signInRequired: boolean | null;
+  /** NIP-11 `payment_required` (a warning only); null without a readable document. */
+  readonly paymentRequired: boolean | null;
 }
 
 /** The I/O seams (relay-io.ts). There is deliberately no key, signer or KeyStore here. */
@@ -149,44 +159,70 @@ const NOSTR_FRAMES: ReadonlySet<string> = new Set([
   'COUNT',
 ]);
 
-type Parsed = { readonly url: string; readonly host: string; readonly port: number };
+type Parsed = {
+  readonly url: string;
+  readonly host: string;
+  readonly port: number;
+  /** What a result shows: the host, `:port` only when not 443 (as the network view). */
+  readonly display: string;
+};
 
 /** Step 1: the relay URL rule on the raw string, with a refusal class a person can act on. */
-function classify(raw: unknown): Parsed | PrecheckRefusal {
-  if (typeof raw !== 'string') return 'invalid_url';
-  if (!raw.startsWith('wss://')) return 'not_wss';
+function classify(raw: unknown): Parsed | 'not_allowed' {
+  if (typeof raw !== 'string') return 'not_allowed';
+  if (!raw.startsWith('wss://')) return 'not_allowed';
   const rest = raw.slice('wss://'.length);
   const end = rest.search(/[/?#]/);
   const authority = end === -1 ? rest : rest.slice(0, end);
-  if (authority.includes('@')) return 'invalid_url';
-  if (authority.startsWith('[')) return 'ip_literal';
+  if (authority.includes('@')) return 'not_allowed';
+  if (authority.startsWith('[')) return 'not_allowed';
   const colon = authority.lastIndexOf(':');
-  if (authority.indexOf(':') !== colon) return 'ip_literal'; // a bare IPv6 address
+  if (authority.indexOf(':') !== colon) return 'not_allowed'; // a bare IPv6 address
   const host = (colon === -1 ? authority : authority.slice(0, colon)).toLowerCase();
   const labels = host.split('.');
-  if (host !== '' && labels.every((label) => NUMERIC_LABEL.test(label))) return 'ip_literal';
+  if (host !== '' && labels.every((label) => NUMERIC_LABEL.test(label))) return 'not_allowed';
   if (LOCAL_NAMES.some((name) => host === name || host.endsWith(`.${name}`))) {
-    return 'private_address';
+    return 'not_allowed';
   }
-  if (!isAllowedRelayUrl(raw)) return 'invalid_url';
+  if (!isAllowedRelayUrl(raw)) return 'not_allowed';
   const m = RELAY_PARTS.exec(raw);
-  if (m === null) return 'invalid_url';
+  if (m === null) return 'not_allowed';
   const port = m[2] === undefined ? 443 : Number(m[2]);
-  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return 'invalid_url';
-  return { url: raw, host: m[1] as string, port };
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return 'not_allowed';
+  const name = m[1] as string;
+  return { url: raw, host: name, port, display: port === 443 ? name : `${name}:${port}` };
 }
 
-const refused = (host: string | null, reason: PrecheckRefusal): PrecheckResult =>
-  Object.freeze({ host, outcome: 'refused', reason, roundTripMs: null });
+type Flags = { readonly auth: boolean; readonly payment: boolean; readonly maxLength?: number };
+
+const refused = (host: string | null, reason: PrecheckRefusal, doc?: Flags): PrecheckResult =>
+  Object.freeze({
+    host,
+    outcome: 'refused',
+    reason,
+    roundTripMs: null,
+    signInRequired: doc === undefined ? null : doc.auth,
+    paymentRequired: doc === undefined ? null : doc.payment,
+  });
 
 const answered = (
   host: string,
   outcome: Exclude<PrecheckOutcome, 'refused'>,
   roundTripMs: number | null,
-): PrecheckResult => Object.freeze({ host, outcome, reason: null, roundTripMs });
+  signInRequired: boolean,
+  doc: Flags | undefined,
+): PrecheckResult =>
+  Object.freeze({
+    host,
+    outcome,
+    reason: null,
+    roundTripMs,
+    signInRequired,
+    paymentRequired: doc === undefined ? null : doc.payment,
+  });
 
 /** NIP-11 flags: each true only for a JSON `true`; undefined for no readable document. */
-function readFlags(body: unknown): { auth: boolean; payment: boolean } | undefined {
+function readFlags(body: unknown): Flags | undefined {
   if (typeof body !== 'string' || body.length > NIP11_MAX_BYTES) return undefined;
   if (encodeUtf8(body).length > NIP11_MAX_BYTES) return undefined;
   let doc: unknown;
@@ -201,7 +237,12 @@ function readFlags(body: unknown): { auth: boolean; payment: boolean } | undefin
     return { auth: false, payment: false };
   }
   const l = limitation as Record<string, unknown>;
-  return { auth: l.auth_required === true, payment: l.payment_required === true };
+  const max = l.max_message_length;
+  return {
+    auth: l.auth_required === true,
+    payment: l.payment_required === true,
+    ...(typeof max === 'number' && Number.isSafeInteger(max) && max > 0 ? { maxLength: max } : {}),
+  };
 }
 
 /** One text frame as a JSON array, size-checked before parsing; anything else is undefined. */
@@ -218,8 +259,9 @@ function frameOf(data: unknown): unknown[] | undefined {
   }
 }
 
+/** A connection that never opened: a refused upgrade is not a Nostr server; the rest unreachable. */
 const failureReason = (kind: RelayConnectFailure | undefined): PrecheckRefusal =>
-  kind === 'tls' ? 'tls_failed' : kind === 'upgrade' ? 'not_nostr' : 'connect_failed';
+  kind === 'upgrade' ? 'invalid' : 'unreachable';
 
 interface Io {
   readonly resolver: HostResolver;
@@ -235,7 +277,7 @@ type Step =
   | { readonly kind: 'sign_in' }
   | { readonly kind: 'refused'; readonly reason: PrecheckRefusal };
 
-/** One address's test; `abort` ends it at the overall cap (closing its sockets). */
+/** One address's test; `abort` ends it at its 10 s bound (closing its sockets). */
 class OneTest {
   readonly #io: Io;
   readonly #sockets = new Set<RelaySocket>();
@@ -264,9 +306,12 @@ class OneTest {
   }
 
   async run(raw: unknown): Promise<PrecheckResult> {
+    // 07 §4.3: 10 s per server, whatever the server does.
+    const timer = this.#io.timers.setTimeout(() => this.abort(), PRECHECK_SERVER_TIMEOUT_MS);
     try {
       return await this.#run(raw);
     } finally {
+      this.#io.timers.clearTimeout(timer);
       this.#closeAll();
     }
   }
@@ -274,49 +319,53 @@ class OneTest {
   async #run(raw: unknown): Promise<PrecheckResult> {
     const parsed = classify(raw);
     if (typeof parsed === 'string') return refused(null, parsed);
-    const { host } = parsed;
+    const host = parsed.display;
     // Step 2: one lookup; every answer globally routable before any socket opens.
-    const answers = await this.#lookup(host);
-    if (answers === 'timeout') return refused(host, 'timeout');
-    if (answers === undefined) return refused(host, 'dns_failed');
-    if (!Array.isArray(answers) || answers.length === 0) return refused(host, 'dns_failed');
+    const answers = await this.#lookup(parsed.host);
+    if (answers === 'timeout' || answers === undefined) return refused(host, 'unreachable');
+    if (!Array.isArray(answers) || answers.length === 0) return refused(host, 'unreachable');
     if (!answers.every((a) => typeof a === 'string' && isGloballyRoutable(a))) {
-      return refused(host, 'private_address');
+      return refused(host, 'not_allowed');
     }
     // Step 3: the pin. Every connection and the NIP-11 fetch use this one target.
     const target: RelayTarget = Object.freeze({
       url: parsed.url,
-      host,
+      host: parsed.host,
       port: parsed.port,
       address: answers[0] as string,
     });
     const flags = this.#nip11(target);
-    // Step 5: the throwaway-key event.
+    // Step 5: the throwaway-key event, with a NIP-40 expiration so servers may drop it soon.
+    const createdAt = Math.floor(this.#io.now() / 1000);
     const event = createThrowawayEvent((pubkey) => ({
       kind: NOSTR_KIND_GIFT_WRAP,
-      created_at: Math.floor(this.#io.now() / 1000),
-      tags: [['p', pubkey]],
+      created_at: createdAt,
+      tags: [
+        ['p', pubkey],
+        ['expiration', String(createdAt + PRECHECK_EVENT_EXPIRY_SECONDS)],
+      ],
       content: encodeHex(randomBytes(16)),
     }));
     const published = await this.#publish(target, event);
-    let readBack: Step | undefined;
-    if (published.kind === 'ok') readBack = await this.#readBack(target, event);
+    let reads: Step | undefined;
+    if (published.kind === 'ok') reads = await this.#readBack(target, event, createdAt);
     const doc = await flags;
-    const step = readBack ?? published;
-    if (step.kind === 'refused') {
-      if (step.reason === 'rejected_events' && doc?.payment === true) {
-        return answered(host, 'needs_payment', null);
-      }
-      return refused(host, step.reason);
+    const step = reads ?? published;
+    if (step.kind === 'refused' && (step.reason === 'unreachable' || step.reason === 'invalid')) {
+      return refused(host, step.reason, doc);
     }
-    if (doc?.payment === true) return answered(host, 'needs_payment', null);
-    if (step.kind === 'sign_in') return answered(host, 'needs_sign_in', null);
+    if (doc?.maxLength !== undefined && doc.maxLength < PRECHECK_MIN_MESSAGE_LENGTH) {
+      return refused(host, 'too_small', doc);
+    }
+    if (step.kind === 'refused') return refused(host, step.reason, doc);
+    if (step.kind === 'sign_in') return answered(host, 'sign_in', null, true, doc);
     const ms = Math.max(published.kind === 'ok' ? published.ms : 0, step.ms);
-    if (doc?.auth === true) return answered(host, 'needs_sign_in', ms);
-    return answered(host, ms > PRECHECK_SLOW_MS ? 'slow' : 'ready', ms);
+    // Accepted and both reads served, but NIP-11 says `auth_required`: sign_in, with a warning.
+    if (doc?.auth === true) return answered(host, 'sign_in', ms, true, doc);
+    return answered(host, ms > PRECHECK_SLOW_MS ? 'slow' : 'ready', ms, false, doc);
   }
 
-  /** Step 2's lookup; it ends at the overall cap even if the resolver never answers. */
+  /** Step 2's lookup; it ends at the bound even if the resolver never answers. */
   #lookup(host: string): Promise<readonly string[] | undefined | 'timeout'> {
     return new Promise((resolve) => {
       let done = false;
@@ -344,12 +393,12 @@ class OneTest {
   }
 
   /** Step 4: NIP-11, bounded in time; never rejects; undefined for no readable document. */
-  #nip11(target: RelayTarget): Promise<{ auth: boolean; payment: boolean } | undefined> {
+  #nip11(target: RelayTarget): Promise<Flags | undefined> {
     const fetcher = this.#io.nip11;
     if (fetcher === undefined) return Promise.resolve(undefined);
     return new Promise((resolve) => {
       let done = false;
-      const finish = (value: { auth: boolean; payment: boolean } | undefined): void => {
+      const finish = (value: Flags | undefined): void => {
         if (done) return;
         done = true;
         this.#io.timers.clearTimeout(timer);
@@ -378,9 +427,9 @@ class OneTest {
     target: RelayTarget,
     begin: (socket: RelaySocket) => void,
     onFrame: (frame: unknown[], end: (step: Step) => void) => void,
-    silence: (spokeNostr: boolean, authSeen: boolean) => Step,
+    quiet: (spokeNostr: boolean, authSeen: boolean) => Step,
   ): Promise<Step> {
-    if (this.#aborted) return Promise.resolve(refusal('timeout'));
+    if (this.#aborted) return Promise.resolve(refusal('unreachable'));
     return new Promise((resolve) => {
       let done = false;
       let opened = false;
@@ -403,11 +452,11 @@ class OneTest {
         }
         resolve(step);
       };
-      // At the overall cap: nothing Nostr-like ever came back is not_nostr, else a timeout.
-      const stop = (): void => end(opened ? silence(spokeNostr, authSeen) : refusal('timeout'));
+      // At the bound, or a close after the open with no answer: the step's own rule (`quiet`).
+      const stop = (): void => end(opened ? quiet(spokeNostr, authSeen) : refusal('unreachable'));
       this.#aborters.add(stop);
       const connectTimer = this.#io.timers.setTimeout(() => {
-        if (!opened) end(refusal('timeout'));
+        if (!opened) end(refusal('unreachable'));
       }, CONNECT_TIMEOUT_MS);
       try {
         socket = this.#io.connector.open(target, {
@@ -417,7 +466,7 @@ class OneTest {
             try {
               begin(socket);
             } catch {
-              end(refusal('connect_failed'));
+              end(refusal('unreachable'));
             }
           },
           onMessage: (data) => {
@@ -434,12 +483,12 @@ class OneTest {
             if (!opened && failure === undefined) failure = kind;
           },
           onClose: () => {
-            if (opened) end(authSeen ? { kind: 'sign_in' } : refusal('connect_failed'));
+            if (opened) end(quiet(true, authSeen));
             else end(refusal(failureReason(failure)));
           },
         });
       } catch {
-        end(refusal('connect_failed'));
+        end(refusal('unreachable'));
         return;
       }
       if (done) {
@@ -470,51 +519,64 @@ class OneTest {
           end({ kind: 'ok', ms: Math.max(0, Math.round(this.#io.now() - sentAt)) });
           return;
         }
-        // Only the machine-readable prefix is read (NIP-01); the rest is never kept.
-        const signIn = typeof frame[3] === 'string' && frame[3].startsWith('auth-required:');
-        end(signIn ? { kind: 'sign_in' } : refusal('rejected_events'));
+        // A refusal, or `auth-required:` (a login to write): contacts could not deliver to it.
+        end(refusal('not_accepted'));
       },
+      // An AUTH challenge and no OK: it wants a login to accept (D-158 (3)); a Nostr frame but no
+      // OK: unreachable in time; nothing Nostr-like at all: not a Nostr server.
       (spokeNostr, authSeen) =>
-        authSeen ? { kind: 'sign_in' } : refusal(spokeNostr ? 'timeout' : 'not_nostr'),
+        refusal(authSeen ? 'not_accepted' : spokeNostr ? 'unreachable' : 'invalid'),
     );
   }
 
-  /** Connection 2, fresh: the event must come back by its id under the sync filter. */
-  #readBack(target: RelayTarget, event: NostrEvent): Promise<Step> {
-    const subId = `t${encodeHex(randomBytes(4))}`;
+  /**
+   * Connection 2, fresh and unauthenticated: the two reads of 07 §4.3, by the event's id and by the
+   * sync filter. Both must serve the event (verified, same id) before their EOSE.
+   */
+  #readBack(target: RelayTarget, event: NostrEvent, createdAt: number): Promise<Step> {
+    const tag = encodeHex(randomBytes(4));
+    const byId = `i${tag}`;
+    const bySync = `s${tag}`;
     let sentAt = 0;
-    let served = false;
+    const served = new Set<string>();
+    const ended = new Set<string>();
     return this.#connect(
       target,
       (socket) => {
         sentAt = this.#io.now();
+        socket.send(JSON.stringify(['REQ', byId, { ids: [event.id], limit: 1 }]));
         socket.send(
           JSON.stringify([
             'REQ',
-            subId,
-            { ids: [event.id], kinds: [NOSTR_KIND_GIFT_WRAP], '#p': [event.pubkey], limit: 1 },
+            bySync,
+            { kinds: [NOSTR_KIND_GIFT_WRAP], '#p': [event.pubkey], since: createdAt - 60 },
           ]),
         );
       },
       (frame, end) => {
-        if (frame[1] !== subId) return;
+        const sub = frame[1];
+        if (sub !== byId && sub !== bySync) return;
         if (frame[0] === 'EVENT') {
           const got = frame[2] as NostrEvent | undefined;
           if (typeof got === 'object' && got !== null && got.id === event.id && verifies(got)) {
-            served = true;
+            served.add(sub);
           }
         } else if (frame[0] === 'EOSE') {
-          end(
-            served
-              ? { kind: 'ok', ms: Math.max(0, Math.round(this.#io.now() - sentAt)) }
-              : refusal('rejected_events'),
-          );
+          if (!served.has(sub)) {
+            end(refusal('not_kept'));
+            return;
+          }
+          ended.add(sub);
+          if (ended.size === 2) {
+            end({ kind: 'ok', ms: Math.max(0, Math.round(this.#io.now() - sentAt)) });
+          }
         } else if (frame[0] === 'CLOSED') {
+          // Only the machine-readable prefix is read (NIP-01); the rest is never kept.
           const signIn = typeof frame[2] === 'string' && frame[2].startsWith('auth-required:');
-          end(signIn ? { kind: 'sign_in' } : refusal('rejected_events'));
+          end(signIn ? { kind: 'sign_in' } : refusal('not_kept'));
         }
       },
-      (_spokeNostr, authSeen) => (authSeen ? { kind: 'sign_in' } : refusal('timeout')),
+      (_spokeNostr, authSeen) => (authSeen ? { kind: 'sign_in' } : refusal('unreachable')),
     );
   }
 }
@@ -542,8 +604,9 @@ const defaultTimers: Timers = {
 
 /**
  * Tests each of `urls` (1 to PRECHECK_MAX_SERVERS entries, as typed; non-strings are refused as
- * `invalid_url`) and answers one result per entry, in order. Never rejects for a server's behaviour;
- * a list that is not an array of 1 to 8 entries is a TransportError (`invalid_argument`).
+ * `not_allowed`) and answers one result per entry, in order. The same address twice is tested once
+ * and answered twice. Never rejects for a server's behaviour; a list that is not an array of 1 to 8
+ * entries is a TransportError (`invalid_argument`).
  */
 export async function precheckServers(
   urls: readonly unknown[],
@@ -559,21 +622,19 @@ export async function precheckServers(
     timers: options.timers ?? defaultTimers,
     now: options.now ?? (() => Date.now()),
   };
-  const tests = urls.map(() => new OneTest(io));
-  const timer = io.timers.setTimeout(() => {
-    for (const test of tests) test.abort();
-  }, PRECHECK_TOTAL_MS);
-  try {
-    // Every step of a test ends when it is aborted, so each run settles by the cap.
-    return await Promise.all(
-      tests.map((test, i) =>
-        test.run(urls[i]).catch(() => {
-          const parsed = classify(urls[i]);
-          return refused(typeof parsed === 'string' ? null : parsed.host, 'connect_failed');
-        }),
-      ),
-    );
-  } finally {
-    io.timers.clearTimeout(timer);
-  }
+  const runs = new Map<string, Promise<PrecheckResult>>();
+  const runOf = (raw: unknown): Promise<PrecheckResult> => {
+    if (typeof raw !== 'string') return Promise.resolve(refused(null, 'not_allowed'));
+    let run = runs.get(raw);
+    if (run === undefined) {
+      run = new OneTest(io).run(raw).catch(() => {
+        const parsed = classify(raw);
+        return refused(typeof parsed === 'string' ? null : parsed.display, 'unreachable');
+      });
+      runs.set(raw, run);
+    }
+    return run;
+  };
+  // Every step of a test ends when it is aborted (10 s per server), so each run settles by then.
+  return Promise.all(urls.map(runOf));
 }

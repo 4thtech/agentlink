@@ -62,9 +62,15 @@ function speakNostr(store: unknown[], options: { okFalse?: string } = {}) {
         store.push(event);
         ws.send(JSON.stringify(['OK', event.id, true, '']));
       } else if (frame[0] === 'REQ') {
-        const filter = frame[2] as { ids?: string[] };
+        const filter = frame[2] as { ids?: string[]; kinds?: number[]; '#p'?: string[] };
         for (const event of store) {
-          if (filter.ids?.includes((event as { id: string }).id) === true) {
+          const e = event as { id: string; kind: number; tags: string[][] };
+          const byId = filter.ids?.includes(e.id) === true;
+          const bySync =
+            filter.ids === undefined &&
+            filter.kinds?.includes(e.kind) === true &&
+            e.tags.some((t) => t[0] === 'p' && filter['#p']?.includes(t[1] as string) === true);
+          if (byId || bySync) {
             ws.send(JSON.stringify(['EVENT', frame[1], event]));
           }
         }
@@ -165,9 +171,9 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     expect(Object.keys(body)).toEqual(['results']);
     expect(body.results.map((r) => [r.host, r.outcome, r.reason])).toEqual([
       [HOST_A, 'ready', null],
-      [HOST_B, 'refused', 'rejected_events'],
-      [HOST_C, 'refused', 'private_address'],
-      [null, 'refused', 'not_wss'],
+      [HOST_B, 'refused', 'not_accepted'],
+      [HOST_C, 'refused', 'not_allowed'],
+      [null, 'refused', 'not_allowed'],
     ]);
     expect(JSON.stringify(body)).not.toMatch(/go away|<b>|10\.1\.2\.3/);
     // SNI and Host were the name; the private host was never dialed; one lookup per name.
@@ -212,7 +218,7 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     expect(w.dialed.every((a) => a === ADDRESS_A)).toBe(true);
   }, 30_000);
 
-  it('a certificate for another name is tls_failed; a refused upgrade is not_nostr', async () => {
+  it('a certificate for another name is unreachable; a refused upgrade is invalid', async () => {
     const wrongCert = await startTestRelay(otherCertificate, { onSocket: speakNostr([]) });
     const noUpgrade = await startTestRelay(certificate, {
       upgrade: (_req, socket) => {
@@ -234,12 +240,12 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
       },
     );
     expect((res.body as { results: { reason: string }[] }).results.map((r) => r.reason)).toEqual([
-      'tls_failed',
-      'not_nostr',
+      'unreachable',
+      'invalid',
     ]);
   }, 30_000);
 
-  it('a server that demands AUTH needs sign-in; the challenge is never answered', async () => {
+  it('a server that demands a login to write is refused (not_accepted); AUTH is never answered', async () => {
     const frames: unknown[][] = [];
     const authRelay = await startTestRelay(certificate, {
       onSocket: (ws) => {
@@ -260,9 +266,10 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
       createNetworkTestRoute(() => w.io),
       { servers: [`wss://${HOST_A}`] },
     );
-    expect((res.body as { results: { outcome: string }[] }).results[0]?.outcome).toBe(
-      'needs_sign_in',
-    );
+    // A login to WRITE: contacts could not deliver to it (D-158 (3)).
+    expect(
+      (res.body as { results: { outcome: string; reason: string }[] }).results[0],
+    ).toMatchObject({ outcome: 'refused', reason: 'not_accepted' });
     expect(frames.some((f) => f[0] === 'AUTH')).toBe(false);
   }, 30_000);
 
@@ -288,7 +295,7 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     expect(w.resolves).toHaveLength(0);
   });
 
-  it('allows 10 tests a minute per process, then 429 with Retry-After seconds', async () => {
+  it('allows 10 tests a minute per process, then 429 busy', async () => {
     const w = world({}, {});
     const route = createNetworkTestRoute(() => w.io);
     for (let i = 0; i < 10; i += 1) {
@@ -297,10 +304,7 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     }
     const res = await call(route, { servers: ['ws://plain.nostr-test.dev'] });
     expect(res.status).toBe(429);
-    const body = res.body as { error: string; retryAfter: number };
-    expect(body.error).toBe('wait');
-    expect(body.retryAfter).toBeGreaterThan(0);
-    expect(body.retryAfter).toBeLessThanOrEqual(60);
+    expect(res.body).toEqual({ error: 'busy' });
   });
 
   it('runs one test at a time: a second while one runs is 429', async () => {

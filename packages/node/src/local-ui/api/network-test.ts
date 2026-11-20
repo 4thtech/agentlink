@@ -9,16 +9,17 @@
 //
 // Body: exactly `{servers: [string, ...]}`, 1 to 8 strings of at most 256 characters, as the owner
 // typed them; anything else is 400 `invalid`, with nothing echoed. Answer 200:
-//   { results: [ { host: string | null,   // the name, only when the address passed the URL rule
-//                  outcome: 'ready' | 'slow' | 'needs_sign_in' | 'needs_payment' | 'refused',
-//                  reason: null | 'not_wss' | 'ip_literal' | 'private_address' | 'invalid_url' |
-//                          'dns_failed' | 'tls_failed' | 'connect_failed' | 'timeout' |
-//                          'not_nostr' | 'rejected_events',
-//                  roundTripMs: int | null } ] }        // one per entry, in the same order
+//   { results: [ { host: string | null,   // origin host (':port' only when not 443), only when
+//                                          // the address passed the URL rule
+//                  outcome: 'ready' | 'slow' | 'sign_in' | 'refused',
+//                  reason: null | 'not_accepted' | 'not_kept' | 'unreachable' | 'not_allowed' |
+//                          'too_small' | 'invalid',
+//                  roundTripMs: int | null,
+//                  signInRequired, paymentRequired: boolean | null } ] }  // one per entry, in order
 // Built field by field from the transport's fixed enums: never a server's text, an address, a key
 // or an error's text. Limits: one test at a time and PRECHECK_RATE_LIMIT (10) tests a minute for
-// this process; over either, 429 `{error: 'wait', retryAfter}` (whole seconds). Each test ends by
-// PRECHECK_TOTAL_MS (15 s). Nothing is logged.
+// this process (stricter than the spec's per page session); over either, 429 `{error: 'busy'}`.
+// Each server's test ends by PRECHECK_SERVER_TIMEOUT_MS (10 s). Nothing is logged.
 import type { JsonObject } from '@4thtech-io/crypto';
 import {
   PRECHECK_MAX_SERVERS,
@@ -54,8 +55,11 @@ const INVALID: LocalUiResult = Object.freeze({
   status: 400,
   body: Object.freeze({ error: 'invalid' }),
 });
-const wait = (retryAfter: number): LocalUiResult =>
-  Object.freeze({ status: 429, body: Object.freeze({ error: 'wait', retryAfter }) });
+/** 08 §1: one test more than the limit, or one while another runs, is `429 busy`. */
+const BUSY: LocalUiResult = Object.freeze({
+  status: 429,
+  body: Object.freeze({ error: 'busy' }),
+});
 
 /** The body's addresses, or undefined: exactly `{servers}`, 1 to 8 strings of at most 256 chars. */
 function addressesOf(body: JsonObject): readonly string[] | undefined {
@@ -85,6 +89,8 @@ function resultOf(r: PrecheckResult): JsonObject {
       typeof r.roundTripMs === 'number' && Number.isSafeInteger(r.roundTripMs) && r.roundTripMs >= 0
         ? r.roundTripMs
         : null,
+    signInRequired: typeof r.signInRequired === 'boolean' ? r.signInRequired : null,
+    paymentRequired: typeof r.paymentRequired === 'boolean' ? r.paymentRequired : null,
   };
 }
 
@@ -111,9 +117,8 @@ export function createNetworkTestRoute(
     handler: async (_context, body): Promise<LocalUiResult> => {
       const servers = addressesOf(body);
       if (servers === undefined) return INVALID;
-      if (running) return wait(1);
-      const retryAfter = limit.take();
-      if (retryAfter > 0) return wait(retryAfter);
+      if (running) return BUSY;
+      if (limit.take() > 0) return BUSY;
       running = true;
       try {
         const { resolver, connector, nip11 } = io();

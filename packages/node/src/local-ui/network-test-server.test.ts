@@ -75,9 +75,10 @@ function memoryRelays(): {
             stored.push(event);
             push(['OK', event.id, true, '']);
           } else if (frame[0] === 'REQ') {
-            const ids = (frame[2] as { ids?: string[] }).ids ?? [];
+            // By id, or (no ids) the sync filter: every stored event matches here.
+            const ids = (frame[2] as { ids?: string[] }).ids;
             for (const event of stored)
-              if (ids.includes(event.id)) push(['EVENT', frame[1], event]);
+              if (ids === undefined || ids.includes(event.id)) push(['EVENT', frame[1], event]);
             push(['EOSE', frame[1]]);
           }
         },
@@ -173,6 +174,8 @@ describe('NET-PRECHECK: the network test gate', () => {
           host: 'relay-a.nostr-test.dev',
           outcome: 'ready',
           reason: null,
+          signInRequired: false,
+          paymentRequired: null,
           roundTripMs: expect.any(Number) as number,
         },
       ],
