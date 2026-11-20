@@ -25,7 +25,7 @@ import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
 import type { LocalUiHistoryStep } from './history-paths.js';
 import type { LocalUiHistorySession } from './history-desk.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
-import type { RelayMigrationOutcome } from '../owner-relay-migration.js';
+import type { RelayMigrationOutcome, ServerChangeOutcome } from '../owner-relay-migration.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
 /**
@@ -93,6 +93,19 @@ export interface LocalUiOwnerOperation {
    * owner session or the epoch control. Absent outside the app host or without the key items.
    */
   updateContactDetails?(review: OwnerReview): Promise<RelayMigrationOutcome>;
+  /**
+   * NET-OWNER-SET (D-158 (6); 04 §2.6; 07 §4.3 "Use your own servers"): the one owner operation of a
+   * server-list change or a reset, instead of `sign` (one or the other, once). With the presence this
+   * request carried it signs exactly the open agent's next card with exactly `plan.relays` (the list
+   * the route built after testing every server again) and stores `plan.announceDefault` with it
+   * (owner-relay-migration.ts signServerChange); then core's card-update tells the contacts. The
+   * handler never sees the owner session or the epoch control. Absent outside the app host or
+   * without the key items.
+   */
+  changeServers?(plan: {
+    readonly relays: readonly string[];
+    readonly announceDefault: boolean;
+  }): Promise<ServerChangeOutcome>;
   /**
    * WP-11 (F-1, D-117 A; 04 §2.3.3 "Export: who sees the seeds", §2.5.1 `backup.export`): the one
    * owner operation of saving a recovery kit, instead of `sign` (one or the other, once). Offered

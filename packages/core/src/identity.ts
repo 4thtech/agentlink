@@ -563,11 +563,15 @@ export class IdentityService {
     const signed = await this.#issue(next, input, name, relays, now);
     // D-141: a renaming pending card carries its name, so finishing it on open stores that name.
     // RELAY-CARD-MIGRATION: so does a pending card with a new relay list.
+    // NET-OWNER-SET: and the announce choice, so an interrupted list change keeps it too.
     const text =
-      renamed || relaysChanged
+      renamed || relaysChanged || input.announceDefault !== undefined
         ? pendingCardText(signed, {
             ...(renamed ? { name } : {}),
             ...(relaysChanged ? { relays } : {}),
+            ...(input.announceDefault === undefined
+              ? {}
+              : { announceDefault: input.announceDefault }),
           })
         : storedCardText(signed);
     // M1-4d-f: the current card joins the history. A card stored before M1-4d-d gets its `cardPop`
@@ -862,7 +866,11 @@ function rotationPending(): CoreError {
  */
 function pendingCardText(
   signed: StoredCard,
-  extra: { readonly name?: string; readonly relays?: readonly string[] },
+  extra: {
+    readonly name?: string;
+    readonly relays?: readonly string[];
+    readonly announceDefault?: boolean;
+  },
 ): string {
   return canonicalize({
     card: signed.card as unknown as JsonValue,
@@ -871,7 +879,24 @@ function pendingCardText(
     cardPop: signed.cardPop,
     ...(extra.name === undefined ? {} : { name: extra.name }),
     ...(extra.relays === undefined ? {} : { relays: [...extra.relays] }),
+    ...(extra.announceDefault === undefined ? {} : { announceDefault: extra.announceDefault }),
   });
+}
+
+/**
+ * NET-OWNER-SET: the announce choice a pending card text carries, or undefined (unchanged). Anything
+ * but a boolean is ignored (the choice then stays as stored).
+ */
+function pendingAnnounceOf(text: string): boolean | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null) return undefined;
+  const announce = (value as Record<string, unknown>)['announceDefault'];
+  return typeof announce === 'boolean' ? announce : undefined;
 }
 
 /** The relay list a pending card text carries (RELAY-CARD-MIGRATION), or undefined (unchanged). */
@@ -951,7 +976,12 @@ async function usablePendingCard(
   bundle: PublicIdentity,
   now: number,
 ): Promise<
-  (StoredCard & { readonly name?: string; readonly relays?: readonly string[] }) | undefined
+  | (StoredCard & {
+      readonly name?: string;
+      readonly relays?: readonly string[];
+      readonly announceDefault?: boolean;
+    })
+  | undefined
 > {
   const key = [row.agent_id];
   try {
@@ -961,6 +991,7 @@ async function usablePendingCard(
     const name = pendingNameOf(text);
     // RELAY-CARD-MIGRATION: a pending card with a new list names it, and relaysHash commits to it.
     const relays = pendingRelaysOf(text);
+    const announceDefault = pendingAnnounceOf(text);
     const current = parseStoredCard(
       await open(ctx, 'identity', 'agent_card_json', key, row.agent_card_json),
     ).card;
@@ -984,6 +1015,7 @@ async function usablePendingCard(
       ...pending,
       ...(name === undefined ? {} : { name }),
       ...(relays === undefined ? {} : { relays }),
+      ...(announceDefault === undefined ? {} : { announceDefault }),
     };
   } catch (error) {
     if (error instanceof CoreError) return undefined;
@@ -1084,6 +1116,9 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
         updated_at: now,
         ...(sealedName === undefined ? {} : { name: sealedName }),
         ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
+        ...(pending.announceDefault === undefined
+          ? {}
+          : { announce_default: pending.announceDefault ? (1 as const) : (0 as const) }),
         ...(prev === undefined ? {} : { prev_relays: prev }),
       };
       return tx.update('identity', where, patch) === 1;

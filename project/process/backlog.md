@@ -11635,6 +11635,7 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Repo/path:** agentlink · core owner card-update targets; invite and restore paths
 - **Depends on:** M1-7j, NET-OWNER-SET
 - **Goal:** a per-ID owner choice, offered only with the mix-in off: the owner card-update then goes to the ID's own and leaving servers only, and the card-update fan-out to the old default servers stops too. Contacts' messages are unchanged; invites carry the card's list; a reset clears it.
+- **Also (from the NET-OWNER-SET review, L6 b):** sign the `network.announce` owner action with the card when the choice changes (NET-OWNER-SET stores the choice with the card but signs no such action yet).
 - **Done when:** `RED (expected):` commit first; with the opt-out on nothing is published to the default set; the short-invite path still reaches the ID; a restore from a backup on a new computer keeps the list and the choice and finds the ID.
 
 #### NET-PREV-DOCTOR · `doctor` names an unreadable list of leaving servers (from the M1-7j review, L-4)
@@ -11643,6 +11644,34 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Depends on:** M1-7j
 - **Goal:** today a stored list of leaving servers that does not open only writes a fixed log line; the agent then reads its own list and the legacy servers, counts the list as empty for the 16 limit, and the next server change replaces it. `doctor` (and the app's diagnostics) says, in fixed text and without any address, that the list of servers still read after a change could not be opened, and what that means (messages a contact sent to a server you left may not arrive until it learns your new details).
 - **Done when:** a test stores a value that does not open and `doctor` reports the fixed finding; a readable or empty list reports nothing; no server address or stored value appears in the output or the logs.
+
+#### NET-REVIEW-BIND · Bind the server-list review to the ID and the page session (from the NET-OWNER-SET review, L4)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Spec:** 08 §1 `POST /api/ui/network/servers` (`changed`); 07 §4.3 "The change"; D-158 (6)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/network-servers.ts`
+- **Depends on:** NET-OWNER-SET
+- **Goal:** a confirm is let on to the owner gesture only when it matches a review the same page session made for the same ID at the same card epoch, with the same list, roles, announce choice, leaving servers and warnings. Today the match covers the list, the roles and the choice only; the signed list is always one the owner reviewed and presence is still required, so this tightens what the owner was shown, not what can be signed.
+- **Done when:** a review from another ID, another page session or an older epoch, or one whose warnings or leaving servers changed, answers `changed` before the gesture; tests for each.
+
+#### NET-RESET-REVIEW-STATE · The reset review shows the automatic servers truthfully (from the NET-OWNER-SET review, L5)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 08 §1 `POST /api/ui/network/reset`; 07 §4.3 "Reset"; 11 §5.14
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/network-servers.ts`, the NET-UI-B reset screen; 08 §1 if the shape changes
+- **Depends on:** NET-OWNER-SET
+- **Goal:** the reset is allowed at any time and does not test the default servers, yet its review answers `outcome: "ready"` for each of them. Either test them for display only (never blocking the reset, within the shared test budget), or answer a neutral value ("automatic") and amend 08 §1 and the screen.
+- **Done when:** with every connection failing, the reset review never says ready; the reset still goes through; tests.
+
+#### NET-ROTATE-LOSER-PENDING · A rotation that lost a race never finishes later (from the NET-OWNER-SET review, L7)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Spec:** 04 §2.6; 07 §4.3; core `identity.rotate` and `finishPendingRotation`
+- **Repo/path:** agentlink · `packages/core/src/identity.ts`
+- **Depends on:** NET-OWNER-SET
+- **Goal:** when two rotations run at once (two processes), the one that loses is told so, but its pending card is not always cleared. In a narrow window (the winner's process stops between advancing the keys and committing), the loser's card could finish on the next open although its owner was told it did not apply. Clear exactly the loser's pending card on every lost compare-and-set, as already done when the advance itself fails. Existing core behaviour shared by rename and "Update your contact details".
+- **Done when:** a test interleaves two rotations and stops the winner after its advance; the next open finishes the winner's card, never the loser's.
+
+#### NET-OWNER-SET-FOLLOWUPS · Spec gaps left to the announce opt-out lane (from the NET-OWNER-SET review, L6)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Spec:** 04 §2.5.1 `network.announce`, §2.6; 11 §5.14 (C5); 08 §1
+- **Repo/path:** agentlink · owner gate, `owner-relay-migration.ts`, the server-list routes
+- **Depends on:** NET-OWNER-SET; (b) goes with NET-ANNOUNCE-OPTOUT
+- **Goal:** (a) the system sheet names the change ("Use {n} message servers") instead of the generic approve reason; (b) the announce choice is stored with the card under the gesture, but no signed `network.announce` owner action is made yet: NET-ANNOUNCE-OPTOUT signs it with the card (or the spec is amended); (c) a refusal after presence (`changed`, `same_list`, a state refusal) answers its own fixed code instead of the gate's generic `refused`, and a refused change is not reported as a done owner operation.
+- **Done when:** tests for (a) and (c); (b) closed by NET-ANNOUNCE-OPTOUT.
 
 #### RELAY-PER-IP-LIMIT · A default server that refuses a third connection
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3; `project/runbooks/relay-vetting.md`

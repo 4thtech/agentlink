@@ -267,6 +267,10 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/network',
       // NET-PRECHECK: the server Test (api/network-test.test.ts, network-test-server.test.ts).
       '/api/ui/network/test',
+      // NET-OWNER-SET: your own servers, the reset and the progress (api/network-servers.test.ts).
+      '/api/ui/network/servers',
+      '/api/ui/network/reset',
+      '/api/ui/network/progress',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

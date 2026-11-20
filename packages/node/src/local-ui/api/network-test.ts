@@ -101,15 +101,42 @@ const productionIo = (): NetworkTestIo => ({
 });
 
 /**
- * The net-test route over `io` (tests: local stand-in relays and a stub resolver). Each route has
- * its own rate limit and in-flight guard; the app registers one (`networkTestRoute`), so the limit
- * is per process.
+ * NET-OWNER-SET (IR L1): the one budget of server tests in this process: PRECHECK_RATE_LIMIT (10) a
+ * minute and one at a time, shared by the Test, the server-list review and its confirm (each takes
+ * one), so no route tests more than 04 §4 allows. Over either: 429 `busy`.
+ */
+export class PrecheckBudget {
+  readonly #limit: PrecheckRateLimit;
+  #running = false;
+
+  constructor(now?: () => number) {
+    this.#limit = new PrecheckRateLimit(now);
+  }
+
+  /** Runs `test` when one is allowed now, else answers 'busy' without running it. */
+  async run<T>(test: () => Promise<T>): Promise<T | 'busy'> {
+    if (this.#running) return 'busy';
+    if (this.#limit.take() > 0) return 'busy';
+    this.#running = true;
+    try {
+      return await test();
+    } finally {
+      this.#running = false;
+    }
+  }
+}
+
+/** The budget the app's routes share (routes.ts registers one Test and one server-list set). */
+export const processPrecheckBudget = new PrecheckBudget();
+
+/**
+ * The net-test route over `io` (tests: local stand-in relays and a stub resolver) and `budget`
+ * (default: the process budget it shares with the server-list routes).
  */
 export function createNetworkTestRoute(
   io: () => NetworkTestIo = productionIo,
+  budget: PrecheckBudget = new PrecheckBudget(),
 ): LocalUiNetworkTestRoute {
-  const limit = new PrecheckRateLimit();
-  let running = false;
   return Object.freeze<LocalUiNetworkTestRoute>({
     method: 'POST',
     path: NETWORK_TEST_PATH,
@@ -117,25 +144,26 @@ export function createNetworkTestRoute(
     handler: async (_context, body): Promise<LocalUiResult> => {
       const servers = addressesOf(body);
       if (servers === undefined) return INVALID;
-      if (running) return BUSY;
-      if (limit.take() > 0) return BUSY;
-      running = true;
       try {
-        const { resolver, connector, nip11 } = io();
-        const results = await precheckServers(servers, {
-          resolver,
-          connector,
-          ...(nip11 === undefined ? {} : { nip11 }),
+        const results = await budget.run(() => {
+          const { resolver, connector, nip11 } = io();
+          return precheckServers(servers, {
+            resolver,
+            connector,
+            ...(nip11 === undefined ? {} : { nip11 }),
+          });
         });
+        if (results === 'busy') return BUSY;
         return { status: 200, body: { results: results.map(resultOf) } };
       } catch {
         return { status: 503, body: { error: 'unavailable' } };
-      } finally {
-        running = false;
       }
     },
   });
 }
 
 /** The route the app registers (routes.ts): the Node relay I/O, one limit for the process. */
-export const networkTestRoute: LocalUiNetworkTestRoute = createNetworkTestRoute();
+export const networkTestRoute: LocalUiNetworkTestRoute = createNetworkTestRoute(
+  productionIo,
+  processPrecheckBudget,
+);
