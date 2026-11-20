@@ -897,7 +897,7 @@ export class RelayPool {
    * NET-VIEW-0514-1: the probe's REQ over the pool's open connection (pinned while it runs, so the
    * idle timer cannot close it). The same answer rules as runProbe: EOSE or CLOSED is `ready`, only
    * the `auth-required:` prefix is read, no answer within PROBE_TIMEOUT_MS is `timeout` (or
-   * `unreachable` when the connection ended meanwhile). The subscription is closed afterwards.
+   * `unreachable` when the connection ends meanwhile, at once). The subscription is closed after.
    */
   private probePooled(relay: string, conn: Connection): Promise<RelayProbeResult> {
     const subId = `p-${encodeHex(randomBytes(6))}`;
@@ -918,6 +918,7 @@ export class RelayPool {
         done = true;
         this.timers.clearTimeout(timer);
         this.probeSubs.delete(key);
+        stopWatch();
         if (!closedByRelay && conn.state === 'open' && conn.socket !== undefined) {
           try {
             conn.socket.send(JSON.stringify(['CLOSE', subId]));
@@ -951,6 +952,10 @@ export class RelayPool {
         () => finish(answered ?? (conn.state === 'open' ? 'timeout' : 'unreachable')),
         PROBE_TIMEOUT_MS,
       );
+      // The pooled connection ends before an answer: unreachable now, not at the bound.
+      const stopWatch = this.onRelayClose((url) => {
+        if (url === conn.url && answered === undefined) finish('unreachable');
+      });
       this.probeSubs.set(key, (frame) => {
         if (done || answered !== undefined) return;
         if (frame[0] === 'EOSE') {

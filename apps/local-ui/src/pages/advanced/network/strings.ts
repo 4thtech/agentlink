@@ -54,7 +54,7 @@ export const NETWORK_STRINGS = {
   stillSending:
     'Messages still go through your other servers. A message counts as sent once 2 servers accept it.',
   mayWait:
-    "A message counts as sent once 2 servers accept it, so new messages may wait until they're back.",
+    'A message counts as sent once 2 servers accept it, so new messages may wait until enough servers are back.',
   ownHealthy: 'Your servers are working.',
   oldDown: (n: number): string =>
     `${String(n)} old read-only ${n === 1 ? 'server' : 'servers'} can't be reached. Sending doesn't use ${n === 1 ? 'it' : 'them'}.`,

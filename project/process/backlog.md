@@ -11441,6 +11441,14 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3 "Message network view"
 - **Goal:** the view's server checks share the delivery-check slots: with a long own list some servers can show "unknown", and in a process that also sends, a check can make a delivery check wait a few seconds. Give the checks their own small bound (or lower priority) so delivery checks never wait for them, and every listed server gets checked.
 
+#### NET-VIEW-0514-1 · Message network view fixes (0.5.15)
+- **Status:** built (branch `fix/net-view-0514-1`) · **Security:** S1 · **Spec:** 07 §4.3 "Message network view"; 08 §1; 11 §5
+- **Done:** the probe reuses the pool's open connection to a server when there is one (`reused`), so a relay that limits connections from one address no longer reads as unreachable while it carries messages; a card that says "Can't reach" next to a recent success explains why. The banner no longer promises an automatic swap, counts the ID's own servers, names the old read-only ones apart and states the 2-server rule. The mode label is a small static chip.
+
+#### NET-VIEW-FOLLOWUPS · Smaller points from the NET-VIEW-0514-1 review
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3 "Message network view"; 08 §1
+- **Goal:** (1) the banner's 2-server sentence counts the ID's own servers; a message to a contact goes to that contact's servers, so word it for contacts with other lists too. (2) On a reused connection that already logged in, `authRequired` reads false from EOSE even on a server that requires a login (NIP-11 still corrects it); say "not known" there instead. (3) A pooled connection that is still connecting takes the fresh path, so a connection-limited server can read "Can't reach" in that short window; wait for it within the probe bound. (4) Check a very long server name on a card in the integrated walkthrough (the card row lost a redundant `min-inline-size`). (5) The app's CSS is 25 bytes under the total budget: make room before the next UI lane.
+
 #### NET-CONTACT-REACH-COST · Cheaper contact reach for the network view
 - **Status:** backlog · **Security:** S0 · **Spec:** 08 §1 "Message network view"
 - **Goal:** the view reads every active contact's server list on each read and on each live update, with no cap on contacts. Cache the counts until contacts or lists change (the contacts mark), and cap the work per read.

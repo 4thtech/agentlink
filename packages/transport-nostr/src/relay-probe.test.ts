@@ -277,6 +277,20 @@ describe('RelayPool.probe over an open pooled connection (NET-VIEW-0514-1)', () 
     if (typeof link !== 'string') link.release();
   });
 
+  it('a pooled connection that drops mid-probe is unreachable at once, not at the bound', async () => {
+    const { net, pool } = setup();
+    const [relay] = relayUrls('droppool', 1) as [string];
+    net.configure(relay, { silentReq: true });
+    const link = await pool.connect(relay);
+    const out: RelayProbeResult[] = [];
+    void pool.probe(relay).then((r) => out.push(r));
+    await vi.advanceTimersByTimeAsync(10);
+    net.sockets.find((s) => !s.closed)?.dropFromRelay();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(out[0]).toMatchObject({ state: 'unreachable', reused: true });
+    if (typeof link !== 'string') link.release();
+  });
+
   it('does not need a read-back slot when it reuses the pooled connection', async () => {
     const { net, pool } = setup();
     const relays = relayUrls('busy2', MAX_READBACKS + 1);

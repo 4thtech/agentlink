@@ -255,7 +255,7 @@ export function NetworkView({
         <h2 className="al-text-title-3">{S.serversHeading}</h2>
         {answer.mode === null ? null : (
           // NET-VIEW-0514-1: a static status chip, not the shell's `.al-chip` (the agent switcher's
-          // pill button); Custom arrives in 0.5.15, so nothing here looks clickable.
+          // pill button). It only names the mode: nothing here looks clickable.
           <span className="nw-mode al-text-body-sm">
             {answer.mode === 'automatic' ? S.modeAutomatic : S.modeCustom}
           </span>
