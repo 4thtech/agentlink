@@ -61,6 +61,10 @@ let refuseAll = false;
 interface Agent extends TestAgent {
   /** The relays of every publish, in order. */
   readonly published: string[][];
+  /** NET-ANNOUNCE-OPTOUT "fully quiet": the relays of every fetch, subscription and probe. */
+  readonly reads: string[][];
+  readonly live: string[][];
+  readonly probed: string[][];
 }
 
 const ORIGIN = 'https://drop.test';
@@ -118,6 +122,9 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
   const cipher = new TestStoreCipher();
   const keyStore: KeyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const published: string[][] = [];
+  const reads: string[][] = [];
+  const live: string[][] = [];
+  const probed: string[][] = [];
   const factory: TransportFactory = (deps) => ({
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
@@ -137,16 +144,36 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
             } as PublishOutcome),
       );
     },
-    sync: () =>
-      Promise.resolve({
+    sync: (options) => {
+      reads.push([...options.relays]);
+      return Promise.resolve({
         partial: false,
         delivered: 0,
         duplicates: 0,
         dropped: 0,
         deferred: 0,
         relays: [],
-      }),
-    subscribe: () => () => Promise.resolve(),
+      });
+    },
+    subscribe: (options) => {
+      live.push([...options.relays]);
+      return () => Promise.resolve();
+    },
+    relayProbe: (relays) => {
+      probed.push([...relays]);
+      return Promise.resolve(
+        relays.map((relay) => ({
+          relay,
+          result: {
+            state: 'ready' as const,
+            connectMs: 10,
+            roundTripMs: 10,
+            authRequired: false,
+            paymentRequired: false,
+          },
+        })),
+      );
+    },
   });
   const client = await AgentLinkClient.create({
     keyStore,
@@ -172,6 +199,9 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
     owner: owner as unknown as TestOwner,
     id: client.agentId,
     published,
+    reads,
+    live,
+    probed,
   };
 }
 
@@ -508,5 +538,143 @@ describe('the whole cycle: zero publishes to any default or legacy server', () =
     expect(hit.some((r) => LEGACY_READ_RELAYS.includes(r) && !DEFAULT_RELAYS.includes(r))).toBe(
       true,
     );
+  });
+});
+
+describe('fully quiet (owner, 20 Nov): no reads, subscriptions or probes to the default servers either', () => {
+  /** Every server `x` touched in any way: publishes, fetches, subscriptions and probes. */
+  const touched = (x: Agent): string[] => [
+    ...x.published.flat(),
+    ...x.reads.flat(),
+    ...x.live.flat(),
+    ...x.probed.flat(),
+  ];
+  /** Off-limits servers touched, less those a contact's card lists (allowed for that contact). */
+  const leaks = (x: Agent, contactLists: readonly string[] = []): string[] =>
+    offLimits(touched(x)).filter((r) => !contactLists.includes(r));
+
+  async function quietPass(x: Agent): Promise<void> {
+    await x.client.syncInbox();
+    const sub = await x.client.subscribeInbox();
+    await sub.close();
+    await x.client.network.probe();
+    await x.client.outbox.processDue();
+  }
+
+  it('the whole cycle with the opt-out on touches no default or legacy server', async () => {
+    const drop = fakeDrop();
+    const x = await agent(111, OWN, drop);
+    const y = await agent(112, BL, drop);
+    expect(await announce(x, false)).toMatchObject({ status: 'applied' });
+    const invite = await x.client.pairing.createInvite();
+    const accepted = await y.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test: not accepted');
+    await deliver(x, accepted.handshake.envelope);
+    await x.client.outbox.processDue();
+    await deliver(y, await lastOut(x, 'handshake-ack'));
+    await x.client.sendMessage({ to: (await x.client.contacts.list())[0]?.id ?? '', text: 'hi' });
+    await quietPass(x);
+    clock.t += 60;
+    await change(x, OWN2);
+    await x.client.sendCardUpdates();
+    await quietPass(x);
+    clock.t += 8 * DAY;
+    await quietPass(x);
+    expect(x.reads.length).toBeGreaterThan(0);
+    expect(x.live.length).toBeGreaterThan(0);
+    expect(x.probed.length).toBeGreaterThan(0);
+    expect(leaks(x)).toEqual([]);
+  });
+
+  it('control: without the opt-out the legacy servers are read and probed', async () => {
+    const x = await agent(113, OWN);
+    await quietPass(x);
+    expect(offLimits([...x.reads.flat(), ...x.probed.flat()]).length).toBeGreaterThan(0);
+  });
+
+  it('a contact on the default servers is still reached there, and nothing else is', async () => {
+    const c = await agent(114, DEFAULT_RELAYS.slice(0, 2));
+    await pairWith(clock, a, c);
+    await announce(a, false);
+    await a.client.sendMessage({ to: c.id, text: 'hello' });
+    await quietPass(a);
+    expect(a.published.flat().some((r) => DEFAULT_RELAYS.slice(0, 2).includes(r))).toBe(true);
+    expect(leaks(a, DEFAULT_RELAYS.slice(0, 2))).toEqual([]);
+    expect(offLimits([...a.reads.flat(), ...a.live.flat(), ...a.probed.flat()])).toEqual([]);
+  });
+
+  it('a change from the default servers to its own with the opt-out: nothing to the old ones during the overlap', async () => {
+    const x = await agent(115, DEFAULT_RELAYS.slice(0, 3));
+    await x.client.cardUpdates.announceToOwner();
+    clock.t += 60;
+    await change(x, OWN, false);
+    expect(await x.client.identity.announceDefault()).toBe(false);
+    x.published.length = 0;
+    x.reads.length = 0;
+    await x.client.sendCardUpdates();
+    await quietPass(x);
+    clock.t += 2 * DAY;
+    await quietPass(x);
+    await x.client.cardUpdates.announceToOwner();
+    expect(x.published.length).toBeGreaterThan(0);
+    expect(leaks(x)).toEqual([]);
+    for (const row of (await outboxRows(x)).filter((r) => r.state === 'pending')) {
+      expect(offLimits(row.relays)).toEqual([]);
+    }
+  });
+
+  it("the ID's own non-default leaving servers are still read and get the card-update", async () => {
+    await announce(a, false);
+    clock.t += 60;
+    await change(a, OWN2);
+    a.reads.length = 0;
+    await a.client.sendCardUpdates();
+    await a.client.syncInbox();
+    const read = a.reads.flat();
+    for (const r of OWN) expect(read).toContain(r);
+    const owner = (await outboxRows(a)).filter(
+      (r) => r.type === 'card-update' && r.contact === null,
+    );
+    expect(owner.some((r) => OWN.some((u) => r.relays.includes(u)))).toBe(true);
+  });
+
+  it('L2: an opt-out that commits while a card-update is being built never leaks a publish', async () => {
+    const b = await agent(116, BL);
+    await pairWith(clock, a, b);
+    clock.t += 60;
+    await change(a, OWN2);
+    const outbox = a.client.outbox;
+    const prepare = outbox.prepareRows.bind(outbox);
+    let flipped = false;
+    // The owner's `network.announce` commits between the routes and the insert.
+    outbox.prepareRows = (async (...args: Parameters<typeof prepare>) => {
+      const rows = await prepare(...args);
+      if (!flipped) {
+        flipped = true;
+        expect(await announce(a, false)).toMatchObject({ status: 'applied' });
+      }
+      return rows;
+    }) as typeof outbox.prepareRows;
+    a.published.length = 0;
+    await a.client.sendCardUpdates().catch(() => undefined);
+    await a.client.cardUpdates.announceToOwner().catch(() => undefined);
+    await a.client.outbox.processDue();
+    expect(flipped).toBe(true);
+    expect(offLimits(a.published.flat())).toEqual([]);
+    for (const row of await outboxRows(a)) expect(offLimits(row.relays)).toEqual([]);
+  });
+
+  it('L3: when the clean-up fails, the announce pass fails closed (nothing new built or sent)', async () => {
+    refuseAll = true;
+    await a.client.cardUpdates.announceToOwner();
+    expect(await announce(a, false)).toMatchObject({ status: 'applied' });
+    refuseAll = false;
+    clock.t += 8 * DAY;
+    const before = (await outboxRows(a)).length;
+    a.client.cardUpdates.withdrawFromDefaultServers = () => Promise.reject(new Error('store'));
+    a.published.length = 0;
+    await expect(a.client.cardUpdates.announceToOwner()).rejects.toThrow();
+    expect((await outboxRows(a)).length).toBe(before);
+    expect(a.published).toEqual([]);
   });
 });

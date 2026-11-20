@@ -878,4 +878,12 @@ describe('NET-ANNOUNCE-OPTOUT: the real GET /api/ui/network answer drives the sw
     expect(text()).toContain(S.finishing);
     expect(button(S.changeServers)?.disabled).toBe(true);
   });
+
+  it('fully quiet (owner, 20 Nov): the warning says what stops at once and what stays 30 days', async () => {
+    expect(S.optOut).toMatch(/old public servers stop being used at once/);
+    expect(S.optOut).toMatch(/previous servers stay readable for 30 days/);
+    expect(S.optOut).toMatch(/old copy of your contact details/);
+    await mount({}, { api: realApi(answer({ announceDefault: false })) });
+    expect(text()).toContain(S.optOut);
+  });
 });
