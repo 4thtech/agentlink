@@ -202,18 +202,30 @@ function updateDelivery(tx: StoreTx, envelopeId: string): void {
   );
 }
 
+/**
+ * NET-ANNOUNCE-OPTOUT (IR F1; D-158 (7), "fully quiet"): the publish targets a row may keep. With the
+ * opt-out on, every row kind drops each default or old default server that is not on that row's
+ * contact's own list. Undefined: no filter (the opt-out is off).
+ */
+export type PublishTargets = (
+  row: Row<'outbox'>,
+  relays: readonly string[],
+) => Promise<readonly string[]>;
+
 /** OutboxPersistence over the Store, with the per-row claim described above. */
 export class StoreOutboxPersistence implements OutboxPersistence {
   readonly #ctx: CoreContext;
   readonly #envelopeId: string | undefined;
+  readonly #targets: PublishTargets | undefined;
   /** wrap_id -> the next_attempt_at this process wrote when it claimed the row. */
   readonly #claims = new Map<string, number>();
   /** How many rows the last listDue claimed. */
   listed = 0;
 
-  constructor(ctx: CoreContext, envelopeId?: string) {
+  constructor(ctx: CoreContext, envelopeId?: string, targets?: PublishTargets) {
     this.#ctx = ctx;
     this.#envelopeId = envelopeId;
+    this.#targets = targets;
   }
 
   async listDue(nowSeconds: number): Promise<readonly OutboxRow[]> {
@@ -279,6 +291,15 @@ export class StoreOutboxPersistence implements OutboxPersistence {
       }
     } catch {
       relays = [];
+    }
+    // IR F1: the one place every row's targets are read before a publish. A row left with too few
+    // servers follows the worker's usual rules (retry, then not delivered); none means unreadable.
+    if (this.#targets !== undefined && relays.length > 0) {
+      try {
+        relays = await this.#targets(row, relays);
+      } catch {
+        relays = relays.filter((r) => !DEFAULT_AND_LEGACY_SERVERS.has(r)); // fail closed
+      }
     }
     const uncounted = await this.#uncountedOf(row, relays);
     return {
@@ -495,6 +516,67 @@ export class OutboxService {
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * NET-ANNOUNCE-OPTOUT (IR F1; "fully quiet", owner 20 Nov 2026): with the opt-out on, the publish
+   * filter for one pass (StoreOutboxPersistence): each row keeps a default or old default server only
+   * when it is on the own list, a leaving server kept by leavingRelays (never a default one then), or
+   * the own list of the row's contact (its agent and owner are reached there). Contact lists are read
+   * once per pass; an unreadable one allows none (fail closed). The row-rewrite clean-up
+   * (announce-optout.ts) stays as the second layer. Undefined while the opt-out is off. A choice that
+   * cannot be read counts as on (fail closed).
+   */
+  async #quietTargets(): Promise<PublishTargets | undefined> {
+    let announce: boolean;
+    try {
+      announce = await this.#identity.announceDefault();
+    } catch {
+      announce = false;
+    }
+    if (announce) return undefined;
+    let own: ReadonlySet<string>;
+    try {
+      own = new Set([
+        ...checkList((await this.#identity.signedCard()).relays),
+        ...(await this.leavingRelays()),
+      ]);
+    } catch {
+      own = new Set();
+    }
+    const lists = new Map<string, ReadonlySet<string>>();
+    const listOf = async (contactId: string): Promise<ReadonlySet<string>> => {
+      let got = lists.get(contactId);
+      if (got === undefined) {
+        try {
+          got = new Set((await this.contactPeer(contactId)).relays);
+        } catch {
+          got = new Set();
+        }
+        lists.set(contactId, got);
+      }
+      return got;
+    };
+    return async (row, relays) => {
+      if (!relays.some((r) => DEFAULT_AND_LEGACY_SERVERS.has(r))) return relays;
+      const env = await this.#ctx.store.transaction((tx) =>
+        tx.get('envelopes', { envelope_id: row.envelope_id }),
+      );
+      const contactId = env?.contact_id ?? null;
+      let theirs: ReadonlySet<string>;
+      if (contactId !== null) theirs = await listOf(contactId);
+      else if (env?.type === 'handshake') {
+        // An accept: the inviter is reached on the list its invite named (the staged pairing).
+        try {
+          theirs = new Set((await this.#contacts.readStaged(row.envelope_id))?.relays ?? []);
+        } catch {
+          theirs = new Set();
+        }
+      } else theirs = new Set();
+      return relays.filter(
+        (r) => !DEFAULT_AND_LEGACY_SERVERS.has(r) || own.has(r) || theirs.has(r),
+      );
+    };
   }
 
   /** The transport, or `transport_unavailable` before anything is stored. Internal (send.ts). */
@@ -736,7 +818,11 @@ export class OutboxService {
     } catch {
       this.#ownRelays = new Set(); // no readable own list: no AUTH anywhere (07 §4.3)
     }
-    const persistence = new StoreOutboxPersistence(this.#ctx, envelopeId);
+    const persistence = new StoreOutboxPersistence(
+      this.#ctx,
+      envelopeId,
+      await this.#quietTargets(),
+    );
     this.#passes.add(persistence);
     try {
       return await this.#passWith(persistence, transport, ownKnown);

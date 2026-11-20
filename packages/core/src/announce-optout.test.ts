@@ -704,6 +704,19 @@ describe('IR F1: the publish sink filters every row kind with the opt-out on', (
     expect(x.published.flat().some((r) => BL.includes(r))).toBe(true);
   });
 
+  it('accepting an invite from someone on the default servers still sends the handshake there', async () => {
+    const c = await agent(125, DEFAULT_RELAYS.slice(0, 2));
+    const x = await agent(126, OWN);
+    await announce(x, false);
+    const invite = await c.client.pairing.createInvite({ long: true });
+    const accepted = await x.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test: not accepted');
+    await x.client.outbox.processDue();
+    const sent = x.published.flat();
+    expect(sent.some((r) => DEFAULT_RELAYS.slice(0, 2).includes(r))).toBe(true);
+    expect(offLimits(sent).filter((r) => !DEFAULT_RELAYS.slice(0, 2).includes(r))).toEqual([]);
+  });
+
   it("a contact whose own list is the default set still gets the retry there (that contact's list)", async () => {
     const x = await agent(123, OWN);
     const c = await agent(124, DEFAULT_RELAYS.slice(0, 2));
