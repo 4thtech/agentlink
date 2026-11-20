@@ -93,6 +93,8 @@ export interface LoopSubscription {
   readonly closed: boolean;
   /** The key epoch the subscription listens on (core `InboxSubscription.keyEpoch`). */
   readonly keyEpoch?: number;
+  /** REL-0515 F1: the read set it was opened on (core `InboxSubscription.readSet`). */
+  readonly readSet?: string;
   close(): Promise<void>;
 }
 
@@ -133,6 +135,12 @@ export interface LoopClient {
    * compares it with the subscription's and reopens the subscription on a change. Optional.
    */
   currentKeyEpoch?(): Promise<number>;
+  /**
+   * REL-0515 F1: the read set a subscription opened now would use (core `liveReadSet`, store reads
+   * only). While live the loop compares it with the subscription's and reopens on a change: the
+   * owner's opt-out (no epoch change) or a leaving server whose 30 days ended. Optional.
+   */
+  liveReadSet?(): Promise<string>;
 }
 
 /** One-shot timers. Tests pass a manual scheduler; production uses unref'd `setTimeout`. */
@@ -380,6 +388,12 @@ export class BackgroundLoop {
       this.#log.info('live subscription reopened for new keys');
       this.#closeSubscription();
       this.#sinceCatchUp = this.#catchUpMs;
+    } else if (this.live && (await this.#readSetMoved())) {
+      // REL-0515 F1: the servers to read changed without a key change. Close at once (nothing more is
+      // read on a server that left the set) and reopen on the new set after a catch-up.
+      this.#log.info('live subscription reopened for new servers');
+      this.#closeSubscription();
+      this.#sinceCatchUp = this.#catchUpMs;
     }
     if (this.live && this.#sinceCatchUp + this.#syncMs < this.#catchUpMs) {
       // Live (M1-9s): the subscription receives; this pass only delivers due outbox rows.
@@ -439,6 +453,18 @@ export class BackgroundLoop {
   async #keysMoved(): Promise<boolean> {
     const subscribedWith = this.#subscription?.keyEpoch;
     const current = this.#client.currentKeyEpoch;
+    if (subscribedWith === undefined || current === undefined) return false;
+    try {
+      return (await current.call(this.#client)) !== subscribedWith;
+    } catch {
+      return false;
+    }
+  }
+
+  /** REL-0515 F1: true when the read set moved from the open subscription's. Never rejects. */
+  async #readSetMoved(): Promise<boolean> {
+    const subscribedWith = this.#subscription?.readSet;
+    const current = this.#client.liveReadSet;
     if (subscribedWith === undefined || current === undefined) return false;
     try {
       return (await current.call(this.#client)) !== subscribedWith;

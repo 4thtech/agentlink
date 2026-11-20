@@ -11688,6 +11688,19 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** `set` and `reset` show the review, including the old servers that stay readable, then wait at "Continue?" and the master-code prompt. If the ID's lists change meanwhile (another process applies a change), the hosts shown can differ from what is signed. Re-read the state after presence and refuse, or show the review again, when it changed.
 - **Done when:** a test changes the list between the review and presence; nothing is signed for the old review, and the terminal says why.
 
+#### NET-CLI-REVIEW-WORDS · The terminal review's lines are built inside the package (from the 0.5.15 final review, L4)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 06 §8; 11 §5.14
+- **Repo/path:** agentlink · `packages/node/src/owner-server-change-terminal.ts`, `apps/cli/src/commands/owner/servers.ts`
+- **Depends on:** NET-CLI
+- **Goal:** `changeServersAtTerminal` takes the review wording from its caller (`describe`). Build the lines inside the package from the tested plan, as the app's server builds its review, so no caller can show words that differ from what is signed.
+- **Done when:** the package builds the review lines; the caller passes no text; a test pins the lines for a list change and a reset.
+
+#### REL0515-STALE-TEXT · Stale text after 0.5.15 (from the 0.5.15 final review, L5)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 · **Spec:** D-158 (5); 06 §8
+- **Repo/path:** agentlink · `project/process/backlog.md` (M2-2e), `apps/local-ui/src/pages/advanced/network/servers/mock.ts`, the guide's server-test sentence
+- **Goal:** M2-2e still says a relay change is "refused while an overlap runs" (D-158 (5): no wait between changes); the `servers/mock.ts` header says "until the backend lands" (it is test-only now); the guide says the CLI "shares the app's limit of 10 tests a minute", which holds per process only (see NET-CLI-TEST-BUDGET).
+- **Done when:** the three texts match the code; the docs drift checks pass.
+
 #### RELAY-PER-IP-LIMIT · A default server that refuses a third connection
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3; `project/runbooks/relay-vetting.md`
 - **Goal:** offchain.pub appears to refuse a third connection from one computer; with several AI apps connected (one connection each) a user could be refused there. Measure the limit, and if confirmed reconsider it as a default.

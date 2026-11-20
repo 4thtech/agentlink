@@ -137,6 +137,12 @@ export interface InboxSubscription {
    */
   readonly keyEpoch: number;
   /**
+   * REL-0515 F1: the read set this subscription was opened on (own + leaving + legacy, after the
+   * announce opt-out and the leaving servers' ends), as `liveReadSet()` spells it. The loop compares
+   * the two each pass and reopens the subscription when they differ.
+   */
+  readonly readSet: string;
+  /**
    * Ends the transport subscription (CLOSE on each relay, no reconnect), then waits for a handler
    * or processing run in flight. Idempotent; never rejects. Call it before the store closes.
    */
@@ -524,8 +530,10 @@ export class SyncService {
     };
     this.#live.add(entry);
     log.info('live subscription open', { relays: relays.length });
+    const readSet = readSetKey(relays);
     return {
       keyEpoch,
+      readSet,
       get closed() {
         return closed;
       },
@@ -685,6 +693,21 @@ export class SyncService {
 
   /** The agent's Nostr key at every epoch, newest first, at most MAX_SYNC_IDENTITIES. */
   /** The current key epoch (a public number), for a live subscription to compare with its own. */
+  /**
+   * REL-0515 F1: the read set a live subscription opened now would use: the own list, the leaving
+   * servers still running (none that are default servers while the opt-out is on) and the legacy
+   * servers (none while the opt-out is on). Store reads only: no KeyStore (keychain) call, so the
+   * loop can compare it every pass.
+   */
+  async liveReadSet(): Promise<string> {
+    const { outbox } = this.#deps;
+    return readSetKey([
+      ...(await outbox.ownListRelays()),
+      ...(await outbox.leavingRelays()),
+      ...(await outbox.legacyReadRelays()),
+    ]);
+  }
+
   async currentKeyEpoch(): Promise<number> {
     return (await this.#ctx.keyStore.getPublicBundle()).keyEpoch;
   }
@@ -726,4 +749,9 @@ function readBudget(budgetMs: number | undefined): number {
     throw new CoreError('sync_budget_invalid', 'The sync time budget is not valid.');
   }
   return budgetMs;
+}
+
+/** REL-0515 F1: a read set as one comparable string (distinct URLs, sorted, one per line). */
+function readSetKey(relays: readonly string[]): string {
+  return [...new Set(relays)].sort().join('\n');
 }

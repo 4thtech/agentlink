@@ -548,6 +548,14 @@ export class AgentLinkClient {
     return this.#sync.subscribeInbox(options);
   }
 
+  /**
+   * REL-0515 F1: the read set a live subscription opened now would use (store reads only). The
+   * background loop reopens the subscription when it differs from the subscription's `readSet`.
+   */
+  liveReadSet(): Promise<string> {
+    return this.#sync.liveReadSet();
+  }
+
   /** The current key epoch (public). The background loop reopens a live subscription when it moves. */
   currentKeyEpoch(): Promise<number> {
     return this.#sync.currentKeyEpoch();

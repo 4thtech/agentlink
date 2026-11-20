@@ -615,6 +615,14 @@ export class OutboxService {
   }
 
   /**
+   * REL-0515 F1: the own list as stored (identity, a store read only; no KeyStore call). Throws
+   * when it cannot be read.
+   */
+  async ownListRelays(): Promise<readonly string[]> {
+    return checkList(await this.#identity.relays());
+  }
+
+  /**
    * NET-ANNOUNCE-OPTOUT (fully quiet): the legacy servers read for the transition (fetch, live
    * subscription, probe), or none while the opt-out is on. Fails closed: none when the choice cannot
    * be read. Never throws.
