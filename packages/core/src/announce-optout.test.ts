@@ -679,3 +679,44 @@ describe('fully quiet (owner, 20 Nov): no reads, subscriptions or probes to the 
     expect(a.published).toEqual([]);
   });
 });
+
+describe('IR F1: the publish sink filters every row kind with the opt-out on', () => {
+  it('a pending message, then a default to own change with the opt-out, then a retry: nothing to the old default servers', async () => {
+    const OLD = DEFAULT_RELAYS.slice(0, 3);
+    const x = await agent(121, OLD);
+    const b = await agent(122, BL);
+    await pairWith(clock, x, b);
+    refuseAll = true;
+    await x.client.sendMessage({ to: b.id, text: 'still pending' });
+    const pending = (await outboxRows(x)).filter((r) => r.type !== 'card-update');
+    // Its own copies name the old default list (the own list when it was sent).
+    expect(pending.some((r) => r.relays.some((u) => OLD.includes(u)))).toBe(true);
+    clock.t += 60;
+    await change(x, OWN, false);
+    expect(await x.client.identity.announceDefault()).toBe(false);
+    await x.client.cardUpdates.withdrawFromDefaultServers();
+    refuseAll = false;
+    x.published.length = 0;
+    clock.t += 3_600;
+    await x.client.outbox.processDue();
+    expect(offLimits(x.published.flat())).toEqual([]);
+    // Delivery to the contact's own servers continues.
+    expect(x.published.flat().some((r) => BL.includes(r))).toBe(true);
+  });
+
+  it("a contact whose own list is the default set still gets the retry there (that contact's list)", async () => {
+    const x = await agent(123, OWN);
+    const c = await agent(124, DEFAULT_RELAYS.slice(0, 2));
+    await pairWith(clock, x, c);
+    await announce(x, false);
+    refuseAll = true;
+    await x.client.sendMessage({ to: c.id, text: 'retry' });
+    refuseAll = false;
+    x.published.length = 0;
+    clock.t += 3_600;
+    await x.client.outbox.processDue();
+    const sent = x.published.flat();
+    expect(sent.some((r) => DEFAULT_RELAYS.slice(0, 2).includes(r))).toBe(true);
+    expect(offLimits(sent).filter((r) => !DEFAULT_RELAYS.slice(0, 2).includes(r))).toEqual([]);
+  });
+});
