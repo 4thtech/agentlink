@@ -183,8 +183,18 @@ describe('the production client', () => {
     };
     const good = client({ [`POST ${SERVERS_PATH}`]: { status: 200, body: review } });
     expect((await good.api.review(input)).kind).toBe('ok');
-    expect(good.calls[0]?.body).toEqual({ ...input, review: true });
-    expect(good.calls[0]?.headers.get('X-AgentLink-Presence')).toBeNull();
+    // NET-OWNER-SET: the owner route's input travels in X-AgentLink-Input; the body is empty (no
+    // master code, no passkey), so the server answers the review before its presence gate.
+    const sent = good.calls[0];
+    expect(sent?.headers.get('content-type')).toBe('application/octet-stream');
+    const raw = sent?.headers.get('X-AgentLink-Input') ?? '';
+    expect(JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')))).toEqual({
+      ...input,
+      review: true,
+    });
+    expect(sent?.body).toBeUndefined();
+    expect(sent?.headers.get('X-AgentLink-Presence')).toBeNull();
+    expect(sent?.headers.get('X-AgentLink-CSRF')).toBe('tok');
     const refused = client({
       [`POST ${SERVERS_PATH}`]: {
         status: 409,
