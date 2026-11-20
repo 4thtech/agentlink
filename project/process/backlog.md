@@ -8645,6 +8645,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - `approval-request` envelopes → approval card → owner-signed `approval` envelope back over Talk; policy editor → owner-signed `policy` envelope.
   - Agents list from cards; add agent (owner signs the agent card); revoke (revoke envelope; on-chain revoke when registered, M2-4b).
   - Whenever the console signs a card (add agent, rotation, relay change under Advanced), it writes the `owner_agents` row with source `signed` in the same store transaction as the signed card (07 §3.6, §4.3, G-24). A relay change from the console follows M1-7j: refused while an overlap runs.
+  - Cloud agent and the owner `card-update` (from M1-7j, 0.5.15): the owner card-update is a host capability (`ownerCardUpdates`), off by default and on only in the desktop and CLI host; a cloud agent's run publishes nothing on its own. When custom servers come to the cloud agent here, decide whether its host turns the capability on (with the leaving-servers overlap and the announce opt-out) and test that a cloud run still publishes only what the spec allows.
   - `contact.check` carrier: add its envelope type and its row in the 04 §3.1.1 owner-signing table (spec PR first) before the console sends `contact.check` over relays.
 - **Acceptance:**
   - An agent applies a console-signed policy and rejects one signed by another key (e2e).

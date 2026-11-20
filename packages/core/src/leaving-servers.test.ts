@@ -59,6 +59,8 @@ let inTx = false;
 const now = (): number => (skew && inTx ? clock.t + 1 : clock.t);
 /** While true, every relay refuses every publish. */
 let refuseAll = false;
+/** The host capability `ownerCardUpdates` of the next agent made (on for the node host). */
+let ownerCapability = true;
 
 /** A store whose transactions mark `inTx`, so the clock can tell where it is read. */
 function watchedStore(inner: MemoryStore): Store {
@@ -152,6 +154,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly str
     clock: now,
     transport: factory,
     policyMark: new MemoryPolicyMark(),
+    ownerCardUpdates: ownerCapability,
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -238,6 +241,7 @@ beforeEach(async () => {
   clock.t = START;
   skew = false;
   refuseAll = false;
+  ownerCapability = true;
   a = await agent(81, ownerA, A);
 });
 
@@ -505,6 +509,30 @@ describe('what is published to the leaving servers', () => {
     clock.t += 5 * DAY;
     await a.client.cardUpdates.announceToOwner();
     expect((await owned()).length).toBeGreaterThan(n);
+  });
+});
+
+describe('the owner card-update is a host capability (off by default)', () => {
+  it('with it off (the cloud agent), syncInbox and sendCardUpdates publish no owner card-update', async () => {
+    ownerCapability = false;
+    const x = await agent(85, ownerB, list('o', 2));
+    await change(x, B);
+    await x.client.syncInbox();
+    await x.client.sendCardUpdates();
+    clock.t += 8 * DAY;
+    await x.client.syncInbox();
+    const owned = (await outboxRows(x)).filter(
+      (r) => r.type === 'card-update' && r.contact === null,
+    );
+    expect(owned).toEqual([]);
+  });
+
+  it('with it on (the node host), syncInbox sends it', async () => {
+    await a.client.syncInbox();
+    const owned = (await outboxRows(a)).filter(
+      (r) => r.type === 'card-update' && r.contact === null,
+    );
+    expect(owned).toHaveLength(2);
   });
 });
 

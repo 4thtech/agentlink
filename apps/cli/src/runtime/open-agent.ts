@@ -288,6 +288,9 @@ async function openLocked(
       // DEVICES-INTERIM: this computer's install id (a KeyStore item, never sent anywhere).
       installId: agentStore.installId,
       transport: deps.transport(),
+      // M1-7j (07 §4.3): this host serves the owner's surfaces (the desktop app, the terminal), so
+      // the owner card-update is on here.
+      ownerCardUpdates: true,
       dropOrigins: DROP_ORIGINS,
       files: nodeFilesPlatform({ home }),
       ...(proofs === undefined ? {} : { proofs: proofs.platform }),

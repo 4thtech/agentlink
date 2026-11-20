@@ -188,6 +188,8 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
     clock: clock.now,
     transport: factory,
     policyMark: new MemoryPolicyMark(),
+    // M1-7j: the node host turns the owner card-update on (a host capability, off by default).
+    ownerCardUpdates: true,
     ...(drop === undefined ? {} : { files: platform(drop) }),
   });
   await client.identity.init({
