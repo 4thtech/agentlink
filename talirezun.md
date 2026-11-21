@@ -131,3 +131,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 ## 2026-11-21 — 0.5.16 started; dev machine incident
 - 0.5.16 (fix release) on rel0516/integration: Windows in-app update (0.5.14 Windows app could not read the update; manual box shown while checking) and Message network polish. Unfinished work saved on rel0516/wip-win-update and rel0516/wip-net-polish. Paused until Tali says go.
 - Dev machine incident: hundreds of leftover worker copies plus parallel tests overloaded the owner's Mac; it hung and needed a macOS reinstall. All old copies removed (work verified merged); new limits: ≤ 2 test-heavy workers, single-core tests, clean copies after each release.
+
+## 2026-11-21 — 0.5.16 released
+- 0.5.16 LIVE: npm latest, GitHub release v0.5.16, signed desktop update (Mac, Windows). Release PR #860, version PR #861.
+- Contents: Windows in-app updates work (the app's core now accepts the Windows update link; the manual download box shows only after a failed check, never while checking); Windows users on 0.5.14 or 0.5.15 install 0.5.16 once by hand, later updates install in the app. Message network view: server labels match the count, own servers first in the diagram, legend on one line. Release checklist gains a worker-copy clean-up step.
+- Owner chose to release without a Windows pre-test; first in-app update on Windows will be 0.5.16 → 0.5.17.
