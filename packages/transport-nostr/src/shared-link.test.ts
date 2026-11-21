@@ -263,10 +263,44 @@ describe('OK routing', () => {
     expect(b.got).toEqual([]);
   });
 });
+/** Records the frames sent on each upstream socket, so a test can tell connections apart. */
+function tracking(inner: RelayConnector): {
+  connector: RelayConnector;
+  sockets: { url: string; frames: string[] }[];
+} {
+  const sockets: { url: string; frames: string[] }[] = [];
+  return {
+    sockets,
+    connector: {
+      open(target, handlers) {
+        const record = { url: target.url, frames: [] as string[] };
+        sockets.push(record);
+        const socket = inner.open(target, handlers);
+        return {
+          send: (text) => {
+            record.frames.push(text);
+            socket.send(text);
+          },
+          close: () => socket.close(),
+        };
+      },
+    },
+  };
+}
 
-describe('NIP-42 AUTH through the shared link', () => {
-  it('sends the challenge to every program; each signs its own login on the one connection', async () => {
-    const { net, shared, pool } = setup();
+/** Index of the upstream socket that carried a frame starting with `prefix` and containing `text`. */
+const carrier = (sockets: { frames: string[] }[], prefix: string, text: string): number[] =>
+  sockets.flatMap((s, i) =>
+    s.frames.some((f) => f.startsWith(prefix) && f.includes(text)) ? [i] : [],
+  );
+
+describe('NIP-42 AUTH: an authenticated connection is never shared across IDs', () => {
+  it('each identity logs in on a connection of its own, never on the shared one', async () => {
+    // Was: "each signs its own login on the one connection". That shared an authenticated
+    // connection across IDs, which the orchestrator ruled out (21 Nov): each login now gets its own.
+    const net = new MockNetwork();
+    const t = tracking(net);
+    const { shared, pool } = setup({ connector: t.connector, addressCheck: { resolver: net } });
     const [r1, r2] = relayUrls('auth', 2) as [string, string];
     net.configure(r1, { requireAuth: true });
     net.configure(r2, { requireAuth: true });
@@ -280,8 +314,11 @@ describe('NIP-42 AUTH through the shared link', () => {
     ]);
     expect(outA.sent).toBe(true);
     expect(outB.sent).toBe(true);
-    expect(net.opens.filter((t) => t.url === r1)).toHaveLength(1);
-    expect([...(net.socket(r1)?.authedKeys ?? [])].sort()).toEqual([ka.pubkey, kb.pubkey].sort());
+    for (const socket of net.sockets) expect(socket.authedKeys.size).toBeLessThanOrEqual(1);
+    for (const url of [r1, r2]) {
+      const authed = net.sockets.filter((s) => s.target.url === url && s.authed);
+      expect(authed.map((s) => [...s.authedKeys][0]).sort()).toEqual([ka.pubkey, kb.pubkey].sort());
+    }
   });
 
   it('a program that may not log in on a relay sends no AUTH, even on a shared connection', async () => {
@@ -292,28 +329,102 @@ describe('NIP-42 AUTH through the shared link', () => {
     const kc = await keys();
     const a = pool(shared(), { authKeys: ka.store, mayAuthenticate: () => true });
     const c = pool(shared(), { authKeys: kc.store, mayAuthenticate: () => false });
-    // C first: it gets the challenge on the shared connection but may not log in, so it fails.
+    expect((await a.publish(makeWrapEvent(), [r1])).results[0]?.ok).toBe(true);
     const outC = await c.publish(makeWrapEvent(), [r1]);
     expect(outC.results[0]?.ok).toBe(false);
-    expect((await a.publish(makeWrapEvent(), [r1])).results[0]?.ok).toBe(true);
-    expect(net.opens.filter((t) => t.url === r1)).toHaveLength(1);
     const logins = net.received
       .filter((f) => f.frame.startsWith('["AUTH"'))
       .map((f) => (JSON.parse(f.frame) as [string, { pubkey: string }])[1].pubkey);
     expect(logins).toEqual([ka.pubkey]);
   });
 
-  it('a program that joins after the challenge still receives it', async () => {
+  it("after A logs in, C's events and subscriptions never ride on A's connection", async () => {
+    const net = new MockNetwork();
+    const t = tracking(net);
+    const { shared, pool } = setup({ connector: t.connector, addressCheck: { resolver: net } });
+    const [r1] = relayUrls('apart', 1) as [string];
+    net.configure(r1, { requireAuth: true });
+    const ka = await keys();
+    const kc = await keys();
+    const a = pool(shared(), { authKeys: ka.store, mayAuthenticate: () => true });
+    const c = pool(shared({ mayAuthenticate: () => false }), {
+      authKeys: kc.store,
+      mayAuthenticate: () => false,
+    });
+    expect((await a.publish(makeWrapEvent(), [r1])).results[0]?.ok).toBe(true);
+    const aLogin = carrier(t.sockets, '["AUTH"', ka.pubkey);
+    expect(aLogin).toHaveLength(1);
+    const eventC = makeWrapEvent();
+    await c.publish(eventC, [r1]);
+    const link = await c.connect(r1);
+    if (typeof link === 'string') throw new Error('no link');
+    link.send(JSON.stringify(['REQ', 'mine', { kinds: [1059], '#p': [kc.pubkey] }]));
+    await flush();
+    const cEvent = carrier(t.sockets, '["EVENT"', eventC.id);
+    const cReq = carrier(t.sockets, '["REQ"', kc.pubkey);
+    expect(cEvent.length).toBeGreaterThan(0);
+    expect(cReq.length).toBeGreaterThan(0);
+    for (const i of [...cEvent, ...cReq]) expect(aLogin).not.toContain(i);
+    // C's frames go only on connections that never carried a login.
+    for (const i of [...cEvent, ...cReq]) {
+      expect(t.sockets[i]?.frames.some((f) => f.startsWith('["AUTH"'))).toBe(false);
+    }
+    link.release();
+  });
+
+  it('programs that never log in share one connection, even with keys', async () => {
+    const { net, shared, pool } = setup();
+    const [r1, r2] = relayUrls('nologin', 2) as [string, string];
+    net.configure(r1);
+    net.configure(r2);
+    const ka = await keys();
+    const kb = await keys();
+    const a = pool(shared(), { authKeys: ka.store, mayAuthenticate: () => true });
+    const b = pool(shared(), { authKeys: kb.store, mayAuthenticate: () => true });
+    await Promise.all([a.publish(makeWrapEvent(), [r1, r2]), b.publish(makeWrapEvent(), [r1, r2])]);
+    expect(net.opens.filter((x) => x.url === r1)).toHaveLength(1);
+    expect(net.opens.filter((x) => x.url === r2)).toHaveLength(1);
+    expect(net.received.some((f) => f.frame.startsWith('["AUTH"'))).toBe(false);
+  });
+
+  it('the shared connection never passes a challenge on; a program that must log in gets its own', async () => {
     const { net, shared } = setup();
     const [r1] = relayUrls('late', 1) as [string];
     net.configure(r1, { requireAuth: true });
     const a = raw(shared(), r1);
-    await flush();
     const b = raw(shared(), r1);
     await flush();
-    const challenge = net.socket(r1)?.challenge;
-    expect(parsed(a)).toEqual([['AUTH', challenge]]);
-    expect(parsed(b)).toEqual([['AUTH', challenge]]);
+    expect(a.got).toEqual([]);
+    expect(b.got).toEqual([]);
+    const event = makeWrapEvent();
+    a.socket.send(JSON.stringify(['EVENT', event]));
+    await flush();
+    const own = net.sockets.at(-1);
+    expect(net.sockets).toHaveLength(2);
+    expect(own?.challenge).not.toBe(net.sockets[0]?.challenge);
+    expect(parsed(a)).toContainEqual(['AUTH', own?.challenge]);
+    expect(b.got).toEqual([]);
+  });
+
+  it('own connections for logins stay within the cap', async () => {
+    const net = new MockNetwork();
+    const count = counting(net);
+    const { shared, pool, server } = setup({
+      connector: count.connector,
+      addressCheck: { resolver: net },
+      maxUpstreams: 2,
+    });
+    const [r1] = relayUrls('capauth', 1) as [string];
+    net.configure(r1, { requireAuth: true });
+    const pools = await Promise.all(
+      [1, 2, 3].map(async () =>
+        pool(shared(), { authKeys: (await keys()).store, mayAuthenticate: () => true }),
+      ),
+    );
+    await Promise.all(pools.map((p) => p.publish(makeWrapEvent(), [r1])));
+    expect(count.max()).toBeLessThanOrEqual(2);
+    expect(server.stats().upstreams).toBeLessThanOrEqual(2);
+    for (const socket of net.sockets) expect(socket.authedKeys.size).toBeLessThanOrEqual(1);
   });
 });
 
@@ -423,17 +534,43 @@ describe('frame limits', () => {
 });
 
 describe('handshake and fallback to the program own connections', () => {
-  it('a CLI version mismatch falls back to direct connections', async () => {
-    const { net, direct, shared, pool } = setup();
+  it('programs of different CLI versions share when the protocol matches; versions are counted', async () => {
+    const { net, direct, shared, pool, server } = setup();
     const [r1, r2] = relayUrls('ver', 2) as [string, string];
     for (const url of [r1, r2]) {
       net.configure(url);
       direct.configure(url);
     }
-    const connector = shared({ cliVersion: '0.5.17' });
+    const older = shared({ cliVersion: '0.5.17' });
+    const out = await pool(older).publish(makeWrapEvent(), [r1, r2]);
+    expect(out.sent).toBe(true);
+    expect(direct.opens).toHaveLength(0);
+    expect(net.openedUrls().sort()).toEqual([r1, r2].sort());
+    expect(older.state).toBe('ready');
+    raw(shared(), r1);
+    await flush();
+    expect(server.stats().cliVersions).toEqual({ '0.5.17': 1, [CLI]: 1 });
+  });
+
+  it('a protocol version mismatch falls back to direct connections', async () => {
+    const { direct, pool, token } = setup();
+    const [r1, r2] = relayUrls('proto', 2) as [string, string];
+    for (const url of [r1, r2]) direct.configure(url);
+    // A shared link that speaks another protocol version answers the hello with a version reject.
+    const connector = new SharedRelayConnector({
+      dial: (handlers) => ({
+        send: () => {
+          void Promise.resolve().then(() =>
+            handlers.onFrame(encodeLinkFrame({ t: 'reject', reason: 'version' })),
+          );
+        },
+        close: () => undefined,
+      }),
+      token,
+      cliVersion: CLI,
+    });
     const out = await pool(connector).publish(makeWrapEvent(), [r1, r2]);
     expect(out.sent).toBe(true);
-    expect(net.opens).toHaveLength(0);
     expect(direct.openedUrls().sort()).toEqual([r1, r2].sort());
     expect(connector.state).toBe('refused');
   });
