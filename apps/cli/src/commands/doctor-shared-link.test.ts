@@ -1,5 +1,5 @@
 // RELAY-SHARED-CONN L4 (D-159 (11); 11 §5.15): `agentlink doctor` says whether the shared server
-// connection is on and how many programs use it. Counts only (I-7): never a path, a program's name
+// connection is on and how many IDs use it. Counts only (I-7): never a path, a program's name
 // or an ID. A notice, never a problem: doctor still exits OK.
 import { describe, expect, it } from 'vitest';
 import { EXIT_OK, createDispatcher } from '../dispatch.js';
@@ -48,8 +48,11 @@ async function doctor(sharedLink?: SharedLinkCheck): Promise<{ code: number; tex
 describe('doctor: shared server connection (11 §5.15)', () => {
   it('the strings are exactly the spec copy', () => {
     expect(DOCTOR_SHARED_LINK_TEXT.on(3)).toBe(
-      'OK       Shared server connection: on, 3 programs\n' +
-        '         AgentLink programs on this computer share one connection to each server.',
+      'OK       Shared server connection: on, 3 IDs\n' +
+        '         The IDs on this computer share one connection to each server.',
+    );
+    expect(DOCTOR_SHARED_LINK_TEXT.on(1).split('\n')[0]).toBe(
+      'OK       Shared server connection: on, 1 ID',
     );
     expect(DOCTOR_SHARED_LINK_TEXT.own).toBe(
       'Notice   Shared server connection: on, but this program uses its own connections\n' +

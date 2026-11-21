@@ -44,7 +44,8 @@ async function mount(data: unknown): Promise<void> {
 
 describe('Message network: the shared server connection line (11 §5.15)', () => {
   it('the strings are the spec copy and pass the vocabulary lint', () => {
-    expect(S.sharedOn(3)).toBe('Shared server connection: on · 3 programs on this computer');
+    expect(S.sharedOn(3)).toBe('Shared server connection: on · 3 IDs on this computer');
+    expect(S.sharedOn(1)).toBe('Shared server connection: on · 1 ID on this computer');
     expect(S.sharedOff).toBe('Shared server connection: off · each program connects on its own');
     expect(lintVocabulary(S.sharedOn(2))).toEqual([]);
     expect(lintVocabulary(S.sharedOff)).toEqual([]);
