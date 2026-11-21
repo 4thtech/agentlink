@@ -43,6 +43,13 @@ export { SHARED_HANDSHAKE_TIMEOUT_MS } from './shared-link-protocol.js';
 /** After the shared link failed (not refused), new sockets go direct for this long before a retry. */
 export const SHARED_LINK_RETRY_MS = 30_000;
 
+/** How a handshake ended, for the endpoint that dialled it (`onHandshake`). Fixed codes only. */
+export type SharedHandshakeOutcome =
+  'ready' | 'stalled' | 'protocol' | 'closed' | 'version' | 'token' | 'busy';
+
+/** Relays this connector sends straight to the direct fallback (after a cap), at most. */
+const MAX_DIRECT_RELAYS = 64;
+
 /** What the channel reports. Frames are whole frames (the endpoint does the length prefix). */
 export interface SharedLinkChannelHandlers {
   onFrame(frame: string): void;
@@ -66,7 +73,9 @@ export type SharedLinkDialer = (handlers: SharedLinkChannelHandlers) => SharedLi
 
 /**
  * `idle` (not dialled yet), `connecting` (handshake), `ready`, `down` (failed; retried after
- * SHARED_LINK_RETRY_MS), `refused` (version mismatch or a failed token proof: never retried).
+ * `retryAfterMs`, or SHARED_LINK_RETRY_MS after a stalled handshake or a protocol error before the
+ * proof), `refused` (version mismatch or a failed token proof: retried only after a new election or
+ * a changed token, `epoch`).
  */
 export type SharedLinkState = 'idle' | 'connecting' | 'ready' | 'down' | 'refused';
 
@@ -94,6 +103,25 @@ export interface SharedRelayConnectorOptions {
   readonly handshakeTimeoutMs?: number;
   /** Default SHARED_LINK_RETRY_MS. */
   readonly retryAfterMs?: number;
+  /**
+   * After a stalled handshake or a protocol error before the proof, how long new sockets and checks
+   * go direct without dialling again (at least `retryAfterMs`). Default SHARED_LINK_RETRY_MS.
+   */
+  readonly handshakeRetryMs?: number;
+  /**
+   * A number that changes when the endpoint changes hands (a new election) or the token changes.
+   * A change lets a `down` or `refused` connector try the link again at once.
+   */
+  readonly epoch?: () => number;
+  /** The token now (it may change with the token file); read at each dial. Default: `token`. */
+  readonly currentToken?: () => Uint8Array;
+  /**
+   * A short-lived connector (the server test, a check): its channel says `kind: aux` and is not
+   * counted as an ID on the link.
+   */
+  readonly transient?: boolean;
+  /** Told how each handshake ended (the endpoint backs off a stalled one). Must not throw. */
+  readonly onHandshake?: (outcome: SharedHandshakeOutcome) => void;
   /**
    * The pool's own `mayAuthenticate` (07 §4.3). A relay where it says no is never given a
    * connection of its own for a login. Absent: every relay may be (the link then decides on demand).
@@ -168,13 +196,22 @@ class VirtualSocket implements RelaySocket {
 
 export class SharedRelayConnector implements RelayConnector {
   private readonly dial: SharedLinkDialer;
-  private readonly token: Uint8Array;
+  private token: Uint8Array;
   private readonly cliVersion: string;
   private readonly logger: Logger | undefined;
   private readonly timers: Timers;
   private readonly now: () => number;
   private readonly handshakeTimeoutMs: number;
   private readonly retryAfterMs: number;
+  private readonly handshakeRetryMs: number;
+  private readonly epoch: (() => number) | undefined;
+  private readonly currentToken: (() => Uint8Array) | undefined;
+  private readonly transient: boolean;
+  private readonly onHandshake: ((outcome: SharedHandshakeOutcome) => void) | undefined;
+  private downRetryMs = 0;
+  private failEpoch: number | undefined;
+  /** Relay URL to the time until which it goes direct (the link closed it at a cap). */
+  private readonly directUntil = new Map<string, number>();
   private readonly mayAuthenticate: ((relayUrl: string) => boolean) | undefined;
   private current: SharedLinkState = 'idle';
   private channel: SharedLinkChannel | undefined;
@@ -199,6 +236,14 @@ export class SharedRelayConnector implements RelayConnector {
     this.now = options.now ?? (() => Date.now());
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? SHARED_HANDSHAKE_TIMEOUT_MS;
     this.retryAfterMs = options.retryAfterMs ?? SHARED_LINK_RETRY_MS;
+    this.handshakeRetryMs = Math.max(
+      this.retryAfterMs,
+      options.handshakeRetryMs ?? SHARED_LINK_RETRY_MS,
+    );
+    this.epoch = options.epoch;
+    this.currentToken = options.currentToken;
+    this.transient = options.transient === true;
+    this.onHandshake = options.onHandshake;
     this.mayAuthenticate = options.mayAuthenticate;
   }
 
@@ -220,6 +265,7 @@ export class SharedRelayConnector implements RelayConnector {
     handlers: RelaySocketHandlers,
     fallback: Fallback | undefined,
   ): RelaySocket {
+    if (fallback !== undefined && this.goesDirect(target.url)) return fallback(handlers);
     if (!this.usable()) {
       if (fallback === undefined) throw new SharedLinkUnavailable();
       return fallback(handlers);
@@ -309,6 +355,29 @@ export class SharedRelayConnector implements RelayConnector {
 
   // --- channel ---------------------------------------------------------------------------------
 
+  /** A relay the link closed at its cap (a login it could not give a connection): direct for now. */
+  private goesDirect(url: string): boolean {
+    const until = this.directUntil.get(url);
+    if (until === undefined) return false;
+    if (this.now() < until) return true;
+    this.directUntil.delete(url);
+    return false;
+  }
+
+  private readEpoch(): number | undefined {
+    try {
+      return this.epoch?.();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private epochChanged(): boolean {
+    if (this.failEpoch === undefined) return false;
+    const now = this.readEpoch();
+    return now !== undefined && now !== this.failEpoch;
+  }
+
   /** True when the shared link is ready or being set up; dials when it is time to (again). */
   private usable(): boolean {
     switch (this.current) {
@@ -316,18 +385,35 @@ export class SharedRelayConnector implements RelayConnector {
       case 'connecting':
         return true;
       case 'refused':
-        return false;
+        return this.epochChanged() ? this.connect() : false;
       case 'down':
-        if (this.now() - this.downAt < this.retryAfterMs) return false;
+        if (!this.epochChanged() && this.now() - this.downAt < this.downRetryMs) return false;
         return this.connect();
       default:
         return this.connect();
     }
   }
 
+  private tell(outcome: SharedHandshakeOutcome): void {
+    try {
+      this.onHandshake?.(outcome);
+    } catch {
+      // the endpoint's hook never stops the connector
+    }
+  }
+
   private connect(): boolean {
     this.current = 'connecting';
     this.proved = false;
+    this.failEpoch = undefined;
+    if (this.currentToken !== undefined) {
+      try {
+        const token = this.currentToken();
+        if (token instanceof Uint8Array && token.length === 32) this.token = token.slice();
+      } catch {
+        // keep the token this connector has
+      }
+    }
     this.nonce = encodeHex(randomBytes(32));
     let channel: SharedLinkChannel | undefined;
     const handlers: SharedLinkChannelHandlers = {
@@ -341,7 +427,7 @@ export class SharedRelayConnector implements RelayConnector {
     try {
       channel = this.dial(handlers);
     } catch {
-      this.markDown('no_endpoint');
+      this.markDown('no_endpoint', this.retryAfterMs);
       return false;
     }
     this.channel = channel;
@@ -354,12 +440,15 @@ export class SharedRelayConnector implements RelayConnector {
       v: SHARED_LINK_VERSION,
       cli: this.cliVersion,
       nonce: this.nonce,
+      ...(this.transient ? { kind: 'aux' as const } : {}),
     });
   }
 
-  private markDown(reason: string): void {
+  private markDown(reason: string, retryMs: number): void {
     this.current = 'down';
     this.downAt = this.now();
+    this.downRetryMs = retryMs;
+    this.failEpoch = this.readEpoch();
     this.logger?.info('shared relay link not used', { reason });
   }
 
@@ -426,7 +515,13 @@ export class SharedRelayConnector implements RelayConnector {
         const link = this.links.get(frame.link);
         if (link === undefined) return;
         this.links.delete(frame.link);
-        if (!link.opened && frame.why === 'limit' && this.toFallback(link)) return;
+        if (frame.why === 'limit') {
+          // A cap on the link: this relay goes direct for a while (a login that could not get a
+          // connection of its own there is made on the program's own connection, at once).
+          if (this.directUntil.size >= MAX_DIRECT_RELAYS) this.directUntil.clear();
+          this.directUntil.set(link.url, this.now() + SHARED_LINK_RETRY_MS);
+          if (!link.opened && this.toFallback(link)) return;
+        }
         this.endLink(link, frame.why === 'closed' ? undefined : frame.why);
         return;
       }
@@ -461,6 +556,7 @@ export class SharedRelayConnector implements RelayConnector {
     if (frame.t === 'accept' && this.proved && frame.v === SHARED_LINK_VERSION) {
       this.current = 'ready';
       this.nonce = undefined;
+      this.tell('ready');
       if (this.handshakeTimer !== undefined) this.timers.clearTimeout(this.handshakeTimer);
       this.handshakeTimer = undefined;
       for (const link of [...this.links.values()]) if (!link.sentOpen) this.sendOpen(link);
@@ -473,6 +569,8 @@ export class SharedRelayConnector implements RelayConnector {
   /** The shared link ends: sockets that never opened go to their fallback, the others close. */
   private fail(state: 'down' | 'refused', reason: string): void {
     const wasReady = this.current === 'ready';
+    const wasConnecting = this.current === 'connecting';
+    const proved = this.proved;
     if (this.current === 'refused' && state === 'down') state = 'refused';
     if (this.handshakeTimer !== undefined) this.timers.clearTimeout(this.handshakeTimer);
     this.handshakeTimer = undefined;
@@ -480,10 +578,25 @@ export class SharedRelayConnector implements RelayConnector {
     this.channel = undefined;
     this.nonce = undefined;
     this.proved = false;
+    // A stall, or a protocol error before the link proved the token: an endpoint that answers but
+    // does not serve. New sockets and checks go direct for the longer wait, not one stall each.
+    const stuck = wasConnecting && (reason === 'stalled' || (reason === 'protocol' && !proved));
     if (state === 'refused') {
       this.current = 'refused';
+      this.failEpoch = this.readEpoch();
       this.logger?.info('shared relay link not used', { reason });
-    } else this.markDown(reason);
+    } else this.markDown(reason, stuck ? this.handshakeRetryMs : this.retryAfterMs);
+    if (wasConnecting) {
+      this.tell(
+        stuck
+          ? reason === 'stalled'
+            ? 'stalled'
+            : 'protocol'
+          : reason === 'version' || reason === 'token' || reason === 'busy'
+            ? reason
+            : 'closed',
+      );
+    }
     try {
       channel?.close();
     } catch {

@@ -107,15 +107,17 @@ function resultOf(r: PrecheckResult): JsonObject {
 }
 
 /**
- * RELAY-SHARED-CONN (D-159 (9)): with this process's shared link on, the test's write and reads go
- * over it (a connector of its own that never logs in) and its read by id through the check lane;
- * otherwise the Node connector, as before.
+ * RELAY-SHARED-CONN (D-159 (9)): with this process's shared link on, the test's write goes over it
+ * (a short-lived connector of its own that never logs in and is not counted as an ID) and its read
+ * by id through the check lane; the read-back (connection 2) is always on a connection of the
+ * program's own (`openOwn`), never on the upstream that wrote; otherwise the Node connector, as
+ * before.
  */
 const productionIo = (): NetworkTestIo => {
   const checkServed = processCheckServed();
   return {
     resolver: nodeHostResolver(),
-    connector: processPoolConnector(() => false),
+    connector: processPoolConnector(() => false, { transient: true }),
     nip11: nodeNip11Fetcher(),
     ...(checkServed === undefined ? {} : { checkServed }),
     sharedLink: processSharedLinkView,

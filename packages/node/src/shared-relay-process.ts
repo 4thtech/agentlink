@@ -22,6 +22,7 @@ import {
   createRelayConnectorWith,
   sharedRelaysEnabled,
   type CreateRelayConnectorOptions,
+  type LinkConnectorOptions,
   type RelayConnectorChoice,
 } from './shared-relay-link.js';
 
@@ -81,8 +82,9 @@ export function startProcessRelayLink(
  */
 export function processPoolConnector(
   mayAuthenticate: (relayUrl: string) => boolean,
+  options?: LinkConnectorOptions,
 ): RelayConnector {
-  return current?.forPool(mayAuthenticate) ?? nodeRelayConnector();
+  return current?.forPool(mayAuthenticate, options) ?? nodeRelayConnector();
 }
 
 /**
@@ -94,7 +96,7 @@ export function processCheckServed():
   const link = current?.link;
   if (link === undefined) return undefined;
   return async (relay, eventId) => {
-    const lane = link.newConnector(() => false);
+    const lane = link.newConnector(() => false, { transient: true });
     try {
       return await lane.checkServed(relay, eventId);
     } finally {

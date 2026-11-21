@@ -58,8 +58,10 @@ import {
   type ServerFrame,
 } from './shared-link-protocol.js';
 
-/** Programs one shared link serves at once. */
+/** Programs one shared link serves at once (proved channels). */
 export const SHARED_LINK_MAX_CLIENTS = 32;
+/** Channels still in the handshake at once: unproved channels never take a program's place. */
+export const SHARED_LINK_MAX_PENDING_HANDSHAKES = 8;
 /** Virtual links one program may hold at once. */
 export const SHARED_LINK_MAX_LINKS_PER_CLIENT = 4 * MAX_CONNECTIONS;
 /** Subscriptions one virtual link may hold at once. */
@@ -111,6 +113,8 @@ export interface SharedLinkMuxOptions {
   readonly logger?: Logger;
   readonly timers?: Timers;
   readonly maxClients?: number;
+  /** Default SHARED_LINK_MAX_PENDING_HANDSHAKES. */
+  readonly maxPending?: number;
   /** Distinct relays one program may use through the link (default MAX_CONNECTIONS). */
   readonly maxRelaysPerClient?: number;
   readonly maxLinksPerClient?: number;
@@ -123,7 +127,14 @@ export interface SharedLinkMuxOptions {
 
 /** Counts only (I-7). */
 export interface SharedLinkStats {
+  /** Channels attached, proved or not. */
   readonly clients: number;
+  /**
+   * IDs on this computer using the link: proved channels of ID clients (one client connector per
+   * ID a program opened), never a channel still in its handshake or a short-lived `aux` one (a
+   * server test, a check, a status question). The number `doctor` and the network view show.
+   */
+  readonly ids: number;
   /** Ready programs by CLI version. */
   readonly cliVersions: Readonly<Record<string, number>>;
   /** Relay connections, shared and own. */
@@ -156,6 +167,8 @@ interface Client {
   checks: number;
   /** The program's CLI version, for counts only. */
   cli: string | undefined;
+  /** A short-lived channel (hello `kind: aux`): never counted as an ID. */
+  aux: boolean;
 }
 
 interface VLink {
@@ -254,6 +267,7 @@ export class SharedLinkMux {
   private readonly logger: Logger | undefined;
   private readonly timers: Timers;
   private readonly maxClients: number;
+  private readonly maxPending: number;
   private readonly maxRelaysPerClient: number;
   private readonly maxLinksPerClient: number;
   private readonly maxUpstreams: number;
@@ -282,6 +296,7 @@ export class SharedLinkMux {
     this.logger = options.logger;
     this.timers = options.timers ?? defaultTimers;
     this.maxClients = options.maxClients ?? SHARED_LINK_MAX_CLIENTS;
+    this.maxPending = options.maxPending ?? SHARED_LINK_MAX_PENDING_HANDSHAKES;
     this.maxRelaysPerClient = options.maxRelaysPerClient ?? MAX_CONNECTIONS;
     this.maxLinksPerClient = options.maxLinksPerClient ?? SHARED_LINK_MAX_LINKS_PER_CLIENT;
     this.maxUpstreams = options.maxUpstreams ?? MAX_CONNECTIONS;
@@ -289,14 +304,17 @@ export class SharedLinkMux {
 
   /** Counts for `doctor` and tests. Never a URL or an id. */
   stats(): SharedLinkStats {
-    const cliVersions: Record<string, number> = {};
+    // No prototype: a version string such as `constructor` is only ever a key (L-d).
+    const cliVersions = Object.create(null) as Record<string, number>;
+    let ids = 0;
     for (const client of this.clients) {
-      if (client.state === 'ready' && client.cli !== undefined) {
-        cliVersions[client.cli] = (cliVersions[client.cli] ?? 0) + 1;
-      }
+      if (client.state !== 'ready') continue;
+      if (!client.aux) ids += 1;
+      if (client.cli !== undefined) cliVersions[client.cli] = (cliVersions[client.cli] ?? 0) + 1;
     }
     return {
       clients: this.clients.size,
+      ids,
       cliVersions,
       upstreams: this.upstreams.size + this.ownUpstreams.size,
       ownUpstreams: this.ownUpstreams.size,
@@ -318,12 +336,13 @@ export class SharedLinkMux {
       nonces: undefined,
       checks: 0,
       cli: undefined,
+      aux: false,
     };
     const handle: SharedLinkClient = {
       receive: (frame) => this.receive(client, frame),
       detach: () => this.detach(client),
     };
-    if (this.closed || this.clients.size >= this.maxClients) {
+    if (this.closed || this.pendingCount() >= this.maxPending) {
       client.state = 'closed';
       this.counts.rejectedHandshakes += 1;
       this.sendTo(client, { t: 'reject', reason: 'busy' }, true);
@@ -336,6 +355,20 @@ export class SharedLinkMux {
       if (client.state === 'hello' || client.state === 'prove') this.reject(client, 'protocol');
     }, SHARED_HANDSHAKE_TIMEOUT_MS);
     return handle;
+  }
+
+  /** Channels still in the handshake. */
+  private pendingCount(): number {
+    let pending = 0;
+    for (const client of this.clients) if (client.state !== 'ready') pending += 1;
+    return pending;
+  }
+
+  /** Proved channels (the program cap counts these only). */
+  private readyCount(): number {
+    let ready = 0;
+    for (const client of this.clients) if (client.state === 'ready') ready += 1;
+    return ready;
   }
 
   /** Ends every program's channel and every upstream. */
@@ -398,6 +431,7 @@ export class SharedLinkMux {
       return;
     }
     client.cli = frame.cli;
+    client.aux = frame.kind === 'aux';
     const serverNonce = encodeHex(randomBytes(32));
     client.nonces = { client: frame.nonce, server: serverNonce };
     client.state = 'prove';
@@ -421,6 +455,10 @@ export class SharedLinkMux {
     client.nonces = undefined;
     if (client.helloTimer !== undefined) this.timers.clearTimeout(client.helloTimer);
     client.helloTimer = undefined;
+    if (this.readyCount() >= this.maxClients) {
+      this.reject(client, 'busy');
+      return;
+    }
     client.state = 'ready';
     this.sendTo(client, { t: 'accept', v: SHARED_LINK_VERSION });
   }
@@ -562,13 +600,17 @@ export class SharedLinkMux {
    * The relay asked this link's program to log in, on the shared connection. A program that may log
    * in there moves to a connection of its own (never shared, D-159), and gets that connection's
    * challenge; its subscriptions are replayed there. A program that may not stays on the shared
-   * connection, which is never logged in. At the connection cap it stays too, and cannot log in.
+   * connection, which is never logged in. At the connection cap the link is closed as `limit`, so
+   * its program logs in on a connection of its own at once instead of waiting for a challenge.
    */
   private moveToOwn(link: VLink): void {
     const from = link.upstream;
     if (from.own || !link.auth || from.state === 'closed') return;
     if (this.upstreamCount() >= this.maxUpstreams) {
       this.counts.limited += 1;
+      if (link.client.links.get(link.id) !== link) return;
+      this.unlink(link);
+      this.sendTo(link.client, { t: 'closed', link: link.id, why: 'limit' });
       return;
     }
     const own = this.connectUpstream(link.url, true);
@@ -920,7 +962,15 @@ export class SharedLinkMux {
     return taken;
   }
 
-  private answer(taken: readonly CheckRequest[], found: Map<string, string> | undefined): void {
+  /**
+   * `partial`: the read ended early; an id neither found nor in `partial` (a match that did not
+   * verify: not evidence, so missing) is unchecked.
+   */
+  private answer(
+    taken: readonly CheckRequest[],
+    found: Map<string, string> | undefined,
+    partial?: ReadonlySet<string>,
+  ): void {
     for (const request of taken) {
       request.client.checks = Math.max(0, request.client.checks - 1);
       const data = found?.get(request.id);
@@ -928,9 +978,11 @@ export class SharedLinkMux {
         request.client,
         found === undefined
           ? { t: 'checked', q: request.q, outcome: 'unchecked' }
-          : data === undefined
-            ? { t: 'checked', q: request.q, outcome: 'missing' }
-            : { t: 'checked', q: request.q, outcome: 'found', data },
+          : data !== undefined
+            ? { t: 'checked', q: request.q, outcome: 'found', data }
+            : partial !== undefined && !partial.has(request.id)
+              ? { t: 'checked', q: request.q, outcome: 'unchecked' }
+              : { t: 'checked', q: request.q, outcome: 'missing' },
       );
     }
   }
@@ -956,15 +1008,21 @@ export class SharedLinkMux {
     let taken: CheckRequest[] = [];
     let batch = new Set<string>();
     const found = new Map<string, string>();
+    let events = 0;
+    const forged = new Set<string>();
     let done = false;
-    const finish = (outcome: 'done' | 'unchecked'): void => {
+    const finish = (outcome: 'done' | 'partial' | 'unchecked'): void => {
       if (done) return;
       done = true;
       this.timers.clearTimeout(timer);
       this.checkSockets -= 1;
       this.closeSocket(socket);
       if (taken.length === 0) taken = this.takeBatch(lane); // ended before it opened
-      this.answer(taken, outcome === 'done' ? found : undefined);
+      this.answer(
+        taken,
+        outcome === 'unchecked' ? undefined : found,
+        outcome === 'partial' ? forged : undefined,
+      );
       next();
     };
     const timer = this.timers.setTimeout(
@@ -994,11 +1052,20 @@ export class SharedLinkMux {
       const frame = parseFrame(data);
       if (frame === undefined || frame[1] !== subId) return; // AUTH, NOTICE, others: ignored
       if (frame[0] === 'EVENT') {
+        events += 1;
         const id = eventId(frame[2]);
-        // Only a matching event that verifies is evidence (as in RelayPool.checkServed).
-        if (id !== undefined && batch.has(id) && !found.has(id) && verifies(frame[2])) {
+        // Only a matching event that verifies is evidence (as in RelayPool.checkServed). The work
+        // per batch is bounded: the read stops at the first match that does not verify, and after
+        // as many EVENT frames as ids it asked for (its `limit`).
+        if (id !== undefined && batch.has(id) && !found.has(id)) {
+          if (!verifies(frame[2])) {
+            forged.add(id);
+            finish('partial');
+            return;
+          }
           found.set(id, JSON.stringify(frame[2]));
         }
+        if (events >= batch.size) finish('partial');
       } else if (frame[0] === 'EOSE') finish('done');
       else if (frame[0] === 'CLOSED') finish('unchecked'); // a login wanted, or refused
     };

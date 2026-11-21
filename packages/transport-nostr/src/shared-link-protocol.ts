@@ -54,7 +54,17 @@ export type SharedCheckAnswer = 'found' | 'missing' | 'unchecked';
 
 /** Frames a program sends to the shared link. */
 export type ClientFrame =
-  | { readonly t: 'hello'; readonly v: number; readonly cli: string; readonly nonce: string }
+  | {
+      readonly t: 'hello';
+      readonly v: number;
+      readonly cli: string;
+      readonly nonce: string;
+      /**
+       * `aux`: a short-lived channel (a server test, a check, a status question) that is not an ID's
+       * client and is not counted as one. Absent: an ID's client.
+       */
+      readonly kind?: 'aux';
+    }
   | { readonly t: 'prove'; readonly proof: string }
   | {
       readonly t: 'open';
@@ -171,13 +181,23 @@ export function decodeClientFrame(text: unknown): LinkDecodeResult<ClientFrame> 
   const { head: h, data } = parts;
   const noData = data === undefined;
   switch (h.t) {
-    case 'hello':
-      if (!noData || !hasKeys(h, ['t', 'v', 'cli', 'nonce'])) return fail('malformed');
+    case 'hello': {
+      const withKind = hasKeys(h, ['t', 'v', 'cli', 'nonce', 'kind']);
+      if (!noData || !(withKind || hasKeys(h, ['t', 'v', 'cli', 'nonce']))) {
+        return fail('malformed');
+      }
+      if (withKind && h.kind !== 'aux') return fail('malformed');
       if (typeof h.v !== 'number' || !Number.isSafeInteger(h.v) || h.v < 0 || h.v > 65535)
         return fail('malformed');
       if (typeof h.cli !== 'string' || !CLI_VERSION.test(h.cli)) return fail('malformed');
       if (typeof h.nonce !== 'string' || !HEX_32.test(h.nonce)) return fail('malformed');
-      return { ok: true, frame: { t: 'hello', v: h.v, cli: h.cli, nonce: h.nonce } };
+      return {
+        ok: true,
+        frame: withKind
+          ? { t: 'hello', v: h.v, cli: h.cli, nonce: h.nonce, kind: 'aux' }
+          : { t: 'hello', v: h.v, cli: h.cli, nonce: h.nonce },
+      };
+    }
     case 'prove':
       if (!noData || !hasKeys(h, ['t', 'proof'])) return fail('malformed');
       if (typeof h.proof !== 'string' || !HEX_32.test(h.proof)) return fail('malformed');

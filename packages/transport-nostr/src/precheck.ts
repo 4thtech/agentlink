@@ -27,6 +27,8 @@
 //      serve it, else `not_kept`; a read that wants a login is `sign_in`. With the shared relay
 //      link on (D-159 (9)), the event is first asked for by its id in the link's check lane
 //      (`checkServed`): `missing` there is `not_kept`; any other answer leaves these reads in charge.
+//      Connection 2 is always the program's own (`openOwn` when the connector has one), never a
+//      virtual socket on the link, so the reads never ride the upstream that wrote the event.
 // Why the test EVENT and not only a REQ: a REQ shows the server speaks Nostr, not that it takes an
 // event from someone who has not signed in, which is what every contact's delivery needs. The
 // event is a throwaway: it names no ID and carries no message.
@@ -470,6 +472,7 @@ class OneTest {
     begin: (socket: RelaySocket) => void,
     onFrame: (frame: unknown[], end: (step: Step) => void) => void,
     quiet: (spokeNostr: boolean, authSeen: boolean) => Step,
+    own = false,
   ): Promise<Step> {
     if (this.#aborted) return Promise.resolve(refusal('unreachable'));
     return new Promise((resolve) => {
@@ -501,7 +504,14 @@ class OneTest {
         if (!opened) end(refusal('unreachable'));
       }, CONNECT_TIMEOUT_MS);
       try {
-        socket = this.#io.connector.open(target, {
+        // Connection 2 (`own`): a connection of the program's own when the connector is on the
+        // shared relay link (D-159 (9)), never a virtual one that rides the upstream that wrote.
+        const connector = this.#io.connector;
+        const opener =
+          own && typeof connector.openOwn === 'function'
+            ? connector.openOwn.bind(connector)
+            : connector.open.bind(connector);
+        socket = opener(target, {
           onOpen: () => {
             if (done || opened || socket === undefined) return;
             opened = true;
@@ -619,6 +629,7 @@ class OneTest {
         }
       },
       (_spokeNostr, authSeen) => (authSeen ? { kind: 'sign_in' } : refusal('unreachable')),
+      true,
     );
   }
 }

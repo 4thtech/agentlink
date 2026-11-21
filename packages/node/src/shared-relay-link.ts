@@ -19,8 +19,17 @@
 //   channel at once and no frame after it is handed to the mux.
 // - Control frames (proved channels only, handled here, never by the mux): `{"t":"yield"}` and
 //   `{"t":"status"}` (answer `{"t":"status","programs":<n>}`), for the desktop host and `doctor`.
+// - A stuck endpoint (it answers the connect but stalls the handshake, or breaks the protocol
+//   before the proof): sharing is off for this program for a growing time (5 s, doubling, at most
+//   30 s), so sockets and checks go direct at once instead of waiting out a handshake each; the
+//   next election after that time finds a healthy winner when there is one. A token refusal re-reads
+//   the token file. Each election, and a changed token, is a new `epoch`: connectors that were down
+//   or refused try the link again then (D-159 build decisions 8 and 10).
+// - Counts (D-159 build decision 11): `programs` is the IDs on this computer using the link, the
+//   same number from the winner and from a client: proved channels of ID client connectors only,
+//   never a channel in its handshake, a status question or a server test (`transient`).
 // - Logging (I-7): fixed codes only; never a frame, id, relay URL, path or the token.
-import { lstat, unlink } from 'node:fs/promises';
+import { chmod, lstat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { connect, createServer, type Server, type Socket } from 'node:net';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
@@ -28,6 +37,7 @@ import {
   FallbackConnector,
   LinkFrameReader,
   SHARED_HANDSHAKE_TIMEOUT_MS,
+  SHARED_LINK_RETRY_MS,
   SHARED_LINK_VERSION,
   SharedLinkMux,
   SharedRelayConnector,
@@ -41,6 +51,7 @@ import {
   type SharedLinkChannel,
   type SharedLinkChannelHandlers,
   type SharedLinkClient,
+  type SharedHandshakeOutcome,
   type SharedLinkDialer,
   type SharedLinkMuxOptions,
   type SharedLinkStats,
@@ -72,6 +83,8 @@ const ELECTION_ATTEMPTS = 3;
 const ELECTION_BACKOFF_MS = 50;
 const LOCK_TIMEOUT_MS = 2_000;
 const PROBE_TIMEOUT_MS = 1_000;
+/** A socket that refused is probed once more after this before it counts as stale (L-c). */
+const STALE_RECHECK_MS = 150;
 const CONNECT_TIMEOUT_MS = SHARED_HANDSHAKE_TIMEOUT_MS;
 const PRE_AUTH_MAX_BYTES = 4 * 1024;
 const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
@@ -82,6 +95,9 @@ const LOCK_FILE = 'relay.lock';
 const CONTROL_YIELD = '{"t":"yield"}';
 const CONTROL_STATUS = '{"t":"status"}';
 const STATUS_REPLY = /^\{"t":"status","programs":([0-9]{1,6})\}$/;
+
+/** What a probe of the endpoint saw: a listener, none (stale or gone), or an error. */
+export type ProbeOutcome = 'alive' | 'refused' | 'error';
 
 const TRUE = new Set(['1', 'on', 'true', 'yes']);
 
@@ -123,6 +139,17 @@ export interface SharedRelayLinkOptions extends EndpointPlatform {
   readonly lstat?: LstatFn;
   /** Test seam: [0, 1) jitter. */
   readonly random?: () => number;
+  /** Test seam: the endpoint probe (`real` is the built-in one). */
+  readonly probeEndpoint?: (
+    path: string,
+    real: (path: string) => Promise<ProbeOutcome>,
+  ) => Promise<ProbeOutcome>;
+}
+
+/** Options for one more client connector on the link. */
+export interface LinkConnectorOptions {
+  /** A short-lived connector (the server test, a check): not counted as an ID on the link. */
+  readonly transient?: boolean;
 }
 
 type BindOutcome = 'bound' | 'busy' | 'unsafe' | 'retry';
@@ -144,7 +171,7 @@ export class SharedRelayLink {
   /** Where this user's shared link listens, or undefined (no usable path: sharing off). */
   readonly endpoint: RelayEndpoint | undefined;
   private readonly options: SharedRelayLinkOptions;
-  private readonly token: Uint8Array;
+  private token: Uint8Array;
   private readonly lstatFn: LstatFn;
   private readonly uid: () => number | undefined;
   private readonly random: () => number;
@@ -159,6 +186,11 @@ export class SharedRelayLink {
   private unavailableUntil = 0;
   private shared: SharedRelayConnector | undefined;
   private closed = false;
+  /** Bumped by every election and every token change (the connectors' `epoch`). */
+  private generation = 0;
+  /** The current back-off after a stuck endpoint (0: none). */
+  private stuckBackoffMs = 0;
+  private reloading = false;
 
   constructor(options: SharedRelayLinkOptions) {
     if (!(options.token instanceof Uint8Array) || options.token.length !== 32) {
@@ -182,17 +214,28 @@ export class SharedRelayLink {
 
   /** This program's client connector on the link (one per link; a failed channel redials at once). */
   connector(): SharedRelayConnector {
-    this.shared ??= new SharedRelayConnector({
+    this.shared ??= this.makeConnector(this.options.mayAuthenticate, false);
+    return this.shared;
+  }
+
+  private makeConnector(
+    mayAuthenticate: ((relayUrl: string) => boolean) | undefined,
+    transient: boolean,
+  ): SharedRelayConnector {
+    return new SharedRelayConnector({
       dial: this.dial,
       token: this.token,
+      currentToken: () => this.token,
+      epoch: () => this.generation,
+      onHandshake: (outcome) => this.handshakeEnded(outcome),
       cliVersion: this.options.cliVersion,
       ...(this.logger === undefined ? {} : { logger: this.logger }),
-      retryAfterMs: 0, // the election here bounds retries (cool down), not the connector
-      ...(this.options.mayAuthenticate === undefined
-        ? {}
-        : { mayAuthenticate: this.options.mayAuthenticate }),
+      // The election here bounds retries (cool down); a stuck endpoint gets SHARED_LINK_RETRY_MS.
+      retryAfterMs: 0,
+      handshakeRetryMs: SHARED_LINK_RETRY_MS,
+      ...(transient ? { transient: true } : {}),
+      ...(mayAuthenticate === undefined ? {} : { mayAuthenticate }),
     });
-    return this.shared;
   }
 
   /**
@@ -200,15 +243,52 @@ export class SharedRelayLink {
    * opens), with that pool's `mayAuthenticate`. Each is its own program on the link, so the check
    * lane never batches ids of different IDs together (D-159, owner decision 1).
    */
-  newConnector(mayAuthenticate?: (relayUrl: string) => boolean): SharedRelayConnector {
-    return new SharedRelayConnector({
-      dial: this.dial,
-      token: this.token,
-      cliVersion: this.options.cliVersion,
-      ...(this.logger === undefined ? {} : { logger: this.logger }),
-      retryAfterMs: 0,
-      ...(mayAuthenticate === undefined ? {} : { mayAuthenticate }),
-    });
+  newConnector(
+    mayAuthenticate?: (relayUrl: string) => boolean,
+    options: LinkConnectorOptions = {},
+  ): SharedRelayConnector {
+    return this.makeConnector(mayAuthenticate, options.transient === true);
+  }
+
+  /**
+   * A connector's handshake ended. A stuck endpoint (stalled, or a protocol error before the
+   * proof) turns sharing off for this program for a growing time; a token refusal re-reads the
+   * token file. Fixed codes only are logged.
+   */
+  private handshakeEnded(outcome: SharedHandshakeOutcome): void {
+    if (outcome === 'ready') {
+      this.stuckBackoffMs = 0;
+      return;
+    }
+    if (outcome === 'token') {
+      void this.reloadToken();
+      return;
+    }
+    if ((outcome !== 'stalled' && outcome !== 'protocol') || this.current !== 'client') return;
+    this.stuckBackoffMs = Math.min(
+      SHARED_LINK_RETRY_MS,
+      Math.max(SHARED_LINK_COOLDOWN_MS, this.stuckBackoffMs * 2),
+    );
+    this.current = 'unavailable';
+    this.unavailableUntil = Date.now() + this.stuckBackoffMs;
+    this.logger?.info('shared relay link not used', { reason: outcome });
+  }
+
+  /** The token file changed (another program replaced a corrupt one): use the new token. */
+  private async reloadToken(): Promise<void> {
+    if (this.reloading || this.closed) return;
+    this.reloading = true;
+    try {
+      const fresh = await ensureLinkToken(this.options.home);
+      if (fresh instanceof Uint8Array && fresh.length === 32 && !sameBytes(fresh, this.token)) {
+        this.token = fresh.slice();
+        this.generation += 1;
+      }
+    } catch {
+      // the token this program has stays
+    } finally {
+      this.reloading = false;
+    }
   }
 
   /**
@@ -251,7 +331,7 @@ export class SharedRelayLink {
   async status(): Promise<SharedRelayStatus> {
     const role = this.current;
     if (role === 'winner' && this.mux !== undefined) {
-      return { on: true, role, programs: this.mux.stats().clients };
+      return { on: true, role, programs: this.mux.stats().ids };
     }
     if (role === 'client') {
       const reply = await this.control(CONTROL_STATUS, 'reply');
@@ -318,6 +398,7 @@ export class SharedRelayLink {
       .then(async (role) => {
         this.election = undefined;
         this.skipDelay = undefined;
+        this.generation += 1; // connectors that were down or refused may try the link again
         if (this.closed) {
           await this.stopServer();
           this.current = 'closed';
@@ -375,9 +456,15 @@ export class SharedRelayLink {
     if ((await checkSocket(path, this.lstatFn, this.uid)) === 'unsafe') return 'unsafe';
     let listened = await this.listen(path);
     if (listened === 'in_use') {
-      const probe = await this.probe(path);
+      let probe = await this.probe(path);
+      if (probe === 'refused') {
+        // A refusal may be a program between close and bind: ask once more before unlinking.
+        await this.sleep(STALE_RECHECK_MS);
+        if (this.closed) return 'retry';
+        probe = await this.probe(path);
+      }
       if (probe === 'alive') return 'busy';
-      if (probe === 'error') return 'retry';
+      if (probe !== 'refused') return 'retry';
       // Stale: no answer. Removed only after the same checks (04 §4).
       if (
         !(await checkDir(dir, this.lstatFn, this.uid)) ||
@@ -389,6 +476,8 @@ export class SharedRelayLink {
       listened = await this.listen(path);
     }
     if (listened !== 'ok') return 'retry';
+    // Only this user may connect, whatever the umask (the 0700 folder is the first guard).
+    await chmod(path, 0o600).catch(() => undefined);
     if (
       !(await checkDir(dir, this.lstatFn, this.uid)) ||
       (await checkSocket(path, this.lstatFn, this.uid)) !== 'ok'
@@ -424,21 +513,10 @@ export class SharedRelayLink {
   }
 
   /** `alive` (a program answers), `refused` (no listener: stale or gone), `error`. */
-  private probe(path: string): Promise<'alive' | 'refused' | 'error'> {
-    return new Promise((resolve) => {
-      const socket = connect(path);
-      const timer = setTimeout(() => finish('error'), PROBE_TIMEOUT_MS);
-      function finish(outcome: 'alive' | 'refused' | 'error'): void {
-        clearTimeout(timer);
-        socket.destroy();
-        resolve(outcome);
-      }
-      socket.once('connect', () => finish('alive'));
-      socket.once('error', (error) => {
-        const code = codeOf(error);
-        finish(code === 'ECONNREFUSED' || code === 'ENOENT' ? 'refused' : 'error');
-      });
-    });
+  private probe(path: string): Promise<ProbeOutcome> {
+    const seam = this.options.probeEndpoint;
+    if (seam !== undefined) return seam(path, (p) => realProbe(p));
+    return realProbe(path);
   }
 
   private async stopServer(): Promise<void> {
@@ -505,8 +583,8 @@ export class SharedRelayLink {
           return;
         }
         if (proved && frame === CONTROL_STATUS) {
-          // The asking channel is not a program on the link: not counted.
-          const programs = Math.max(0, mux.stats().clients - 1);
+          // IDs on the link, as the winner counts them (the asking channel is `aux`: not one).
+          const programs = mux.stats().ids;
           socket.write(linkFrameBytes(`{"t":"status","programs":${programs}}`));
           continue;
         }
@@ -742,6 +820,7 @@ export class SharedRelayLink {
             v: SHARED_LINK_VERSION,
             cli: this.options.cliVersion,
             nonce,
+            kind: 'aux', // a status or yield question: never counted as an ID
           }),
         ),
       );
@@ -778,6 +857,31 @@ export class SharedRelayLink {
   }
 }
 
+/** The built-in endpoint probe. */
+function realProbe(path: string): Promise<ProbeOutcome> {
+  return new Promise((resolve) => {
+    const socket = connect(path);
+    const timer = setTimeout(() => finish('error'), PROBE_TIMEOUT_MS);
+    function finish(outcome: ProbeOutcome): void {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(outcome);
+    }
+    socket.once('connect', () => finish('alive'));
+    socket.once('error', (error) => {
+      const code = codeOf(error);
+      finish(code === 'ECONNREFUSED' || code === 'ENOENT' ? 'refused' : 'error');
+    });
+  });
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= (a[i] as number) ^ (b[i] as number);
+  return diff === 0;
+}
+
 export interface CreateRelayConnectorOptions {
   readonly home: string;
   readonly cliVersion: string;
@@ -800,7 +904,10 @@ export interface RelayConnectorChoice {
    * connector on the link with that pool's `mayAuthenticate`, with the direct fallback; the direct
    * connector when off.
    */
-  forPool(mayAuthenticate: (relayUrl: string) => boolean): RelayConnector;
+  forPool(
+    mayAuthenticate: (relayUrl: string) => boolean,
+    options?: LinkConnectorOptions,
+  ): RelayConnector;
 }
 
 /** Test seam behind createRelayConnector: the direct connector and the address check injected. */
@@ -829,8 +936,8 @@ export async function createRelayConnectorWith(
     connector: new FallbackConnector(shared, options.direct),
     link,
     shared,
-    forPool: (mayAuthenticate) =>
-      new FallbackConnector(link.newConnector(mayAuthenticate), options.direct),
+    forPool: (mayAuthenticate, connectorOptions) =>
+      new FallbackConnector(link.newConnector(mayAuthenticate, connectorOptions), options.direct),
   };
 }
 

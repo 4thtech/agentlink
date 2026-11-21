@@ -1161,6 +1161,8 @@ export class RelayPool {
   }
 
   private waitForChallenge(conn: Connection): Promise<string | undefined> {
+    // A connection that already closed gets no challenge: no wait (it would last OK_TIMEOUT_MS).
+    if (conn.state === 'closed') return Promise.resolve(undefined);
     return new Promise((resolve) => {
       const waiter = (challenge: string | undefined): void => {
         this.timers.clearTimeout(timer);

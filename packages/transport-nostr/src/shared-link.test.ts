@@ -1131,7 +1131,7 @@ describe('shared link hardening', () => {
       outcome = o;
     });
     await vi.advanceTimersByTimeAsync(100);
-    expect(outcome).toBe('unchecked');
+    expect(outcome).toBe('missing'); // a forged match is not evidence, and the read ends there
     expect(relay.closed()).toBe(1);
   });
 
