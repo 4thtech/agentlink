@@ -127,3 +127,7 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.15 LIVE: npm latest, GitHub release v0.5.15, signed desktop update (Mac, Windows). Release PR #856, version PR #857.
 - Contents: use your own message servers end to end (Test button, own list 2–8 with automatic mix-in, owner approval, 30-day overlap, fully quiet option that sends nothing to and reads nothing from public servers, `agentlink owner servers` CLI); compact Message network view with diagram and 24-hour bar; fixes from the owner's test; faster database setup.
 - Next: on-chain spending allowance and signed Mac helper before mainnet.
+
+## 2026-11-21 — 0.5.16 started; dev machine incident
+- 0.5.16 (fix release) on rel0516/integration: Windows in-app update (0.5.14 Windows app could not read the update; manual box shown while checking) and Message network polish. Unfinished work saved on rel0516/wip-win-update and rel0516/wip-net-polish. Paused until Tali says go.
+- Dev machine incident: hundreds of leftover worker copies plus parallel tests overloaded the owner's Mac; it hung and needed a macOS reinstall. All old copies removed (work verified merged); new limits: ≤ 2 test-heavy workers, single-core tests, clean copies after each release.
