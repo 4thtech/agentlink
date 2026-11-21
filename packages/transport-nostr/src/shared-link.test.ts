@@ -421,7 +421,11 @@ describe('NIP-42 AUTH: an authenticated connection is never shared across IDs', 
         pool(shared(), { authKeys: (await keys()).store, mayAuthenticate: () => true }),
       ),
     );
-    await Promise.all(pools.map((p) => p.publish(makeWrapEvent(), [r1])));
+    // Programs past the cap wait for a challenge that never comes: let their login time out.
+    const pending = Promise.all(pools.map((p) => p.publish(makeWrapEvent(), [r1])));
+    await vi.advanceTimersByTimeAsync(30_000);
+    const outcomes = await pending;
+    expect(outcomes.filter((o) => o.results[0]?.ok)).toHaveLength(1);
     expect(count.max()).toBeLessThanOrEqual(2);
     expect(server.stats().upstreams).toBeLessThanOrEqual(2);
     for (const socket of net.sockets) expect(socket.authedKeys.size).toBeLessThanOrEqual(1);
