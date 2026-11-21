@@ -31,18 +31,18 @@ New collaborator or agent? Start at `project/process/onboarding.md`.
 
 ## Orchestration and context economy
 
-The main session is the **orchestrator**: it deploys workers and audits. **The orchestrator never implements; it keeps up to 5 workers busy.** Playbook: `project/process/orchestrator-playbook.md`.
+The main session is the **orchestrator**: it deploys workers and audits, never implements, and keeps up to 5 workers busy. Playbook: `project/process/orchestrator-playbook.md`.
 
 - **Delegate** reading, building and verification. Take back conclusions, not dumps; reports **≤ 400 words**.
 - **Route** (owner; when in doubt, route up; always the latest model versions):
   - **Haiku 5.5**: read-only, mechanical, status, verifiers; never S1/S2 builds.
   - **Sonnet 5.5**: clear-spec builds, tests, CI, docs, UI.
-  - **Opus 5.5** (medium): all S2 builds, architecture, planning, every independent review.
+  - **Opus 5.5** (medium): S2 builds, architecture, planning, every independent review.
   - **Fable 5.2**: security audits (keys, crypto, owner presence, money, contracts, supply chain).
 - **Machine limits:** ≤ 2 test-heavy workers; vitest `--maxWorkers=1`; delete worktrees after merge (`project/runbooks/dev-machine-resources.md`).
-- **Audit, don't relay.** Verify with targeted checks (CI status, `git diff --stat`, specific hunks). For S2 and sensitive paths, use an **independent auditor worker** that gets only the spec and the diff (Decision 54). Never call a worker's claim verified.
-- **Load only what you need.** Open specs by section; use `grep` and line ranges.
-- **Save early.** Keep handoff and sync file current; at ~60% context, save and suggest a new session.
+- **Audit, don't relay.** Verify with targeted checks (tests, CI status, `git diff --stat`, specific hunks). For S2 and sensitive paths, use an **independent auditor worker** that gets only the spec and the diff (Decision 54). Never call a worker's claim verified.
+- **Load only what you need.** Open specs by section; use `grep` and line ranges; keep large outputs in files.
+- **Save early.** Keep handoff and sync file current; at ~60% context, save, suggest a new session.
 - **Session-start budgets:** `project/process/development-process.md` §3.6. **No subagents?** Follow the rules sequentially, say so.
 
 ## Before you change anything

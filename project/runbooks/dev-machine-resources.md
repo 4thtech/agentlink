@@ -74,9 +74,9 @@ git -C <path> push -u origin HEAD
 
 ```bash
 # normal: one worktree
-git worktree remove --force <path>
+git worktree remove <path>        # refuses a dirty tree, which is the point
 
-# many at once: list merged ones first, review the list, then remove
+# many at once: list all worktrees, pick the merged ones by hand, then remove
 git worktree list --porcelain | awk '/^worktree /{print $2}' | grep '/.claude/worktrees/'
 
 # big or stuck tree (node_modules makes remove slow): move aside, then prune
@@ -85,7 +85,7 @@ git worktree prune
 nice -n 19 rm -rf ~/.Trash-agentlink-*     # low priority, see "big delete" in section 5
 
 # also delete the merged branches
-git branch --merged origin/main | grep -v '^\*\|main' | xargs -n 20 git branch -d
+git branch --merged origin/main | grep -v '^[*+]\|main' | xargs -n 20 git branch -d
 ```
 
 Old copies outside the repo (`~/Projects/agentlink-*`, copies in `~`) are not worktrees. Check each with `git status` and `git log origin/main..HEAD`, then delete them the same way. Never delete the main checkout at `~/Projects/agentlink`.
