@@ -4,6 +4,7 @@
 // that cannot answer leaves today's fresh read in charge. Mock relays only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRECHECK_SERVER_TIMEOUT_MS, precheckServers, type PrecheckResult } from './precheck.js';
+import type { RelayConnector, RelaySocket, RelaySocketHandlers, RelayTarget } from './relay-io.js';
 import type { SharedCheckOutcome } from './shared-relay-connector.js';
 import { MockNetwork, relayUrls } from './testing/mock-network.js';
 
@@ -59,4 +60,51 @@ describe('precheckServers through the check lane', () => {
     const result = await test(net, url, () => Promise.resolve('unavailable'));
     expect(result.outcome).toBe('ready');
   });
+});
+
+// RELAY-SHARED-CONN fix round (D-159 build decision 9): the read-back's "fresh connection" is a
+// connection of the program's own, never a virtual one on the link that carried the write.
+describe('the read-back never rides the connection that wrote', () => {
+  function recording(net: MockNetwork): {
+    connector: RelayConnector;
+    reqsOn: (how: 'open' | 'openOwn') => number;
+  } {
+    const reqs = { open: 0, openOwn: 0 };
+    const wrap =
+      (how: 'open' | 'openOwn') =>
+      (target: RelayTarget, handlers: RelaySocketHandlers): RelaySocket => {
+        const socket = net.open(target, handlers);
+        return {
+          send: (text) => {
+            if (text.startsWith('["REQ"')) reqs[how] += 1;
+            socket.send(text);
+          },
+          close: () => socket.close(),
+        };
+      };
+    return {
+      connector: { open: wrap('open'), openOwn: wrap('openOwn') },
+      reqsOn: (how) => reqs[how],
+    };
+  }
+
+  for (const lane of ['unchecked', 'unavailable', 'served'] as const) {
+    it(`reads on the program's own connection (lane ${lane})`, async () => {
+      const net = new MockNetwork();
+      const [url] = relayUrls(`own-${lane}`, 1) as [string];
+      net.configure(url);
+      const io = recording(net);
+      const pending = precheckServers([url], {
+        resolver: net,
+        connector: io.connector,
+        nip11: net,
+        checkServed: () => Promise.resolve(lane),
+      });
+      await vi.advanceTimersByTimeAsync(PRECHECK_SERVER_TIMEOUT_MS + 1_000);
+      const result = (await pending)[0] as PrecheckResult;
+      expect(result.outcome).toBe('ready');
+      expect(io.reqsOn('open')).toBe(0);
+      expect(io.reqsOn('openOwn')).toBe(2);
+    });
+  }
 });

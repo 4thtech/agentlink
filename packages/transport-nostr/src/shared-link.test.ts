@@ -17,6 +17,7 @@ import {
 import {
   FallbackConnector,
   SHARED_HANDSHAKE_TIMEOUT_MS,
+  SHARED_LINK_RETRY_MS,
   SharedLinkUnavailable,
   SharedRelayConnector,
   type SharedRelayConnectorOptions,
@@ -925,5 +926,270 @@ describe('no frame content in logs or errors (I-7)', () => {
     }
     expect(message).not.toBe('');
     expect(message).not.toContain('leak');
+  });
+});
+
+// RELAY-SHARED-CONN fix round (D-159 build decisions 8 to 11; 04 §4 "Local relay link").
+describe('shared link hardening', () => {
+  /** A channel that answers the hello with a frame that does not decode (before any proof). */
+  const garbledDialer = (): { dial: SharedRelayConnectorOptions['dial']; dials: () => number } => {
+    let dials = 0;
+    return {
+      dials: () => dials,
+      dial: (handlers) => {
+        dials += 1;
+        return {
+          send: () => {
+            void Promise.resolve().then(() => handlers.onFrame('{"t":"nonsense"}'));
+          },
+          close: () => undefined,
+        };
+      },
+    };
+  };
+
+  it('after a stalled handshake, the next sockets and checks go direct at once (no 2 s wait each)', async () => {
+    const { direct, token } = setup();
+    const [r1] = relayUrls('stall2', 1) as [string];
+    direct.configure(r1);
+    const stalled = stalledDialer();
+    let dials = 0;
+    const connector = new SharedRelayConnector({
+      dial: (h) => {
+        dials += 1;
+        return stalled.dial(h);
+      },
+      token,
+      cliVersion: CLI,
+      retryAfterMs: 0, // as the Node link builds it
+    });
+    const fallback = new FallbackConnector(connector, direct);
+    const first = raw(fallback, r1);
+    await vi.advanceTimersByTimeAsync(SHARED_HANDSHAKE_TIMEOUT_MS);
+    expect(first.opened()).toBe(true);
+    expect(direct.opens).toHaveLength(1);
+    const second = raw(fallback, r1);
+    await flush();
+    expect(second.opened()).toBe(true); // direct without another handshake wait
+    expect(direct.opens).toHaveLength(2);
+    expect(dials).toBe(1);
+    expect(await connector.checkServed(r1, 'aa'.repeat(32))).toBe('unavailable');
+    await vi.advanceTimersByTimeAsync(SHARED_LINK_RETRY_MS);
+    raw(fallback, r1);
+    expect(dials).toBe(2); // tried again after the retry time
+  });
+
+  it('after a protocol error before the proof, the link is not dialled again for the retry time', async () => {
+    const { direct, token } = setup();
+    const [r1] = relayUrls('garble', 1) as [string];
+    direct.configure(r1);
+    const garbled = garbledDialer();
+    const connector = new SharedRelayConnector({
+      dial: garbled.dial,
+      token,
+      cliVersion: CLI,
+      retryAfterMs: 0,
+    });
+    const fallback = new FallbackConnector(connector, direct);
+    raw(fallback, r1);
+    await flush();
+    raw(fallback, r1);
+    await flush();
+    expect(direct.opens).toHaveLength(2);
+    expect(garbled.dials()).toBe(1);
+  });
+
+  it('a new election (epoch) lets a stalled connector try the link again at once', async () => {
+    const { net, direct, server, token } = setup();
+    const [r1] = relayUrls('epoch', 1) as [string];
+    net.configure(r1);
+    direct.configure(r1);
+    const healthy = memoryDialer(server);
+    let stalledNow = true;
+    let epoch = 0;
+    const connector = new SharedRelayConnector({
+      dial: (h) => (stalledNow ? stalledDialer().dial(h) : healthy.dial(h)),
+      token,
+      cliVersion: CLI,
+      retryAfterMs: 0,
+      epoch: () => epoch,
+    });
+    const fallback = new FallbackConnector(connector, direct);
+    raw(fallback, r1);
+    await vi.advanceTimersByTimeAsync(SHARED_HANDSHAKE_TIMEOUT_MS);
+    expect(connector.state).toBe('down');
+    stalledNow = false;
+    epoch += 1; // a healthy winner was elected
+    const again = raw(fallback, r1);
+    await flush();
+    expect(again.opened()).toBe(true);
+    expect(connector.state).toBe('ready');
+    expect(net.opens).toHaveLength(1);
+  });
+
+  it('refused clears on a new election or a changed token; it does not stick forever', async () => {
+    const { net, direct, server, token } = setup();
+    const { dial } = memoryDialer(server);
+    const [r1] = relayUrls('unrefuse', 1) as [string];
+    net.configure(r1);
+    direct.configure(r1);
+    let current = randomBytes(32);
+    let epoch = 0;
+    const connector = new SharedRelayConnector({
+      dial,
+      token: current,
+      currentToken: () => current,
+      cliVersion: CLI,
+      retryAfterMs: 0,
+      epoch: () => epoch,
+    });
+    const fallback = new FallbackConnector(connector, direct);
+    raw(fallback, r1);
+    await flush();
+    expect(connector.state).toBe('refused');
+    raw(fallback, r1);
+    await flush();
+    expect(connector.state).toBe('refused'); // the same election: not retried
+    current = token; // the token file changed
+    epoch += 1;
+    const after = raw(fallback, r1);
+    await flush();
+    expect(after.opened()).toBe(true);
+    expect(connector.state).toBe('ready');
+    expect(net.opens).toHaveLength(1);
+  });
+
+  it('channels that never prove the token cannot fill the program cap', async () => {
+    const { net, server, shared } = setup({ maxClients: 2 });
+    const [r1] = relayUrls('preauth', 1) as [string];
+    net.configure(r1);
+    for (let i = 0; i < 2; i += 1) {
+      server.attach({ send: () => undefined, close: () => undefined });
+    }
+    const connector = shared();
+    const r = raw(connector, r1);
+    await flush();
+    expect(connector.state).toBe('ready');
+    expect(r.opened()).toBe(true);
+    // Unproved channels have a small cap of their own.
+    const busy: string[] = [];
+    for (let i = 0; i < 16; i += 1) {
+      server.attach({ send: (f) => busy.push(f), close: () => undefined });
+    }
+    expect(busy.filter((f) => f.includes('"busy"')).length).toBeGreaterThan(0);
+  });
+
+  /** A relay for the check lane that answers a REQ with `frames(subId)` and never an EOSE. */
+  function scripted(frames: (sub: string) => string[]): {
+    connector: RelayConnector;
+    closed: () => number;
+  } {
+    let closed = 0;
+    return {
+      closed: () => closed,
+      connector: {
+        open(_target, handlers) {
+          void Promise.resolve().then(() => handlers.onOpen());
+          return {
+            send(text) {
+              const frame = JSON.parse(text) as unknown[];
+              if (frame[0] !== 'REQ') return;
+              for (const f of frames(frame[1] as string)) {
+                void Promise.resolve().then(() => handlers.onMessage(f));
+              }
+            },
+            close() {
+              closed += 1;
+            },
+          };
+        },
+      },
+    };
+  }
+
+  function laneOver(relay: RelayConnector): SharedRelayConnector {
+    const token = randomBytes(32);
+    const net = new MockNetwork();
+    const server = new SharedLinkMux({
+      connector: relay,
+      addressCheck: { resolver: net },
+      token,
+      cliVersion: CLI,
+    });
+    const { dial } = memoryDialer(server);
+    return new SharedRelayConnector({ dial, token, cliVersion: CLI });
+  }
+
+  it('a check batch stops at the first matching event that does not verify', async () => {
+    const event = makeWrapEvent();
+    const forged = { ...event, sig: '00'.repeat(64) };
+    const relay = scripted((sub) => [JSON.stringify(['EVENT', sub, forged])]);
+    const connector = laneOver(relay.connector);
+    const [r1] = relayUrls('forge2', 1) as [string];
+    let outcome: string | undefined;
+    void connector.checkServed(r1, event.id).then((o) => {
+      outcome = o;
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(outcome).toBe('unchecked');
+    expect(relay.closed()).toBe(1);
+  });
+
+  it('a check batch reads at most as many EVENT frames as ids it asked for', async () => {
+    const wanted = makeWrapEvent();
+    const others = Array.from({ length: 50 }, () => makeWrapEvent());
+    const relay = scripted((sub) => others.map((e) => JSON.stringify(['EVENT', sub, e])));
+    const connector = laneOver(relay.connector);
+    const [r1] = relayUrls('flood', 1) as [string];
+    let outcome: string | undefined;
+    void connector.checkServed(r1, wanted.id).then((o) => {
+      outcome = o;
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(outcome).toBe('unchecked');
+    expect(relay.closed()).toBe(1);
+  });
+
+  it('counts CLI versions without inherited keys', async () => {
+    const { server, shared, net } = setup();
+    const [r1] = relayUrls('proto2', 1) as [string];
+    net.configure(r1);
+    raw(shared({ cliVersion: 'constructor' }), r1);
+    raw(shared({ cliVersion: 'toString' }), r1);
+    await flush();
+    expect(server.stats().cliVersions).toEqual({ constructor: 1, toString: 1 });
+  });
+
+  it('at the connection cap, a program that must log in goes direct promptly', async () => {
+    const { net, direct, shared, pool } = setup({ maxUpstreams: 1 });
+    const [r1] = relayUrls('capdirect', 1) as [string];
+    net.configure(r1, { requireAuth: true });
+    direct.configure(r1, { requireAuth: true });
+    const { store } = await keys();
+    const p = pool(shared(), { authKeys: store, mayAuthenticate: () => true });
+    let first: Awaited<ReturnType<RelayPool['publish']>> | undefined;
+    void p.publish(makeWrapEvent(), [r1]).then((o) => {
+      first = o;
+    });
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(first).toBeDefined(); // no 30 s wait for a login that cannot happen on the link
+    const second = p.publish(makeWrapEvent(), [r1]);
+    await vi.advanceTimersByTimeAsync(3_000);
+    const out = await second;
+    expect(first?.results[0]?.ok === true || out.results[0]?.ok === true).toBe(true);
+    expect(direct.openedUrls()).toContain(r1);
+    expect(direct.sockets.some((s) => s.authedKeys.size === 1)).toBe(true);
+  });
+
+  it('counts ID clients only: never unproved channels or transient (server test) connectors', async () => {
+    const { net, server, shared } = setup();
+    const [r1] = relayUrls('ids', 1) as [string];
+    net.configure(r1);
+    raw(shared(), r1);
+    raw(shared(), r1);
+    raw(shared({ transient: true }), r1);
+    server.attach({ send: () => undefined, close: () => undefined }); // never proves
+    await flush();
+    expect(server.stats().ids).toBe(2);
   });
 });

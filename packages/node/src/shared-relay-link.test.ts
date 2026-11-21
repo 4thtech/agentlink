@@ -667,3 +667,81 @@ describe.runIf(process.platform === 'win32')(
     });
   },
 );
+
+// RELAY-SHARED-CONN fix round (D-159 build decisions 8 to 11; 04 §4 "Local relay link").
+describe.runIf(POSIX)('shared link hardening (Unix socket)', () => {
+  it('a hung endpoint: after one stalled handshake, further sockets and checks go direct at once', async () => {
+    const home = tempHome();
+    const dir = join(home, '.agentlink', RELAY_RUN_DIR);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    chmodSync(dir, 0o700);
+    const accepted: Socket[] = [];
+    const hung = createServer((socket) => accepted.push(socket)); // accepts, never answers
+    await new Promise<void>((resolve) => hung.listen(socketPath(home), resolve));
+    try {
+      const b = makeLink(home, token());
+      expect(await b.link.start()).toBe('client');
+      const first = new FallbackConnector(b.link.newConnector(), b.relay.connector);
+      await roundTrip(first, 'stall-1'); // waits out one handshake, then direct
+      const t0 = Date.now();
+      const second = new FallbackConnector(b.link.newConnector(), b.relay.connector);
+      await roundTrip(second, 'stall-2');
+      expect(Date.now() - t0).toBeLessThan(500);
+      const t1 = Date.now();
+      expect(await b.link.newConnector().checkServed(RELAY, 'aa'.repeat(32))).toBe('unavailable');
+      expect(Date.now() - t1).toBeLessThan(500);
+      expect(b.link.role).toBe('unavailable');
+    } finally {
+      for (const socket of accepted) socket.destroy();
+      await new Promise<void>((resolve) => hung.close(() => resolve()));
+    }
+  }, 10_000);
+
+  it('a socket that refused once is probed again after a short delay before it is removed', async () => {
+    const home = tempHome();
+    const dir = join(home, '.agentlink', RELAY_RUN_DIR);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    chmodSync(dir, 0o700);
+    // A live program holds the endpoint, but the first probe sees a refusal (it was restarting).
+    const live = makeLink(home, token());
+    expect(await live.link.start()).toBe('winner');
+    let probes = 0;
+    const b = makeLink(home, token(), {
+      probeEndpoint: async (path, real) => {
+        probes += 1;
+        return probes === 1 ? 'refused' : real(path);
+      },
+    });
+    expect(await b.link.start()).toBe('client');
+    expect(probes).toBeGreaterThanOrEqual(2);
+    expect(lstatSync(socketPath(home)).isSocket()).toBe(true);
+    expect(live.link.role).toBe('winner');
+    const probe = await rawClient(socketPath(home));
+    expect(probe.closed()).toBe(false);
+  });
+
+  it('the bound socket is mode 0600', async () => {
+    const home = tempHome();
+    const a = makeLink(home, token());
+    expect(await a.link.start()).toBe('winner');
+    expect(statSync(socketPath(home)).mode & 0o777).toBe(0o600);
+  });
+
+  it('winner and client report the same count: ID clients only, no server-test connectors', async () => {
+    const home = tempHome();
+    const t = token();
+    const a = makeLink(home, t);
+    const b = makeLink(home, t);
+    await a.link.start();
+    await b.link.start();
+    await roundTrip(a.link.connector(), 'a');
+    await roundTrip(b.link.connector(), 'b');
+    const test = b.link.newConnector(() => false, { transient: true });
+    await test.checkServed(RELAY, 'aa'.repeat(32));
+    const unproved = await rawClient(socketPath(home)); // connected, never proves
+    expect(unproved.closed()).toBe(false);
+    expect(await a.link.status()).toEqual({ on: true, role: 'winner', programs: 2 });
+    expect(await b.link.status()).toEqual({ on: true, role: 'client', programs: 2 });
+    test.close();
+  });
+});

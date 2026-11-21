@@ -172,3 +172,37 @@ describe.runIf(POSIX)('the process relay link, on', () => {
     expect(typeof probed.programs).toBe('number');
   });
 });
+
+describe.runIf(POSIX)('the process relay link: counts (fix round, D-159 build decision 11)', () => {
+  it('server-test connectors and check lanes are not counted as IDs on this computer', async () => {
+    const home = tempHome();
+    const choice = await startProcessRelayLink({
+      home,
+      cliVersion: CLI,
+      env: ON,
+      direct: fakeRelay(),
+      addressCheck,
+    });
+    await waitFor(() => choice.link?.role === 'winner');
+    const id = processPoolConnector(() => true) as FallbackConnector;
+    const test = processPoolConnector(() => false, { transient: true }) as FallbackConnector;
+    const target = {
+      url: 'wss://relay.example.com',
+      host: 'relay.example.com',
+      port: 443,
+      address: '93.184.216.34',
+    };
+    const opened: string[] = [];
+    const handlers = (name: string): RelaySocketHandlers => ({
+      onOpen: () => opened.push(name),
+      onMessage: () => undefined,
+      onClose: () => undefined,
+    });
+    id.open(target, handlers('id'));
+    test.open(target, handlers('test'));
+    await waitFor(() => opened.length === 2);
+    expect(await processSharedLinkView()).toEqual({ on: true, programs: 1 });
+    id.close();
+    test.close();
+  });
+});
