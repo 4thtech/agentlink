@@ -39,6 +39,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'RpcFetchError',
       // M1-15: the SSRF-safe download (no lookup, CA or route seam).
       'SAFE_FETCH_TIMEOUT_MS',
+      // RELAY-SHARED-CONN L3 (D-159): the shared relay link switch (names, not values).
+      'SHARED_RELAYS_DEFAULT',
+      'SHARED_RELAYS_ENV',
       'SafeFetchError',
       // M1-9t (D-78): `owner add-agent`, a prompting entry point like initOwner.
       'addAgentToOwner',
@@ -53,6 +56,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createFileKeyStoreAgent',
       'createInboxFile',
       'createOsKeychainAgent',
+      // RELAY-SHARED-CONN L3: the relay connector factory (no lstat, uid or connector seam).
+      'createRelayConnector',
       'decideReviewedApprovals',
       // DESK-D12c: the desktop app's presence helper behind fixed commands (no path or runner seam;
       // it releases a secret only after the owner's OS gesture, and only the approval server uses it).
@@ -122,6 +127,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // M1-36b-2-c: the Send folder for an existing agent; the owner signs through the given
       // owner operation (performOwnerOperation in the CLI), nothing is unlocked here.
       'setUpSendFolder',
+      // RELAY-SHARED-CONN L3: the AGENTLINK_SHARED_RELAYS reader.
+      'sharedRelaysEnabled',
       // M1-8d: the local approval server entry point (no owner-store or opener seam).
       'startApprovalServer',
       // WP-D3: the same server for the desktop host; session links go to the pipe sink, never the
@@ -209,6 +216,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'updateContactDetailsWith',
       'signRelayMigration',
       'RelayCardSession',
+      // RELAY-SHARED-CONN L3: the shared link's seam variant and internals stay inside.
+      'createRelayConnectorWith',
+      'ensureLinkToken',
+      'resolveEndpoint',
     ]) {
       expect(names).not.toContain(name);
     }

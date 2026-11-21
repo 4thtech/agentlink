@@ -247,6 +247,21 @@ export {
   nodeNip11Fetcher,
   nodeRelayConnector,
 } from './relay-io.js';
+// RELAY-SHARED-CONN L3 (D-159): one relay link per computer. The factory picks the shared link with a
+// direct fallback (AGENTLINK_SHARED_RELAYS on) or the direct connector (off, the 0.5.18 default); the
+// returned link gives the hand-over and the doctor status. Its test seams (lstat, uid, tmpdir, an
+// injected direct connector) stay inside.
+export {
+  SHARED_RELAYS_DEFAULT,
+  SHARED_RELAYS_ENV,
+  createRelayConnector,
+  sharedRelaysEnabled,
+  type CreateRelayConnectorOptions,
+  type RelayConnectorChoice,
+  type SharedLinkRole,
+  type SharedRelayLink,
+  type SharedRelayStatus,
+} from './shared-relay-link.js';
 // M1-15: the SSRF-safe download (DNS-pinned, 04 §4) and the allowed-folder and inbox file guards.
 // The test seams (an injected lookup, a CA, a route to a local port) stay inside.
 export {

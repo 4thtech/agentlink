@@ -2,7 +2,6 @@
 // the per-user endpoint (Unix socket or Windows named pipe), the token file, the election, the
 // server that hosts the mux, the client dialer, the hand-over and the off switch. Every test uses a
 // temporary home and an in-memory relay: no network, never the real ~/.agentlink.
-import { randomBytes as nodeRandomBytes } from 'node:crypto';
 import {
   chmodSync,
   linkSync,
@@ -34,6 +33,7 @@ import {
   type RelaySocketHandlers,
   type RelayTarget,
 } from '@4thtech-io/transport-nostr';
+import { randomBytes } from '@4thtech-io/crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   RELAY_RUN_DIR,
@@ -210,7 +210,7 @@ async function rawClient(path: string): Promise<{
   return { socket, frames, closed: () => closed };
 }
 
-const token = (): Uint8Array => new Uint8Array(nodeRandomBytes(32));
+const token = (): Uint8Array => randomBytes(32);
 const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString('hex');
 
 describe('token file (04 §4 "Local relay link")', () => {
@@ -281,7 +281,7 @@ describe('endpoint path', () => {
     if (endpoint?.kind !== 'unix') return;
     expect(Buffer.byteLength(endpoint.path)).toBeLessThanOrEqual(SOCKET_PATH_MAX_BYTES.darwin);
     expect(endpoint.dir).toBe(join(short, 'agentlink-501'));
-    expect(endpoint.path).toMatch(/relay-[0-9a-f]{16}\.sock$/);
+    expect(endpoint.path).toMatch(/r[0-9a-f]{16}\.sock$/);
     // Stable for one home, different for another.
     expect(
       resolveEndpoint(home, { platform: 'darwin', tmpdir: () => short, uid: () => 501 }),
