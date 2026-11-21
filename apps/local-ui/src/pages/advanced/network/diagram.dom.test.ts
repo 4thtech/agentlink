@@ -280,6 +280,26 @@ describe('network diagram: contacts', () => {
     expect(host.querySelectorAll('.nw-list > .nw-srv[data-state]')).toHaveLength(12);
   });
 
+  it('draws own servers first (problems first), then old read-only ones, even when those are unreachable', async () => {
+    const list = [
+      server({ host: 'old1.example.org', kind: 'legacy', sends: false, state: 'unreachable' }),
+      server({ host: 'old2.example.org', kind: 'legacy', sends: false, state: 'unreachable' }),
+      ...Array.from({ length: 5 }, (_, i) =>
+        server({ host: `own${String(i)}.example.org`, state: i === 4 ? 'slow' : 'ready' }),
+      ),
+    ];
+    await mount(() =>
+      Promise.resolve(ok(answer({ servers: list, contacts: { total: 0, sharing: 0 } }))),
+    );
+    const svg = wide() as SVGElement;
+    const drawn = [...svg.querySelectorAll('[data-node-state]')].map((n) => n.textContent ?? '');
+    expect(drawn).toHaveLength(5);
+    expect(drawn[0]).toContain('own4.example.org');
+    expect(drawn.some((t) => t.includes('old1.example.org'))).toBe(false);
+    expect(drawn.every((t) => t.includes('own'))).toBe(true);
+    expect(slot().querySelector('.nwd-more')?.textContent).toContain(S.diagramMoreServers(2));
+  });
+
   it('falls back to the server column alone when the contacts read fails, and shows the cards', async () => {
     const read = vi.fn((c: boolean) =>
       Promise.resolve(
