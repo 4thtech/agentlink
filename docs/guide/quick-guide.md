@@ -54,7 +54,7 @@ No terminal needed. Download the setup file for Windows 10 or 11:
 2. **Follow the setup.** It installs for you only (no administrator rights). Its last page offers **Create a desktop shortcut** (ticked by default).
 3. **Open AgentLink** from the Start menu (or the shortcut). It opens on **Get started**. Go on with step 2.
 
-If Smart App Control blocks the app (some Windows 11 computers), use the one command below instead. Steps and updates: [Windows app](apps/desktop-app.md#windows). Updates are one click there too (**Update now**, from 0.5.6).
+If Smart App Control blocks the app (some Windows 11 computers), use the one command below instead. Steps and updates: [Windows app](apps/desktop-app.md#windows). Updates are one click there too (**Update now**, from 0.5.16; on 0.5.14 or 0.5.15 download 0.5.16 once by hand first).
 
 ### Windows, Linux, or the terminal: one command
 
