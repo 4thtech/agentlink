@@ -161,6 +161,19 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 - **Refused uploads.** When a send with files is refused after the files were uploaded, the uploads are removed.
 - **Delete history.** Receipts arriving after the delete sheet listed its items no longer make it fail; a new message or saved file still does.
 
+## New in 0.5.18 (D-159)
+
+### Shared server connection (04 §4 "Local relay link", 07 §4.2)
+
+Off by default in 0.5.18 (`AGENTLINK_SHARED_RELAYS=1` turns it on); planned to be on by default in a later release. The AgentLink programs of one OS user share one connection per relay through the first program that binds a per-user local endpoint. How it works: [Shared server connection](shared-server-connection.md).
+
+- **Keys never move.** Only ciphertext, already-signed events, filters, event ids and relay URLs cross the local channel. Each program keeps its own `KeyStore`, signing and checks (I-1, I-2, I-5).
+- **Other users and programs are kept out.** A `0700` run folder and socket checked with `lstat`, or a Windows named pipe; a two-way HMAC proof of a 32-byte token (mode `0600`, never sent) before any relay frame is read. A wrong proof closes the channel.
+- **Not an open proxy.** Only `wss://` relays, each through the relay URL rule and the connect-time address check, re-run in the link; caps of 32 clients, 64 relays per client and 64 connections.
+- **Logins are never shared across IDs.** The shared connection is never logged in; an ID that must log in gets a connection of its own.
+- **Failure is fallback.** Any failure makes a program use its own connections, as before.
+- **Logs hold counts only** (I-7).
+
 ## Updates and sending
 
 - **Updater trust (D-145, D-151).** The desktop app installs an update only if it is signed by the one update key whose public half is pinned in the app. CI signs the manifest (SHA-256 of each file, channel, short validity, no downgrades) only after the owner's approval click in a protected environment. The app re-checks every signature and hash before it replaces itself. Updating never touches IDs, keys or messages.
@@ -174,6 +187,7 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 - **The proof gate is a guard, not a wall (0.5.14).** The KeyStore signs a proof record only with a one-time ticket made for exactly that record, and the generic signing path refuses proof records. The KeyStore cannot see the spending ledger, so the core decides when to ask for a ticket. This stops faulty or generic code paths from signing a proof by accident; it is not a boundary against a program running as the same OS user (G-1).
 - **Several computers on one ID.** Until multi-device support and the on-chain allowance, spending limits and sending caps apply per computer. The app and `agentlink doctor` say when the same ID sends from another computer; a computer that only receives is not seen, and after 7 days without a sighting the notice stays on until a verified contact message addressed to this computer's current key shows it is the one in use.
 - **Your own servers (new in 0.5.15; D-158; 04 §2.6, 07 §4.3).** Only the owner changes servers, with Touch ID or the master code and an owner signature; no AI tool, config value or link can (I-4). Each typed server is tested on this computer first (public `wss://` only, every address checked before a socket opens, a throwaway key, 10 tests a minute per app process), at least 2 of the owner's own must be ready, and the review says what servers can see. Old servers stay readable for 30 days. The "Don't also announce on the default servers" option, offered only with the automatic mix-in off, stops all traffic to the default servers except a server a contact lists; its cost (another computer finds the ID only with the owner link or a backup; contacts with an old copy of the details may miss the update) is stated before approval.
+- **IDs on one computer are linkable by a relay when sharing is on (new in 0.5.18; D-159; 04 §7).** Sharing one connection lets a relay see that the IDs on a computer belong together, as their shared IP address already hints; content, senders and recipients stay hidden. Off by default in 0.5.18; `AGENTLINK_SHARED_RELAYS=0` keeps separate connections afterwards.
 - **Old default relays.** During the 0.5.13 transition contacts that still list a dropped relay are reached there, and card updates also go there until 31 January 2027. Content stays end-to-end encrypted.
 - **Delivery not always confirmed.** A message that no relay serves back is reported as "Sent, availability unknown", not as confirmed.
 - **Limits that cannot be read.** If the stored limits cannot be read, every paid action needs the owner's approval and the per-proof ceiling still applies; when the spending record cannot be summed either, the daily total cannot be checked until the limits are saved again.
@@ -207,6 +221,7 @@ The decisions below shape the security mechanisms on this page and in 04; each f
 | D-81 | Revocation typed data and single-use owner nonces (05 §4) |
 | D-82 | The owner seed wraps `ALKP` (passkey) and `ALKR` (recovery code) (04 §2.3.1, §2.3.2) |
 | D-90 | Lifetimes of owner-signed objects, the rolling 24-hour budget window and per-contact proof rules (04 §2.5.1, 06 §3) |
+| D-159 | One shared connection per relay per computer: the local channel, its token proof and the rules above (04 §4, 07 §4.2) |
 | D-99 | An allowed folder may not contain a protected folder (04 §4) |
 | D-102, D-104 | Proof-pack verification: the agent card's proof of possession, owner approvals and receipt links (07 §8) |
 | D-106 | Card updates are sent only to contacts the policy allows, and none while the policy cannot be read |

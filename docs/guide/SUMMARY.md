@@ -57,6 +57,7 @@
   * [Update your contact details](local-app/update-contact-details.md)
   * [Under the hood](local-app/under-the-hood.md)
   * [Use your own servers](local-app/use-your-own-servers.md)
+  * [Shared server connection](local-app/shared-server-connection.md)
   * [Confirming paid actions](local-app/confirm-paid-actions.md)
 
 ## More everyday use
