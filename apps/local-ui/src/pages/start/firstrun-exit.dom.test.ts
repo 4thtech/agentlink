@@ -260,11 +260,16 @@ describe('FIRSTRUN-EXIT: Settings › Updates before an owner exists', () => {
     expect(host.textContent).toContain('AgentLink is up to date.');
   });
 
-  it('the Windows app: "Download the new version" to the stable latest setup, also when the read fails', async () => {
+  // WIN-UPDATE (owner, 21 Nov 2026): only when the check definitively could not run or failed.
+  it('the Windows app: "Download the new version" to the stable latest setup when the check fails or the read fails', async () => {
     expect(WINDOWS_SETUP_URL).toBe(
       'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe',
     );
-    for (const answer of [ok(view('idle', 'desktop')), { kind: 'offline' } as ApiResult<unknown>]) {
+    for (const answer of [
+      ok(view('failed', 'desktop')),
+      ok(view('offline', 'desktop')),
+      { kind: 'offline' } as ApiResult<unknown>,
+    ]) {
       const get = (): Promise<ApiResult<unknown>> => Promise.resolve(answer);
       await render(
         h(UpdatesPage, {
@@ -278,6 +283,22 @@ describe('FIRSTRUN-EXIT: Settings › Updates before an owner exists', () => {
       expect(dl?.getAttribute('href')).toBe(WINDOWS_SETUP_URL);
       expect(dl?.getAttribute('target')).toBe('_blank');
       expect(dl?.getAttribute('rel')).toBe('noopener noreferrer');
+    }
+  });
+
+  it('WIN-UPDATE: the Windows app: no download card while the check runs, or before one ran', async () => {
+    for (const state of ['checking', 'idle']) {
+      const get = (): Promise<ApiResult<unknown>> => Promise.resolve(ok(view(state, 'desktop')));
+      await render(
+        h(UpdatesPage, {
+          api: { get } as unknown as ApiClient,
+          pollMs: 0,
+          os: 'windows',
+          desktop: true,
+        }),
+      );
+      expect(host.textContent, state).toContain('You have AgentLink 0.5.5.');
+      expect(link(SETUP_EXIT.windowsDownload), state).toBeUndefined();
     }
   });
 
