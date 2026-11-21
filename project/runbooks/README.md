@@ -32,6 +32,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-22 | [First-run matrix (manual, real machines)](firstrun-matrix.md) | Owner, with a builder for the e2e | Sonnet |
 | RB-22 | [Classroom handout: students and teacher](classroom-handout.md) | Teacher and students | Any |
 | RB-23 | [Desktop update key: one-time setup, renewal and changing the key](desktop-update-keys.md) | Owner (Tali) only | Owner |
+| RB-24 | [Development-machine resources: worker limits, worktree cleanup, Spotlight, relay simulation](dev-machine-resources.md) | Orchestrator, every worker | Any |
 
 ## Template
 

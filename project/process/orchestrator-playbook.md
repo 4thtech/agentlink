@@ -28,7 +28,7 @@ Every build, fix, keeper merge, CI triage, review, doc edit, card edit and statu
 
 ## 2. Throughput rule
 
-- **Keep 8–15 workers running in parallel whenever work exists.**
+- **Keep up to 5 workers running in parallel whenever work exists, at most 2 of them test-heavy** (owner, 21 Nov 2026, after a machine hang; [RB-24](../runbooks/dev-machine-resources.md): check `uptime` first, `--maxWorkers=1`, delete worktrees after merge, never start Docker Desktop or browsers without the owner's OK). This replaces the earlier 8–15.
 - Queue babysitting (keepers, verifiers, reviewers on queued PRs) runs **alongside** new building, never instead of it.
 - When running workers drop below about **6**, pull the next batch. A **read-only scan worker** (Haiku 5.5) produces it: cards that are ready, unclaimed (sync board), have all dependencies done, and touch files disjoint from everything in flight. The orchestrator checks the batch against the board and launches.
 - **Blocked work gets a planning worker** (Opus 5.5) that writes the plan and the brief to a file, so the build starts the moment the blocker clears.
