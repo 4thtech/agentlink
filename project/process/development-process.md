@@ -147,7 +147,7 @@ The orchestrator's job is to **orchestrate, deploy workers and audit**, not to i
 | Targeted verification | The orchestrator verifies with targeted checks: re-run tests, CI status, `git diff --stat`, specific hunks (§5). |
 | Independent auditor | For S1/S2 it spawns an independent auditor worker (`audit-rules.md` §4) and does **not** read the entire diff itself. |
 | Files over context | Large outputs (test logs, diffs, reports) go to files and are read in slices (`grep`, `head`, line ranges). Specs are opened by section. |
-| Parallel and background | Independent workers run in parallel and in the background. Throughput rule (owner instruction 2026-10-23): keep 8–15 workers running whenever work exists, with queue babysitting alongside new building, and pull the next batch when fewer than about 6 run (playbook §2). |
+| Parallel and background | Independent workers run in parallel and in the background. Throughput rule (owner instruction 2026-10-23): keep up to 5 workers running whenever work exists (at most 2 test-heavy, owner 2026-11-21, RB-24), with queue babysitting alongside new building, and pull the next batch when fewer than about 3 run (playbook §2). |
 | Save at ~60% | At about 60% context use, the orchestrator saves the Curator handoff and its sync file, and suggests a fresh session to the owner. |
 | Never at the cost of safety | Context economy never skips a §5 step, an independent review or a gate. When a check is expensive, delegate it; do not drop it. |
 
