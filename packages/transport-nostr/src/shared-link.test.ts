@@ -21,12 +21,7 @@ import {
   SharedRelayConnector,
   type SharedRelayConnectorOptions,
 } from './shared-relay-connector.js';
-import {
-  MockNetwork,
-  PUBLIC_ADDRESS,
-  makeWrapEvent,
-  relayUrls,
-} from './testing/mock-network.js';
+import { MockNetwork, PUBLIC_ADDRESS, makeWrapEvent, relayUrls } from './testing/mock-network.js';
 import { memoryDialer, stalledDialer } from './testing/shared-link-memory.js';
 
 beforeEach(() => {
@@ -37,7 +32,9 @@ afterEach(() => {
 });
 
 const CLI = '0.5.18';
-const flush = (): Promise<void> => vi.advanceTimersByTimeAsync(0);
+const flush = async (): Promise<void> => {
+  await vi.advanceTimersByTimeAsync(0);
+};
 
 /** Counts sockets a connector has open at once (MockSocket.close does not call onClose). */
 function counting(inner: RelayConnector): { connector: RelayConnector; max: () => number } {
@@ -206,7 +203,7 @@ describe('subscription ids', () => {
     const forA = makeWrapEvent({ recipient: pA });
     net.inject(r1, forA);
     await flush();
-    expect(parsed(a).at(-1)).toEqual(['EVENT', 's1', forA]);
+    expect(parsed(a).at(-1)).toEqual(['EVENT', 's1', JSON.parse(JSON.stringify(forA))]);
     expect(parsed(b)).toEqual([['EOSE', 's1']]);
 
     a.socket.send(JSON.stringify(['CLOSE', 's1']));
@@ -295,9 +292,11 @@ describe('NIP-42 AUTH through the shared link', () => {
     const kc = await keys();
     const a = pool(shared(), { authKeys: ka.store, mayAuthenticate: () => true });
     const c = pool(shared(), { authKeys: kc.store, mayAuthenticate: () => false });
-    expect((await a.publish(makeWrapEvent(), [r1])).results[0]?.ok).toBe(true);
+    // C first: it gets the challenge on the shared connection but may not log in, so it fails.
     const outC = await c.publish(makeWrapEvent(), [r1]);
     expect(outC.results[0]?.ok).toBe(false);
+    expect((await a.publish(makeWrapEvent(), [r1])).results[0]?.ok).toBe(true);
+    expect(net.opens.filter((t) => t.url === r1)).toHaveLength(1);
     const logins = net.received
       .filter((f) => f.frame.startsWith('["AUTH"'))
       .map((f) => (JSON.parse(f.frame) as [string, { pubkey: string }])[1].pubkey);

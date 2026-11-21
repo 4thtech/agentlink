@@ -27,17 +27,20 @@ export function memoryDialer(mux: SharedLinkMux): { dial: SharedLinkDialer; link
   const dial: SharedLinkDialer = (handlers: SharedLinkChannelHandlers): SharedLinkChannel => {
     const link: MemoryLink = { toServer: [], toClient: [], closed: false, client: undefined };
     links.push(link);
+    // A close is delivered after the frames already sent, as a socket flushes before it ends.
+    let ending = false;
     const shut = (): void => {
-      if (link.closed) return;
-      link.closed = true;
+      if (ending) return;
+      ending = true;
       microtask(() => {
+        link.closed = true;
         link.client?.detach();
         handlers.onClose();
       });
     };
     link.client = mux.attach({
       send: (frame) => {
-        if (link.closed) throw new Error('channel closed');
+        if (ending) throw new Error('channel closed');
         link.toClient.push(frame);
         microtask(() => {
           if (!link.closed) handlers.onFrame(frame);
@@ -47,7 +50,7 @@ export function memoryDialer(mux: SharedLinkMux): { dial: SharedLinkDialer; link
     });
     return {
       send: (frame) => {
-        if (link.closed) throw new Error('channel closed');
+        if (ending) throw new Error('channel closed');
         link.toServer.push(frame);
         microtask(() => {
           if (!link.closed) link.client?.receive(frame);

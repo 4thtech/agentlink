@@ -321,7 +321,7 @@ export function relayOrigin(url: string): string {
 }
 
 /** Splits a validated relay URL into host and port without a URL parser (04 §4). */
-function relayParts(url: string): { host: string; port: number } | undefined {
+export function relayParts(url: string): { host: string; port: number } | undefined {
   const m = RELAY_PARTS.exec(url);
   if (m === null) return undefined;
   return { host: m[1] as string, port: m[2] === undefined ? 443 : Number(m[2]) };
