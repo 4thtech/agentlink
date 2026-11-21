@@ -410,6 +410,17 @@ describe('RELAY-DEFAULTS-SWAP (0.5.13): legacy relays are read, never published 
     expect([...net.stored.keys()].every((r) => DEFAULT_RELAYS.includes(r))).toBe(true);
   });
 
+  it('offchain.pub is read through the legacy list but never published to (0.5.17)', async () => {
+    expect(LEGACY_READ_RELAYS).toContain('wss://offchain.pub');
+    expect(DEFAULT_RELAYS).not.toContain('wss://offchain.pub');
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const b = await openAgent(2, 'bob', DEFAULT_RELAYS, net);
+    await pair(a, b);
+    expect((await a.client.sendMessage({ to: b.id, text: 'hi' })).status).toBe('ok');
+    expect(net.stored.get('wss://offchain.pub')).toBeUndefined();
+  });
+
   it('an old-invite contact is still reachable: its own list is used to send to it', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);

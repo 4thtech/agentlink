@@ -12,7 +12,7 @@ describe('DEFAULT_RELAYS (D-75)', () => {
   it('is the exported list and holds the four public relays of D-75', () => {
     expect(FROM_INDEX).toBe(DEFAULT_RELAYS);
     expect([...DEFAULT_RELAYS]).toEqual([
-      'wss://offchain.pub',
+      'wss://nostr.data.haus',
       'wss://relay.primal.net',
       'wss://relay.snort.social',
       'wss://nostr.bitcoiner.social',
@@ -39,9 +39,14 @@ describe('DEFAULT_RELAYS (D-75)', () => {
 });
 
 describe('LEGACY_READ_RELAYS (0.5.13 transition)', () => {
-  it('is the two replaced relays, read only, outside the defaults', () => {
+  it('is the three replaced relays, read only, outside the defaults', () => {
     expect(LEGACY_FROM_INDEX).toBe(LEGACY_READ_RELAYS);
-    expect([...LEGACY_READ_RELAYS]).toEqual(['wss://nos.lol', 'wss://nostr.mom']);
+    expect([...LEGACY_READ_RELAYS]).toEqual([
+      'wss://nos.lol',
+      'wss://nostr.mom',
+      'wss://offchain.pub',
+    ]);
+    expect(LEGACY_READ_RELAYS.filter((u) => DEFAULT_RELAYS.includes(u))).toEqual([]);
     for (const url of LEGACY_READ_RELAYS) {
       expect(DEFAULT_RELAYS).not.toContain(url);
       expect(isAllowedRelayUrl(url)).toBe(true);

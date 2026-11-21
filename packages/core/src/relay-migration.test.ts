@@ -70,3 +70,22 @@ describe('the migrated relay list', () => {
     expect(migratedRelays([...DEFAULT_RELAYS])).toEqual([...DEFAULT_RELAYS]);
   });
 });
+
+describe('offchain.pub to nostr.data.haus (0.5.17, owner decision 21 Nov 2026)', () => {
+  const CARD = ['wss://offchain.pub', 'wss://relay.primal.net', 'wss://relay.snort.social'];
+
+  it('a stored card listing offchain.pub needs the update', () => {
+    expect(needsRelayMigration(CARD)).toBe(true);
+    expect(needsRelayMigration([...DEFAULT_RELAYS])).toBe(false);
+  });
+
+  it('the migrated list drops offchain.pub, adds nostr.data.haus, keeps order, holds 2 to 16', () => {
+    const next = migratedRelays(CARD);
+    expect(next).not.toContain('wss://offchain.pub');
+    expect(next).toContain('wss://nostr.data.haus');
+    expect(next.slice(0, 2)).toEqual(['wss://relay.primal.net', 'wss://relay.snort.social']);
+    expect(next.length).toBeGreaterThanOrEqual(2);
+    expect(next.length).toBeLessThanOrEqual(16);
+    expect(new Set(next).size).toBe(next.length);
+  });
+});
