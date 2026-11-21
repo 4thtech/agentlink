@@ -8,7 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RelayConnector, RelaySocket, RelaySocketHandlers } from './relay-io.js';
 import { MAX_FRAME_BYTES, RelayPool, type RelayPoolOptions } from './relay-pool.js';
 import { SharedLinkMux, type SharedLinkMuxOptions } from './shared-link-mux.js';
-import { SHARED_LINK_VERSION, encodeLinkFrame } from './shared-link-protocol.js';
+import {
+  SHARED_LINK_VERSION,
+  decodeServerFrame,
+  encodeLinkFrame,
+  linkProof,
+} from './shared-link-protocol.js';
 import {
   FallbackConnector,
   SHARED_HANDSHAKE_TIMEOUT_MS,
@@ -435,7 +440,7 @@ describe('handshake and fallback to the program own connections', () => {
   });
 
   it('a protocol version mismatch is rejected and the channel closed', async () => {
-    const { server, token } = setup();
+    const { server } = setup();
     const sent: string[] = [];
     let closed = false;
     const client = server.attach({
@@ -445,15 +450,15 @@ describe('handshake and fallback to the program own connections', () => {
       },
     });
     client.receive(
-      encodeLinkFrame({ t: 'hello', v: SHARED_LINK_VERSION + 1, cli: CLI, token: encodeHex(token) }),
+      encodeLinkFrame({ t: 'hello', v: SHARED_LINK_VERSION + 1, cli: CLI, nonce: 'aa'.repeat(32) }),
     );
     await flush();
     expect(sent).toEqual([encodeLinkFrame({ t: 'reject', reason: 'version' })]);
     expect(closed).toBe(true);
   });
 
-  it('a wrong token is rejected, the channel closed, and nothing after it is read', async () => {
-    const { net, server } = setup();
+  it('proves the token both ways without sending it; a wrong proof closes before any relay frame', async () => {
+    const { net, server, token } = setup();
     const [r1] = relayUrls('tok', 1) as [string];
     net.configure(r1);
     const sent: string[] = [];
@@ -464,14 +469,53 @@ describe('handshake and fallback to the program own connections', () => {
         closed = true;
       },
     });
+    const cn = 'aa'.repeat(32);
+    client.receive(encodeLinkFrame({ t: 'hello', v: SHARED_LINK_VERSION, cli: CLI, nonce: cn }));
+    await flush();
+    const challenge = decodeServerFrame(sent[0]);
+    if (!challenge.ok || challenge.frame.t !== 'challenge') throw new Error('no challenge');
+    const sn = challenge.frame.nonce;
+    expect(challenge.frame.proof).toBe(linkProof(token, 'server', cn, sn));
+    expect(sent.join('')).not.toContain(encodeHex(token));
+    // A proof made with another token.
     client.receive(
-      encodeLinkFrame({ t: 'hello', v: SHARED_LINK_VERSION, cli: CLI, token: '00'.repeat(32) }),
+      encodeLinkFrame({ t: 'prove', proof: linkProof(randomBytes(32), 'client', cn, sn) }),
     );
     client.receive(encodeLinkFrame({ t: 'open', link: 1, url: r1 }));
     await flush();
-    expect(sent).toEqual([encodeLinkFrame({ t: 'reject', reason: 'token' })]);
+    expect(sent.slice(1)).toEqual([encodeLinkFrame({ t: 'reject', reason: 'token' })]);
     expect(closed).toBe(true);
     expect(net.opens).toHaveLength(0);
+  });
+
+  it('a right proof is accepted', async () => {
+    const { server, token } = setup();
+    const sent: string[] = [];
+    const client = server.attach({ send: (f) => sent.push(f), close: () => undefined });
+    const cn = 'cc'.repeat(32);
+    client.receive(encodeLinkFrame({ t: 'hello', v: SHARED_LINK_VERSION, cli: CLI, nonce: cn }));
+    await flush();
+    const challenge = decodeServerFrame(sent[0]);
+    if (!challenge.ok || challenge.frame.t !== 'challenge') throw new Error('no challenge');
+    client.receive(
+      encodeLinkFrame({ t: 'prove', proof: linkProof(token, 'client', cn, challenge.frame.nonce) }),
+    );
+    await flush();
+    expect(sent[1]).toBe(encodeLinkFrame({ t: 'accept', v: SHARED_LINK_VERSION }));
+  });
+
+  it('a link that cannot prove the token gets nothing from the program but the hello', async () => {
+    const { net, direct, links, shared, pool } = setup();
+    const [r1, r2] = relayUrls('impostor', 2) as [string, string];
+    for (const url of [r1, r2]) direct.configure(url);
+    const connector = shared({ token: randomBytes(32) });
+    expect((await pool(connector).publish(makeWrapEvent(), [r1, r2])).sent).toBe(true);
+    expect(connector.state).toBe('refused');
+    expect(net.opens).toHaveLength(0);
+    const types = links[0]?.toServer.map(
+      (f) => (JSON.parse(f.split('\n')[0] as string) as { t: string }).t,
+    );
+    expect(types).toEqual(['hello']);
   });
 
   it('a frame before the handshake closes the channel', async () => {
@@ -551,7 +595,7 @@ describe('handshake and fallback to the program own connections', () => {
 });
 
 describe('check lane (D-156 (7) on the shared link)', () => {
-  it('batches checks into one login-free connection per relay, at most one at a time', async () => {
+  it('batches one program checks into one login-free read per relay, at most one at a time', async () => {
     const net = new MockNetwork();
     const count = counting(net);
     const token = randomBytes(32);
@@ -571,10 +615,11 @@ describe('check lane (D-156 (7) on the shared link)', () => {
     net.inject(r1, e1);
     net.inject(r1, e2);
     const missing = 'ef'.repeat(32);
+    const one = make();
     const outcomes = await Promise.all([
-      make().checkServed(r1, e1.id),
-      make().checkServed(r1, e2.id),
-      make().checkServed(r1, missing),
+      one.checkServed(r1, e1.id),
+      one.checkServed(r1, e2.id),
+      one.checkServed(r1, missing),
     ]);
     expect(outcomes).toEqual(['served', 'served', 'missing']);
     expect(count.max()).toBe(1);
@@ -582,6 +627,36 @@ describe('check lane (D-156 (7) on the shared link)', () => {
     expect(reqs).toHaveLength(1);
     expect([...(reqs[0]?.filter.ids ?? [])].sort()).toEqual([e1.id, e2.id, missing].sort());
     expect(net.received.some((f) => f.frame.startsWith('["AUTH"'))).toBe(false);
+  });
+
+  it('never puts ids of different programs into one read (D-159 owner decision 1)', async () => {
+    const net = new MockNetwork();
+    const count = counting(net);
+    const token = randomBytes(32);
+    const server = new SharedLinkMux({
+      connector: count.connector,
+      addressCheck: { resolver: net },
+      token,
+      cliVersion: CLI,
+    });
+    const { dial } = memoryDialer(server);
+    const a = new SharedRelayConnector({ dial, token, cliVersion: CLI });
+    const b = new SharedRelayConnector({ dial, token, cliVersion: CLI });
+    const [r1] = relayUrls('apart', 1) as [string];
+    net.configure(r1);
+    const [e1, e2, e3] = [makeWrapEvent(), makeWrapEvent(), makeWrapEvent()];
+    for (const e of [e1, e2, e3]) net.inject(r1, e);
+    const outcomes = await Promise.all([
+      a.checkServed(r1, e1.id),
+      b.checkServed(r1, e3.id),
+      a.checkServed(r1, e2.id),
+    ]);
+    expect(outcomes).toEqual(['served', 'served', 'served']);
+    const reads = net.reqs(r1).map((r) => [...(r.filter.ids ?? [])].sort());
+    expect(reads).toHaveLength(2);
+    expect(reads).toContainEqual([e1.id, e2.id].sort());
+    expect(reads).toContainEqual([e3.id]);
+    expect(count.max()).toBe(1);
   });
 
   it('a check that arrives while one runs waits; still one check connection at a time', async () => {

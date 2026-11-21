@@ -6,22 +6,26 @@ import {
   LinkFrameReader,
   SHARED_LINK_MAX_FRAME_BYTES,
   SHARED_LINK_VERSION,
+  checkLinkProof,
   decodeClientFrame,
   decodeServerFrame,
   encodeLinkFrame,
   linkFrameBytes,
+  linkProof,
   type ClientFrame,
   type ServerFrame,
 } from './shared-link-protocol.js';
 
-const TOKEN = 'ab'.repeat(32);
+const NONCE = 'ab'.repeat(32);
+const PROOF = '12'.repeat(32);
 const URL_A = 'wss://relay-a.nostr-test.dev';
 const ID = 'cd'.repeat(32);
 
 describe('frame codec', () => {
   it('round-trips every client frame', () => {
     const frames: ClientFrame[] = [
-      { t: 'hello', v: SHARED_LINK_VERSION, cli: '0.5.18', token: TOKEN },
+      { t: 'hello', v: SHARED_LINK_VERSION, cli: '0.5.18', nonce: NONCE },
+      { t: 'prove', proof: PROOF },
       { t: 'open', link: 1, url: URL_A },
       { t: 'send', link: 1, data: '["REQ","s1",{"kinds":[1059]}]' },
       { t: 'send', link: 2, data: 'a\nb "quoted"  ' },
@@ -35,6 +39,7 @@ describe('frame codec', () => {
 
   it('round-trips every server frame', () => {
     const frames: ServerFrame[] = [
+      { t: 'challenge', v: SHARED_LINK_VERSION, nonce: NONCE, proof: PROOF },
       { t: 'accept', v: SHARED_LINK_VERSION },
       { t: 'reject', reason: 'version' },
       { t: 'reject', reason: 'token' },
@@ -68,8 +73,10 @@ describe('frame codec', () => {
       `{"t":"open","link":1.5,"url":"${secret}"}`,
       `{"t":"open","link":-1,"url":"${secret}"}`,
       '{"t":"open","link":1}',
-      '{"t":"hello","v":1,"cli":"0.5.18","token":"short"}',
-      `{"t":"hello","v":1,"cli":"${'9'.repeat(100)}","token":"${TOKEN}"}`,
+      '{"t":"hello","v":1,"cli":"0.5.18","nonce":"short"}',
+      `{"t":"hello","v":1,"cli":"0.5.18","token":"${NONCE}"}`,
+      `{"t":"hello","v":1,"cli":"${'9'.repeat(100)}","nonce":"${NONCE}"}`,
+      '{"t":"prove","proof":"zz"}',
       `{"t":"check","q":1,"url":"${secret}","id":"zz"}`,
       '{"t":"send","link":1}',
       '["send",1]',
@@ -101,6 +108,25 @@ describe('frame codec', () => {
       ok: false,
       reason: 'too_large',
     });
+  });
+});
+
+describe('token proof (04 §4 "Local relay link")', () => {
+  it('differs by side, by either nonce and by token, and never contains the token', () => {
+    const token = new Uint8Array(32).fill(7);
+    const other = new Uint8Array(32).fill(8);
+    const cn = 'aa'.repeat(32);
+    const sn = 'bb'.repeat(32);
+    const server = linkProof(token, 'server', cn, sn);
+    expect(server).toMatch(/^[0-9a-f]{64}$/);
+    expect(linkProof(token, 'server', cn, sn)).toBe(server);
+    expect(linkProof(token, 'client', cn, sn)).not.toBe(server);
+    expect(linkProof(token, 'server', sn, cn)).not.toBe(server);
+    expect(linkProof(other, 'server', cn, sn)).not.toBe(server);
+    expect(server).not.toContain('07'.repeat(32));
+    expect(checkLinkProof(token, 'server', cn, sn, server)).toBe(true);
+    expect(checkLinkProof(token, 'client', cn, sn, server)).toBe(false);
+    expect(checkLinkProof(token, 'server', cn, sn, 'zz')).toBe(false);
   });
 });
 
