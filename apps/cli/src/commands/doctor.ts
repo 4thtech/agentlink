@@ -92,9 +92,9 @@ export const DOCTOR_DEVICES_TEXT = Object.freeze({
  * never a problem. Counts only: never a path, a program's name or an ID (I-7).
  */
 export const DOCTOR_SHARED_LINK_TEXT = Object.freeze({
-  on: (programs: number): string =>
-    `OK       Shared server connection: on, ${String(programs)} programs\n` +
-    '         AgentLink programs on this computer share one connection to each server.',
+  on: (ids: number): string =>
+    `OK       Shared server connection: on, ${String(ids)} ${ids === 1 ? 'ID' : 'IDs'}\n` +
+    '         The IDs on this computer share one connection to each server.',
   own:
     'Notice   Shared server connection: on, but this program uses its own connections\n' +
     "         It's an older or newer version, or the connection couldn't be checked. Messages still work.",

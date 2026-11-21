@@ -623,16 +623,15 @@ D-159 (decided by Tali in chat, 21 Nov 2026: one connection per server for all A
 
 | Where | String |
 |---|---|
-| `agentlink doctor`, on | "OK       Shared server connection: on, {n} programs" · "AgentLink programs on this computer share one connection to each server." |
+| `agentlink doctor`, on | "OK       Shared server connection: on, {n} IDs" ("1 ID" when one) · "The IDs on this computer share one connection to each server." |
 | `agentlink doctor`, on, this program not on it | "Notice   Shared server connection: on, but this program uses its own connections" · "It's an older or newer version, or the connection couldn't be checked. Messages still work." |
 | `agentlink doctor`, off | "OK       Shared server connection: off" · in the first release, add "Turn it on with AGENTLINK_SHARED_RELAYS=1." |
-| Message network, Under the hood, on | "Shared server connection: on · {n} programs on this computer" |
+| Message network, Under the hood, on | "Shared server connection: on · {n} IDs on this computer" ("1 ID" when one) |
 | Message network, Under the hood, off | "Shared server connection: off · each program connects on its own" |
-| Server test, footnote when on | "Tested through this computer's shared connection." |
 
 **Rules.**
 - Say "server" and "connection", never "relay", "Nostr", "socket", "pipe" or "AUTH" (§5.1). The environment variable keeps its name; `--json` keys may say relay.
-- "Programs" counts AgentLink programs (the app and each AI app's AgentLink); never name them, their IDs or paths here.
+- The number counts IDs that use the shared connection (each ID has its own connection to it, so one AI app with 3 IDs counts 3), not programs; never name them, their IDs or paths here. The in-app server test shows no footnote about the shared connection (it only runs inside it; `POST /api/ui/network/test` still answers `sharedLink`, 08 §1).
 - Never claim the shared connection makes messages more private or faster; it only stops servers from turning extra connections away.
 
 ## 6. Surfaces and information architecture

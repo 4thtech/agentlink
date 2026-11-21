@@ -100,7 +100,7 @@ export const NETWORK_STRINGS = {
   lastChecked: (ago: string): string => `Last checked ${ago}`,
   /** RELAY-SHARED-CONN (11 §5.15): one line under the hood about the shared server connection. */
   sharedOn: (n: number): string =>
-    `Shared server connection: on · ${String(n)} programs on this computer`,
+    `Shared server connection: on · ${String(n)} ${n === 1 ? 'ID' : 'IDs'} on this computer`,
   sharedOff: 'Shared server connection: off · each program connects on its own',
   // The diagram (NET-DIAGRAM; owner's three columns: this ID, servers, contacts).
   diagramHeadThisId: 'This ID',
