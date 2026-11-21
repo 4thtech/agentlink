@@ -9,7 +9,7 @@ describe('the Message network server list', () => {
   it('lists the own servers, then the legacy read-only ones not already own, once each', () => {
     const own = ['wss://relay.primal.net', 'wss://a.example.org/path'];
     const list = networkServerList(own, LEGACY_READ_RELAYS);
-    expect(list.map((s) => s.kind)).toEqual(['own', 'own', 'legacy', 'legacy']);
+    expect(list.map((s) => s.kind)).toEqual(['own', 'own', 'legacy', 'legacy', 'legacy']);
     expect(list.map((s) => s.relay)).toEqual([...own, ...LEGACY_READ_RELAYS]);
     const overlap = networkServerList(
       [LEGACY_READ_RELAYS[0] as string, own[0] as string],
@@ -77,6 +77,7 @@ describe('contactReach (one pass: reach and per-server counts)', () => {
       'wss://a.example.org': 1,
       [LEGACY_READ_RELAYS[0] as string]: 1,
       [LEGACY_READ_RELAYS[1] as string]: 0,
+      [LEGACY_READ_RELAYS[2] as string]: 0,
     });
     expect(Object.keys(reach.perServer)).not.toContain('wss://other.example.net');
     expect(reads).toBe(4); // one list read per active contact

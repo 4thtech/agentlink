@@ -210,7 +210,7 @@ Codex, Gemini CLI, OpenCode and Antigravity: not available. AgentLink has not ve
 
 ## Default message network
 
-Messages travel over public Nostr relays that see only ciphertext (I-3). The default set, in this order, is `wss://offchain.pub`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.bitcoiner.social` (D-75 as amended in 0.5.13). The list lives in one place, `DEFAULT_RELAYS` in `@4thtech-io/transport-nostr`. The two earlier defaults, `nos.lol` and `nostr.mom`, are still read but never published to, until at least 2027-03-02. Choosing other relays for an agent is not available; an ID whose card still lists the earlier defaults moves to the current set with `agentlink owner update-contact-details` (or "Update your contact details" in the app).
+Messages travel over public Nostr relays that see only ciphertext (I-3). The default set, in this order, is `wss://nostr.data.haus`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.bitcoiner.social` (D-75 as amended in 0.5.13 and 0.5.17). The list lives in one place, `DEFAULT_RELAYS` in `@4thtech-io/transport-nostr`. The earlier defaults, `nos.lol`, `nostr.mom` and (since 0.5.17) `offchain.pub`, are still read but never published to, until at least 2027-03-02. Choosing other relays for an agent is not available; an ID whose card still lists the earlier defaults moves to the current set with `agentlink owner update-contact-details` (or "Update your contact details" in the app).
 
 ## Tools and approval prompts
 
