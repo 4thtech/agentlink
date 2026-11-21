@@ -23,6 +23,8 @@ Section references such as (04 §4) point into the source spec. A "Residual" nam
 | **Consumer storage account compromise or over-broad OAuth scope** | Minimal scopes (app folder or app-created files); tokens only in the OS keychain, never sent to 4thTech or logged; ciphertext only, and hash checks detect replacement; the owner can revoke the app at the provider (D-49, 07 §5.5) |
 | **Malicious submitter** | Cannot alter signed records; can only censor, so the client fails over to another submitter or direct mode |
 | **Network observer** | TLS everywhere; content already end-to-end encrypted |
+| **IDs on one computer linked through the shared relay link** (planned, D-159; not in a release yet) | When it ships, the AgentLink programs on one computer share one connection per server, so a server can tell their IDs belong together; they already share the computer's IP address. Message content, senders and recipients stay hidden as before. `AGENTLINK_SHARED_RELAYS=0` gives each program its own connections (04 §7) |
+| **Another user or program misuses the local relay link** (planned, D-159; not in a release yet) | A private run folder and socket owned by the user, or on Windows a named pipe, and a two-way token proof before anything is read; only checked public `wss://` servers; caps; any failure falls back to the program's own connections. Keys never cross the channel (04 §4) |
 
 ## Counterparties and content
 

@@ -4,12 +4,16 @@
 // over the local channel (shared-link-protocol.ts), so each relay sees one connection per computer.
 //
 // What it does, and no more:
-// - one upstream connection per relay, shared by every program (virtual link) that opens it;
+// - one unauthenticated upstream connection per relay, shared by every program (virtual link) that
+//   opens it. An authenticated connection is never shared across IDs: the shared connection never
+//   carries a login (no challenge is passed on from it, no AUTH is sent on it); when the relay answers
+//   a link with `auth-required:` and its program may log in there, that link moves to a connection of
+//   its own (its subscriptions are replayed there), gets that connection's challenge, and its program
+//   signs its own login on it, so no other program's events or subscriptions ever ride on it;
 // - subscription ids are rewritten per virtual link (`c<n>:<id>`) on REQ, COUNT and CLOSE, and the
 //   prefix is stripped on EVENT, EOSE, CLOSED and COUNT, so a program never sees another's frames;
 // - OK goes, by event id, only to the link(s) that sent that event or login;
-// - the relay's AUTH challenge goes to every link on that relay (and is replayed to a link that joins
-//   later); each program signs its own login with its own key, under its own policy. Keys, seeds and
+// - each program signs its own login with its own key, under its own policy. Keys, seeds and
 //   plaintext never cross the channel: only signed events and relay URLs do (I-1, I-2);
 // - NOTICE goes to every link on that relay;
 // - not an open proxy (04 §4): every relay URL is re-checked with the relay URL rule and the address
@@ -99,24 +103,33 @@ export interface SharedLinkMuxOptions {
   readonly addressCheck: AddressCheck;
   /** The 32-byte secret a program must present in the handshake. */
   readonly token: Uint8Array;
-  /** This build's CLI version. */
+  /**
+   * This build's CLI version. Programs share by protocol version only (SHARED_LINK_VERSION); CLI
+   * versions are counted for `doctor`, never a reason to refuse.
+   */
   readonly cliVersion: string;
-  /** Which program versions may share (default: exactly `cliVersion`). */
-  readonly acceptCliVersion?: (version: string) => boolean;
   readonly logger?: Logger;
   readonly timers?: Timers;
   readonly maxClients?: number;
   /** Distinct relays one program may use through the link (default MAX_CONNECTIONS). */
   readonly maxRelaysPerClient?: number;
   readonly maxLinksPerClient?: number;
-  /** Shared relay connections in total (default MAX_CONNECTIONS, 64; D-159). Check connections have their own cap. */
+  /**
+   * Relay connections in total, shared and own (logged-in) ones (default MAX_CONNECTIONS, 64;
+   * D-159). Check connections have their own cap.
+   */
   readonly maxUpstreams?: number;
 }
 
 /** Counts only (I-7). */
 export interface SharedLinkStats {
   readonly clients: number;
+  /** Ready programs by CLI version. */
+  readonly cliVersions: Readonly<Record<string, number>>;
+  /** Relay connections, shared and own. */
   readonly upstreams: number;
+  /** Of those, connections of one link that logs in there. */
+  readonly ownUpstreams: number;
   readonly checkSockets: number;
   /** Virtual links refused by the relay URL rule or the address check. */
   readonly refused: number;
@@ -141,6 +154,8 @@ interface Client {
   /** Both handshake nonces (hex), between `hello` and `prove`. */
   nonces: { client: string; server: string } | undefined;
   checks: number;
+  /** The program's CLI version, for counts only. */
+  cli: string | undefined;
 }
 
 interface VLink {
@@ -149,14 +164,23 @@ interface VLink {
   readonly client: Client;
   readonly id: number;
   readonly url: string;
-  readonly upstream: Upstream;
+  /** The shared connection, or this link's own one after it moved to log in. */
+  upstream: Upstream;
+  /** The program may log in on this relay (its `mayAuthenticate`). */
+  readonly auth: boolean;
   opened: boolean;
   /** The program's sub id to the rewritten one. */
   readonly subs: Map<string, string>;
+  /** The program's sub id to its rewritten REQ or COUNT frame, replayed when the link moves. */
+  readonly reqs: Map<string, string>;
+  /** Frames from the program while its own connection opens (bounded). */
+  readonly pending: string[];
 }
 
 interface Upstream {
   readonly url: string;
+  /** A connection of one link that logs in on it; never shared. */
+  readonly own: boolean;
   state: 'connecting' | 'open' | 'closed';
   socket: RelaySocket | undefined;
   readonly links: Set<VLink>;
@@ -205,6 +229,16 @@ const eventId = (value: unknown): string | undefined => {
   return typeof id === 'string' && HEX_32.test(id) ? id : undefined;
 };
 
+/** A relay's `auth-required:` prefix (NIP-42), read on OK and CLOSED messages only. */
+const authRequired = (message: unknown): boolean =>
+  typeof message === 'string' && message.startsWith('auth-required:');
+
+/** The program's own sub id for a rewritten one. */
+const subOf = (link: { subs: Map<string, string> }, rewritten: string): string => {
+  for (const [orig, value] of link.subs) if (value === rewritten) return orig;
+  return rewritten;
+};
+
 const verifies = (event: unknown): boolean => {
   try {
     return verifyNostrEvent(event as NostrEvent);
@@ -217,7 +251,6 @@ export class SharedLinkMux {
   private readonly connector: RelayConnector;
   private readonly addressCheck: AddressCheck;
   private readonly token: Uint8Array;
-  private readonly acceptCli: (version: string) => boolean;
   private readonly logger: Logger | undefined;
   private readonly timers: Timers;
   private readonly maxClients: number;
@@ -226,6 +259,7 @@ export class SharedLinkMux {
   private readonly maxUpstreams: number;
   private readonly clients = new Set<Client>();
   private readonly upstreams = new Map<string, Upstream>();
+  private readonly ownUpstreams = new Set<Upstream>();
   private readonly lanes = new Map<string, Lane>();
   private checkSockets = 0;
   private linkSeq = 0;
@@ -245,8 +279,6 @@ export class SharedLinkMux {
     this.connector = options.connector;
     this.addressCheck = options.addressCheck;
     this.token = options.token.slice();
-    const cli = options.cliVersion;
-    this.acceptCli = options.acceptCliVersion ?? ((version) => version === cli);
     this.logger = options.logger;
     this.timers = options.timers ?? defaultTimers;
     this.maxClients = options.maxClients ?? SHARED_LINK_MAX_CLIENTS;
@@ -257,9 +289,17 @@ export class SharedLinkMux {
 
   /** Counts for `doctor` and tests. Never a URL or an id. */
   stats(): SharedLinkStats {
+    const cliVersions: Record<string, number> = {};
+    for (const client of this.clients) {
+      if (client.state === 'ready' && client.cli !== undefined) {
+        cliVersions[client.cli] = (cliVersions[client.cli] ?? 0) + 1;
+      }
+    }
     return {
       clients: this.clients.size,
-      upstreams: this.upstreams.size,
+      cliVersions,
+      upstreams: this.upstreams.size + this.ownUpstreams.size,
+      ownUpstreams: this.ownUpstreams.size,
       checkSockets: this.checkSockets,
       refused: this.counts.refused,
       limited: this.counts.limited,
@@ -277,6 +317,7 @@ export class SharedLinkMux {
       helloTimer: undefined,
       nonces: undefined,
       checks: 0,
+      cli: undefined,
     };
     const handle: SharedLinkClient = {
       receive: (frame) => this.receive(client, frame),
@@ -329,7 +370,7 @@ export class SharedLinkMux {
     const frame = decoded.frame;
     switch (frame.t) {
       case 'open':
-        this.open(client, frame.link, frame.url);
+        this.open(client, frame.link, frame.url, frame.auth ?? true);
         return;
       case 'send': {
         const link = client.links.get(frame.link);
@@ -351,10 +392,12 @@ export class SharedLinkMux {
   }
 
   private hello(client: Client, frame: Extract<ClientFrame, { t: 'hello' }>): void {
-    if (frame.v !== SHARED_LINK_VERSION || !this.acceptCli(frame.cli)) {
+    // Protocol version only (D-159): CLI versions differ between npx versions and still share.
+    if (frame.v !== SHARED_LINK_VERSION) {
       this.reject(client, 'version');
       return;
     }
+    client.cli = frame.cli;
     const serverNonce = encodeHex(randomBytes(32));
     client.nonces = { client: frame.nonce, server: serverNonce };
     client.state = 'prove';
@@ -427,9 +470,13 @@ export class SharedLinkMux {
     this.logger?.debug('shared relay link dropped a frame', { reason });
   }
 
+  private upstreamCount(): number {
+    return this.upstreams.size + this.ownUpstreams.size;
+  }
+
   // --- virtual links -----------------------------------------------------------------------------
 
-  private open(client: Client, id: number, url: string): void {
+  private open(client: Client, id: number, url: string, auth: boolean): void {
     if (client.links.has(id)) {
       this.drop('malformed');
       return;
@@ -455,12 +502,12 @@ export class SharedLinkMux {
     }
     let upstream = this.upstreams.get(url);
     if (upstream === undefined) {
-      if (this.upstreams.size >= this.maxUpstreams) {
+      if (this.upstreamCount() >= this.maxUpstreams) {
         this.counts.limited += 1;
         closeAt('limit');
         return;
       }
-      upstream = this.connectUpstream(url);
+      upstream = this.connectUpstream(url, false);
     }
     this.linkSeq = (this.linkSeq + 1) % Number.MAX_SAFE_INTEGER;
     const link: VLink = {
@@ -469,8 +516,11 @@ export class SharedLinkMux {
       id,
       url,
       upstream,
+      auth,
       opened: false,
       subs: new Map(),
+      reqs: new Map(),
+      pending: [],
     };
     client.links.set(id, link);
     upstream.links.add(link);
@@ -481,25 +531,59 @@ export class SharedLinkMux {
     if (link.opened) return;
     link.opened = true;
     this.sendTo(link.client, { t: 'opened', link: link.id });
-    const challenge = link.upstream.challenge;
-    if (challenge !== undefined) this.toLink(link, JSON.stringify(['AUTH', challenge]));
+  }
+
+  /** Leaves `upstream`: its subscriptions there end, and an upstream with no link left closes. */
+  private leave(link: VLink, upstream: Upstream): void {
+    if (!upstream.links.delete(link)) return;
+    for (const rewritten of link.subs.values()) {
+      if (upstream.subs.get(rewritten)?.link !== link) continue;
+      upstream.subs.delete(rewritten);
+      this.toRelay(upstream, JSON.stringify(['CLOSE', rewritten]));
+    }
+    for (const [id, senders] of upstream.oks) {
+      senders.delete(link);
+      if (senders.size === 0) upstream.oks.delete(id);
+    }
+    if (upstream.links.size === 0) this.endUpstream(upstream, 'closed');
   }
 
   /** A link ends (the program closed it, or left): its subscriptions end upstream too. */
   private unlink(link: VLink): void {
     const { client, upstream } = link;
     if (client.links.get(link.id) === link) client.links.delete(link.id);
-    if (!upstream.links.delete(link)) return;
-    for (const rewritten of link.subs.values()) {
-      upstream.subs.delete(rewritten);
-      this.toRelay(upstream, JSON.stringify(['CLOSE', rewritten]));
-    }
+    this.leave(link, upstream);
     link.subs.clear();
-    for (const [id, senders] of upstream.oks) {
-      senders.delete(link);
-      if (senders.size === 0) upstream.oks.delete(id);
+    link.reqs.clear();
+    link.pending.length = 0;
+  }
+
+  /**
+   * The relay asked this link's program to log in, on the shared connection. A program that may log
+   * in there moves to a connection of its own (never shared, D-159), and gets that connection's
+   * challenge; its subscriptions are replayed there. A program that may not stays on the shared
+   * connection, which is never logged in. At the connection cap it stays too, and cannot log in.
+   */
+  private moveToOwn(link: VLink): void {
+    const from = link.upstream;
+    if (from.own || !link.auth || from.state === 'closed') return;
+    if (this.upstreamCount() >= this.maxUpstreams) {
+      this.counts.limited += 1;
+      return;
     }
-    if (upstream.links.size === 0) this.endUpstream(upstream, 'closed');
+    const own = this.connectUpstream(link.url, true);
+    // Keep the shared connection's pending OKs for this link: answers already on their way still
+    // route to it by event id (oks are not tied to `link.upstream`).
+    for (const rewritten of link.subs.values()) {
+      if (from.subs.get(rewritten)?.link !== link) continue;
+      from.subs.delete(rewritten);
+      this.toRelay(from, JSON.stringify(['CLOSE', rewritten]));
+      own.subs.set(rewritten, { link, orig: subOf(link, rewritten) });
+    }
+    from.links.delete(link);
+    link.upstream = own;
+    own.links.add(link);
+    if (from.links.size === 0) this.endUpstream(from, 'closed');
   }
 
   private toLink(link: VLink, data: string): void {
@@ -509,9 +593,10 @@ export class SharedLinkMux {
 
   // --- upstream connections ----------------------------------------------------------------------
 
-  private connectUpstream(url: string): Upstream {
+  private connectUpstream(url: string, own: boolean): Upstream {
     const upstream: Upstream = {
       url,
+      own,
       state: 'connecting',
       socket: undefined,
       links: new Set(),
@@ -521,7 +606,8 @@ export class SharedLinkMux {
       failure: undefined,
       timer: undefined,
     };
-    this.upstreams.set(url, upstream);
+    if (own) this.ownUpstreams.add(upstream);
+    else this.upstreams.set(url, upstream);
     upstream.timer = this.timers.setTimeout(() => {
       upstream.timer = undefined;
       if (upstream.state === 'connecting') this.endUpstream(upstream, 'connect');
@@ -536,13 +622,7 @@ export class SharedLinkMux {
         }
         try {
           upstream.socket = this.connector.open(target, {
-            onOpen: () => {
-              if (upstream.state !== 'connecting') return;
-              upstream.state = 'open';
-              if (upstream.timer !== undefined) this.timers.clearTimeout(upstream.timer);
-              upstream.timer = undefined;
-              for (const link of [...upstream.links]) this.markOpened(link);
-            },
+            onOpen: () => this.upstreamOpened(upstream),
             onMessage: (data) => this.fromRelay(upstream, data),
             onClose: () => this.endUpstream(upstream, upstream.failure ?? 'closed'),
             onFailure: (kind) => {
@@ -559,6 +639,22 @@ export class SharedLinkMux {
       () => this.endUpstream(upstream, 'connect'),
     );
     return upstream;
+  }
+
+  private upstreamOpened(upstream: Upstream): void {
+    if (upstream.state !== 'connecting') return;
+    upstream.state = 'open';
+    if (upstream.timer !== undefined) this.timers.clearTimeout(upstream.timer);
+    upstream.timer = undefined;
+    for (const link of [...upstream.links]) {
+      this.markOpened(link);
+      if (!upstream.own) continue;
+      // A link that moved here: its subscriptions again, then what it sent meanwhile.
+      for (const req of link.reqs.values()) this.toRelay(upstream, req);
+      for (const text of link.pending.splice(0)) this.fromProgram(link, text);
+      const challenge = upstream.challenge;
+      if (challenge !== undefined) this.toLink(link, JSON.stringify(['AUTH', challenge]));
+    }
   }
 
   /** 07 §4.2 steps 1 to 3, again, here: the program's claimed address is never used. */
@@ -588,11 +684,15 @@ export class SharedLinkMux {
     if (upstream.timer !== undefined) this.timers.clearTimeout(upstream.timer);
     upstream.timer = undefined;
     if (this.upstreams.get(upstream.url) === upstream) this.upstreams.delete(upstream.url);
+    this.ownUpstreams.delete(upstream);
     this.closeSocket(upstream.socket);
     for (const link of [...upstream.links]) {
       upstream.links.delete(link);
       if (link.client.links.get(link.id) === link) link.client.links.delete(link.id);
-      this.sendTo(link.client, { t: 'closed', link: link.id, why });
+      link.pending.length = 0;
+      if (link.opened || !upstream.own) {
+        this.sendTo(link.client, { t: 'closed', link: link.id, why });
+      }
     }
     upstream.subs.clear();
     upstream.oks.clear();
@@ -618,6 +718,12 @@ export class SharedLinkMux {
   /** A program's relay frame: only the head is read; subscription ids are rewritten. */
   private fromProgram(link: VLink, data: string): void {
     const upstream = link.upstream;
+    if (link.opened && upstream.own && upstream.state === 'connecting') {
+      // Its own connection is opening: hold the frame (bounded), send it once open.
+      if (link.pending.length < SHARED_LINK_MAX_SUBS_PER_LINK) link.pending.push(data);
+      else this.drop('unrouted');
+      return;
+    }
     if (!link.opened || upstream.state !== 'open') {
       this.drop('unrouted');
       return;
@@ -644,9 +750,11 @@ export class SharedLinkMux {
           this.toLink(link, JSON.stringify(['CLOSED', sub, 'error: shared link limit']));
           return;
         }
+        const text = JSON.stringify([frame[0], rewritten, ...frame.slice(2)]);
         link.subs.set(sub, rewritten);
+        if (frame[0] === 'REQ') link.reqs.set(sub, text);
         upstream.subs.set(rewritten, { link, orig: sub });
-        this.toRelay(upstream, JSON.stringify([frame[0], rewritten, ...frame.slice(2)]));
+        this.toRelay(upstream, text);
         return;
       }
       case 'CLOSE': {
@@ -657,6 +765,7 @@ export class SharedLinkMux {
           return;
         }
         link.subs.delete(sub as string);
+        link.reqs.delete(sub as string);
         upstream.subs.delete(rewritten);
         this.toRelay(upstream, JSON.stringify(['CLOSE', rewritten]));
         return;
@@ -666,6 +775,13 @@ export class SharedLinkMux {
         const id = eventId(frame[1]);
         if (id === undefined) {
           this.drop('malformed');
+          return;
+        }
+        if (frame[0] === 'AUTH' && !upstream.own) {
+          // Never a login on the shared connection (D-159): it would cover every program on it.
+          this.drop('unrouted');
+          this.toLink(link, JSON.stringify(['OK', id, false, 'restricted: shared connection']));
+          this.moveToOwn(link);
           return;
         }
         let senders = upstream.oks.get(id);
@@ -710,8 +826,12 @@ export class SharedLinkMux {
         if (frame[0] === 'CLOSED') {
           upstream.subs.delete(frame[1] as string);
           sub.link.subs.delete(sub.orig);
+          sub.link.reqs.delete(sub.orig);
         }
         this.toLink(sub.link, JSON.stringify([frame[0], sub.orig, ...frame.slice(2)]));
+        if (frame[0] === 'CLOSED' && !upstream.own && authRequired(frame[2])) {
+          this.moveToOwn(sub.link);
+        }
         return;
       }
       case 'OK': {
@@ -723,6 +843,9 @@ export class SharedLinkMux {
         }
         upstream.oks.delete(id as string);
         for (const link of senders) this.toLink(link, data);
+        if (!upstream.own && frame[2] === false && authRequired(frame[3])) {
+          for (const link of senders) if (link.upstream === upstream) this.moveToOwn(link);
+        }
         return;
       }
       case 'AUTH': {
@@ -735,6 +858,8 @@ export class SharedLinkMux {
           this.drop('malformed');
           return;
         }
+        // The shared connection's challenge is never passed on: nobody logs in there.
+        if (!upstream.own) return;
         upstream.challenge = challenge;
         for (const link of [...upstream.links]) this.toLink(link, data);
         return;

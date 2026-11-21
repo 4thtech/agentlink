@@ -94,6 +94,11 @@ export interface SharedRelayConnectorOptions {
   readonly handshakeTimeoutMs?: number;
   /** Default SHARED_LINK_RETRY_MS. */
   readonly retryAfterMs?: number;
+  /**
+   * The pool's own `mayAuthenticate` (07 §4.3). A relay where it says no is never given a
+   * connection of its own for a login. Absent: every relay may be (the link then decides on demand).
+   */
+  readonly mayAuthenticate?: (relayUrl: string) => boolean;
 }
 
 type Fallback = (handlers: RelaySocketHandlers) => RelaySocket;
@@ -170,6 +175,7 @@ export class SharedRelayConnector implements RelayConnector {
   private readonly now: () => number;
   private readonly handshakeTimeoutMs: number;
   private readonly retryAfterMs: number;
+  private readonly mayAuthenticate: ((relayUrl: string) => boolean) | undefined;
   private current: SharedLinkState = 'idle';
   private channel: SharedLinkChannel | undefined;
   private nonce: string | undefined;
@@ -193,6 +199,7 @@ export class SharedRelayConnector implements RelayConnector {
     this.now = options.now ?? (() => Date.now());
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? SHARED_HANDSHAKE_TIMEOUT_MS;
     this.retryAfterMs = options.retryAfterMs ?? SHARED_LINK_RETRY_MS;
+    this.mayAuthenticate = options.mayAuthenticate;
   }
 
   get state(): SharedLinkState {
@@ -375,7 +382,13 @@ export class SharedRelayConnector implements RelayConnector {
 
   private sendOpen(link: Link): void {
     link.sentOpen = true;
-    this.send({ t: 'open', link: link.id, url: link.url });
+    let auth: boolean;
+    try {
+      auth = this.mayAuthenticate?.(link.url) ?? true;
+    } catch {
+      auth = false; // a failing policy hook never grants a login
+    }
+    this.send({ t: 'open', link: link.id, url: link.url, auth: auth === true });
   }
 
   private sendCheck(check: PendingCheck): void {

@@ -56,7 +56,16 @@ export type SharedCheckAnswer = 'found' | 'missing' | 'unchecked';
 export type ClientFrame =
   | { readonly t: 'hello'; readonly v: number; readonly cli: string; readonly nonce: string }
   | { readonly t: 'prove'; readonly proof: string }
-  | { readonly t: 'open'; readonly link: number; readonly url: string }
+  | {
+      readonly t: 'open';
+      readonly link: number;
+      readonly url: string;
+      /**
+       * Whether this program may log in on this relay (its `mayAuthenticate`). Absent: it may. A
+       * program that may log in moves to a connection of its own when the relay asks for a login.
+       */
+      readonly auth?: boolean;
+    }
   | { readonly t: 'send'; readonly link: number; readonly data: string }
   | { readonly t: 'close'; readonly link: number }
   | { readonly t: 'check'; readonly q: number; readonly url: string; readonly id: string };
@@ -173,10 +182,18 @@ export function decodeClientFrame(text: unknown): LinkDecodeResult<ClientFrame> 
       if (!noData || !hasKeys(h, ['t', 'proof'])) return fail('malformed');
       if (typeof h.proof !== 'string' || !HEX_32.test(h.proof)) return fail('malformed');
       return { ok: true, frame: { t: 'prove', proof: h.proof } };
-    case 'open':
-      if (!noData || !hasKeys(h, ['t', 'link', 'url']) || !isId(h.link) || !isUrl(h.url))
-        return fail('malformed');
-      return { ok: true, frame: { t: 'open', link: h.link, url: h.url } };
+    case 'open': {
+      const withAuth = hasKeys(h, ['t', 'link', 'url', 'auth']);
+      if (!noData || !(withAuth || hasKeys(h, ['t', 'link', 'url']))) return fail('malformed');
+      if (!isId(h.link) || !isUrl(h.url)) return fail('malformed');
+      if (withAuth && typeof h.auth !== 'boolean') return fail('malformed');
+      return {
+        ok: true,
+        frame: withAuth
+          ? { t: 'open', link: h.link, url: h.url, auth: h.auth as boolean }
+          : { t: 'open', link: h.link, url: h.url },
+      };
+    }
     case 'send':
       if (noData || !hasKeys(h, ['t', 'link']) || !isId(h.link)) return fail('malformed');
       return { ok: true, frame: { t: 'send', link: h.link, data } };

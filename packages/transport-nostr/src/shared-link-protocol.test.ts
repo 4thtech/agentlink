@@ -27,6 +27,7 @@ describe('frame codec', () => {
       { t: 'hello', v: SHARED_LINK_VERSION, cli: '0.5.18', nonce: NONCE },
       { t: 'prove', proof: PROOF },
       { t: 'open', link: 1, url: URL_A },
+      { t: 'open', link: 2, url: URL_A, auth: false },
       { t: 'send', link: 1, data: '["REQ","s1",{"kinds":[1059]}]' },
       { t: 'send', link: 2, data: 'a\nb "quoted"  ' },
       { t: 'close', link: 1 },
