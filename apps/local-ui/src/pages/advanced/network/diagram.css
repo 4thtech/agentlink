@@ -104,12 +104,18 @@
 .nwd-person {
   display: inline-flex;
   align-items: center;
-  gap: var(--al-space-2);
+  gap: var(--al-space-1);
+}
+.nwd-legend {
+  column-gap: var(--al-space-3);
+}
+.nwd-legend li {
+  white-space: nowrap;
 }
 .nwd-key,
 .nwd-conn {
   display: inline-block;
-  inline-size: 22px;
+  inline-size: 16px;
   border-block-start: 2px solid var(--nc, var(--al-color-status-success-icon));
 }
 .nwd-key.is-old {

@@ -688,16 +688,17 @@ function Reach({
                 {S.contactServers(c.servers, c.shared)}
               </div>
               <ul className="nw-hosts al-text-code al-muted">
-                {c.hosts.map((h) => (
-                  <li
-                    key={h}
-                    title={h}
-                    className={answer.servers.some((s) => s.host === h) ? 'is-shared' : ''}
-                  >
-                    {h}
-                    {answer.servers.some((s) => s.host === h) ? ` · ${S.shared}` : ''}
-                  </li>
-                ))}
+                {c.hosts.map((h) => {
+                  const mine = answer.servers.find((s) => s.host === h);
+                  const tag =
+                    mine === undefined ? S.notShared : mine.kind === 'legacy' ? S.oldReadOnly : '';
+                  return (
+                    <li key={h} title={h} className={mine?.kind === 'own' ? 'is-shared' : ''}>
+                      {h}
+                      {tag === '' ? '' : ` · ${tag}`}
+                    </li>
+                  );
+                })}
               </ul>
             </li>
           ))}

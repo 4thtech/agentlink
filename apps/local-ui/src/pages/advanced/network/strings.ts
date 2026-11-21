@@ -94,7 +94,8 @@ export const NETWORK_STRINGS = {
   contactsFailed: "Couldn't read your contacts' servers. Try again in a moment.",
   contactServers: (servers: number, shared: number): string =>
     `${String(servers)} ${servers === 1 ? 'server' : 'servers'} · ${String(shared)} shared with you`,
-  shared: 'shared',
+  notShared: 'not shared',
+  oldReadOnly: 'old, read only',
   someoneUnknown: 'A contact',
   lastChecked: (ago: string): string => `Last checked ${ago}`,
   // The diagram (NET-DIAGRAM; owner's three columns: this ID, servers, contacts).

@@ -391,7 +391,9 @@ describe('Message network view: contacts', () => {
     const items = [...host.querySelectorAll('.nw-contact')].map((li) => li.textContent);
     expect(items[0]).toContain('Natasa');
     expect(items[0]).toContain(S.contactServers(3, 1));
-    expect(items[0]).toContain('relay.primal.net · shared');
+    // Servers you share carry no label; ones you do not share say so.
+    expect(items[0]).not.toContain('relay.primal.net · shared');
+    expect(items[0]).toContain('nostr.wine · not shared');
     expect(items[0]).toContain('nostr.wine');
     // A contact the Contacts page does not know: no ref or id is shown.
     expect(items[1]).toContain(S.someoneUnknown);
@@ -405,6 +407,48 @@ describe('Message network view: contacts', () => {
     expect(cards[0]).toContain(S.usedBy(1));
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(toggle.textContent).toContain(S.hideContacts);
+  });
+
+  it('labels a contact\'s old read-only server "old, read only", not "shared"', async () => {
+    const withOld = (c: boolean): ApiResult<unknown> =>
+      ok(
+        c
+          ? answer({
+              servers: [
+                { ...server(), host: 'relay.primal.net' },
+                { ...server(), host: 'nos.lol', kind: 'legacy', sends: false },
+              ],
+              contactHosts: [
+                {
+                  ref: REF,
+                  servers: 3,
+                  shared: 1,
+                  hosts: ['relay.primal.net', 'nos.lol', 'x.example.net'],
+                },
+              ],
+            })
+          : answer(),
+      );
+    await act(async () =>
+      root.render(
+        h(NetworkView, {
+          read: (c: boolean) => Promise.resolve(withOld(c)),
+          readContacts: () => Promise.resolve(contacts()),
+          now: () => NOW,
+          online: () => true,
+        }),
+      ),
+    );
+    await flush();
+    const toggle = [...host.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes(S.showContacts),
+    ) as HTMLButtonElement;
+    await act(async () => toggle.click());
+    await flush();
+    const item = host.querySelector('.nw-contact')?.textContent ?? '';
+    expect(item).toContain('nos.lol · old, read only');
+    expect(item).toContain('x.example.net · not shared');
+    expect(item).not.toContain('· shared');
   });
 
   it('an injected <img onerror> host never becomes markup, a link or a request', async () => {
