@@ -262,6 +262,17 @@ export {
   type SharedRelayLink,
   type SharedRelayStatus,
 } from './shared-relay-link.js';
+// RELAY-SHARED-CONN L4: one shared relay link per long-running process (MCP, desktop host).
+export {
+  closeProcessRelayLink,
+  probeSharedRelayLink,
+  processCheckServed,
+  processPoolConnector,
+  processSharedLinkView,
+  startProcessRelayLink,
+  type ProcessRelayLinkOptions,
+  type SharedLinkView,
+} from './shared-relay-process.js';
 // M1-15: the SSRF-safe download (DNS-pinned, 04 §4) and the allowed-folder and inbox file guards.
 // The test seams (an injected lookup, a CA, a route to a local port) stay inside.
 export {

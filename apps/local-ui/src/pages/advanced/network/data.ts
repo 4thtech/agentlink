@@ -50,6 +50,8 @@ export interface NetworkAnswer {
   readonly contactHosts?: readonly NetworkContactHosts[];
   /** Own servers an "Update your contact details" would drop (own lists are capped at 8); 0 when absent. */
   readonly updateWouldDrop: number;
+  /** RELAY-SHARED-CONN (08 §1): this computer's shared server connection; off when absent. */
+  readonly sharedLink: { readonly on: boolean; readonly programs: number };
 }
 
 const AGENTS: ReadonlySet<string> = new Set(['running', 'paused', 'not_running', 'needs_setup']);
@@ -71,6 +73,12 @@ const countOrNull = (v: unknown): number | null =>
 const time = (v: unknown): number | null =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= 4_102_444_800 ? v : null;
 const flag = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+
+/** `{on, programs}` (a boolean and a count), off for anything else. */
+function sharedLinkOf(v: unknown): NetworkAnswer['sharedLink'] {
+  if (!isObject(v) || v['on'] !== true) return { on: false, programs: 0 };
+  return { on: true, programs: count(v['programs']) };
+}
 
 /** A host as plain text, or undefined (never a link, never markup). */
 export function plainHost(v: unknown): string | undefined {
@@ -143,6 +151,7 @@ export function parseNetwork(data: unknown): NetworkAnswer | undefined {
     legacyReadUntil: time(data['legacyReadUntil']),
     contacts: { total, sharing },
     updateWouldDrop: count(data['updateWouldDrop']),
+    sharedLink: sharedLinkOf(data['sharedLink']),
     ...(hosts === undefined ? {} : { contactHosts: hosts }),
   };
 }

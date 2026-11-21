@@ -82,6 +82,8 @@ const NETWORK_SHAPE = {
   announceDefault: true,
   change: null,
   previousUntil: null,
+  // RELAY-SHARED-CONN L4 (08 §1): the shared server connection, counts only (off here).
+  sharedLink: { on: false, programs: 0 },
 } as const;
 
 const snapshot = (over: Partial<LocalUiNetworkSnapshot> = {}): LocalUiNetworkSnapshot => ({
@@ -372,6 +374,7 @@ describe('GET /api/ui/network (NET-ROUTE)', () => {
       announceDefault: true,
       change: null,
       previousUntil: null,
+      sharedLink: { on: false, programs: 0 },
     });
   });
 

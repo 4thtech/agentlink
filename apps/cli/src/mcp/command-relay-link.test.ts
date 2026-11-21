@@ -41,7 +41,7 @@ describe('agentlink mcp: the shared relay link', () => {
         },
       },
     });
-    const run = command({ parsed, ...io } as Parameters<typeof command>[0]);
+    const run = command({ command: 'mcp', parsed, ...io });
     await vi.waitFor(() => expect(order).toContain('open agent'));
     await clientSide.close();
     await run;
@@ -67,7 +67,7 @@ describe('agentlink mcp: the shared relay link', () => {
         },
       },
     });
-    const run = command({ parsed, ...io } as Parameters<typeof command>[0]);
+    const run = command({ command: 'mcp', parsed, ...io });
     await vi.waitFor(() => expect(order).toContain('open agent'));
     await clientSide.close();
     await run;

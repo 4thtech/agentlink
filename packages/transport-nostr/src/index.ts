@@ -24,6 +24,7 @@ export type {
   AddressCheck,
   HostResolver,
   Nip11Fetcher,
+  RelayCheckSignal,
   RelayConnectFailure,
   RelayConnector,
   RelaySocket,

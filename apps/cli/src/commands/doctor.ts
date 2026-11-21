@@ -24,8 +24,11 @@ import {
   NodeKeyStoreError,
   NodeStoreError,
   nodeRpcFetch,
+  probeSharedRelayLink,
   restoreHoldHere,
 } from '@4thtech-io/node';
+import { homedir } from 'node:os';
+import { cliVersion } from '../runtime/cli-version.js';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
 import { isAgentName } from '../runtime/agent-name.js';
@@ -84,6 +87,26 @@ export const DOCTOR_DEVICES_TEXT = Object.freeze({
     ].join('\n'),
 });
 
+/**
+ * RELAY-SHARED-CONN L4 (D-159 (11); 11 §5.15): the shared server connection. A notice at most,
+ * never a problem. Counts only: never a path, a program's name or an ID (I-7).
+ */
+export const DOCTOR_SHARED_LINK_TEXT = Object.freeze({
+  on: (programs: number): string =>
+    `OK       Shared server connection: on, ${String(programs)} programs\n` +
+    '         AgentLink programs on this computer share one connection to each server.',
+  own:
+    'Notice   Shared server connection: on, but this program uses its own connections\n' +
+    "         It's an older or newer version, or the connection couldn't be checked. Messages still work.",
+  // The first release (0.5.18, off by default) adds how to turn it on.
+  off:
+    'OK       Shared server connection: off\n' +
+    '         Turn it on with AGENTLINK_SHARED_RELAYS=1.',
+});
+
+/** The shared server connection as doctor sees it, without joining it (node probeSharedRelayLink). */
+export type SharedLinkCheck = () => Promise<{ readonly on: boolean; readonly programs?: number }>;
+
 /** M1-9h: how long `doctor` waits for each proof network. */
 export const DOCTOR_PROOF_BUDGET_MS = 4_000;
 
@@ -108,6 +131,8 @@ export interface DoctorDeps extends CommandDeps {
    * between the IDs and the owner). Store-only. Absent: the line is never printed.
    */
   readonly restoreHold?: () => Promise<'finish_restore' | 'keychain_unavailable' | undefined>;
+  /** RELAY-SHARED-CONN: the shared server connection line. Absent: not printed (tests). */
+  readonly sharedLink?: SharedLinkCheck;
 }
 
 /** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
@@ -392,6 +417,22 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       failed = await checkOne(context.parsed.agent, true);
       if (failed) return EXIT_FAILED;
     }
+    // RELAY-SHARED-CONN (11 §5.15): one line for the computer, after the IDs. Never a problem.
+    if (deps.sharedLink !== undefined) {
+      const shared: Awaited<ReturnType<SharedLinkCheck>> = await deps
+        .sharedLink()
+        .catch(() => ({ on: true }));
+      context.output.print('');
+      emit(
+        !shared.on
+          ? DOCTOR_SHARED_LINK_TEXT.off
+          : typeof shared.programs === 'number' &&
+              Number.isSafeInteger(shared.programs) &&
+              shared.programs >= 0
+            ? DOCTOR_SHARED_LINK_TEXT.on(shared.programs)
+            : DOCTOR_SHARED_LINK_TEXT.own,
+      );
+    }
     context.output.print('');
     context.output.print(DOCTOR_PROOF_TEXT.notChecked);
     return problems === 0 && !failed ? EXIT_OK : EXIT_FAILED;
@@ -404,6 +445,8 @@ export const doctorHandler: CommandHandler = createDoctorHandler({
   ownerOnMachine: hasOwnerOnMachine,
   restoreHold: restoreHoldHere,
   local: () => localDoctorChecks({ env: process.env }),
+  sharedLink: () =>
+    probeSharedRelayLink({ home: homedir(), cliVersion: cliVersion(), env: process.env }),
 });
 
 /**

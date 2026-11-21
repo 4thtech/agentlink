@@ -125,6 +125,13 @@ export interface DesktopHostDeps {
    * takeOverAppHost). Its outcome never stops the start. Absent: nothing is looked for (tests).
    */
   takeOver?(): Promise<'none' | 'stale' | 'yielded' | 'kept'>;
+  /**
+   * RELAY-SHARED-CONN L4 (D-159 (8); 07 §4.2 "Hand-over"): this process's shared relay link,
+   * started before the server opens any ID (asking an MCP program that holds it to hand over, so the
+   * long-lived host usually holds it) and closed last when the host stops. A start that fails never
+   * stops the app (its IDs use their own connections). Absent: none (tests).
+   */
+  readonly relayLink?: { start(): Promise<void>; close(): Promise<void> };
 }
 
 /** Exit codes: 0 for a clean stop, 1 when it could not start or a fatal error ended it. */
@@ -383,6 +390,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   // browser tab says so), and a stale record of a crashed host is cleared. Same ~/.agentlink, same
   // keychain, same IDs: nothing is set up again, and AI app entries are untouched.
   await deps.takeOver?.().catch(() => 'kept' as const);
+  // RELAY-SHARED-CONN: before any ID opens, so every pool is built on the link.
+  await deps.relayLink?.start().catch(() => undefined);
   let started: { ok: true; server: UiServer } | { ok: false; failure: StopReason };
   try {
     const result = await startUiServer(deps.uiDeps(startServer), undefined);
@@ -399,6 +408,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     pipe.send({ v: 1, type: 'stopped', reason });
     unsubscribe();
     unguard?.();
+    await deps.relayLink?.close().catch(() => undefined);
     await pipe.close();
     return started.ok && reason !== 'fatal' ? HOST_EXIT_OK : HOST_EXIT_FAILED;
   }
@@ -616,6 +626,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   pipe.send({ v: 1, type: 'stopped', reason });
   unsubscribe();
   unguard?.();
+  // RELAY-SHARED-CONN: after the server (its IDs closed their pools); the others re-race.
+  await deps.relayLink?.close().catch(() => undefined);
   await pipe.close();
   return reason === 'fatal' ? HOST_EXIT_FAILED : HOST_EXIT_OK;
 }

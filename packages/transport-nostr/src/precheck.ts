@@ -24,7 +24,9 @@
 //      never answered, with any key.
 //   6. Connection 2, fresh and unauthenticated, makes the two reads: the event's id (`limit: 1`)
 //      and the sync filter AgentLink uses (`kinds: [1059]`, `#p` the throwaway key). Both must
-//      serve it, else `not_kept`; a read that wants a login is `sign_in`.
+//      serve it, else `not_kept`; a read that wants a login is `sign_in`. With the shared relay
+//      link on (D-159 (9)), the event is first asked for by its id in the link's check lane
+//      (`checkServed`): `missing` there is `not_kept`; any other answer leaves these reads in charge.
 // Why the test EVENT and not only a REQ: a REQ shows the server speaks Nostr, not that it takes an
 // event from someone who has not signed in, which is what every contact's delivery needs. The
 // event is a throwaway: it names no ID and carries no message.
@@ -119,6 +121,15 @@ export interface PrecheckOptions {
   readonly timers?: Timers;
   /** Milliseconds; default Date.now (read at call time, so fake clocks apply). */
   readonly now?: () => number;
+  /**
+   * RELAY-SHARED-CONN (D-159 (9); 07 §4.2 "Check lane"): the shared link's check lane, when it is
+   * on. After the write, the event is asked for by its id there (never on the connection that wrote
+   * it); `missing` is `not_kept`. Any other answer leaves the fresh reads (step 6) in charge.
+   */
+  readonly checkServed?: (
+    relay: string,
+    eventId: string,
+  ) => Promise<'served' | 'missing' | 'unchecked' | 'unavailable'>;
 }
 
 /** The per-process rate limit: PRECHECK_RATE_LIMIT tests per PRECHECK_RATE_WINDOW_MS. */
@@ -266,6 +277,7 @@ const failureReason = (kind: RelayConnectFailure | undefined): PrecheckRefusal =
 interface Io {
   readonly resolver: HostResolver;
   readonly connector: RelayConnector;
+  readonly checkServed: PrecheckOptions['checkServed'];
   readonly nip11: Nip11Fetcher | undefined;
   readonly timers: Timers;
   readonly now: () => number;
@@ -348,7 +360,12 @@ class OneTest {
     }));
     const published = await this.#publish(target, event);
     let reads: Step | undefined;
-    if (published.kind === 'ok') reads = await this.#readBack(target, event, createdAt);
+    if (published.kind === 'ok') {
+      reads =
+        (await this.#lane(parsed.url, event.id)) === 'missing'
+          ? refusal('not_kept')
+          : await this.#readBack(target, event, createdAt);
+    }
     const doc = await flags;
     const step = reads ?? published;
     if (step.kind === 'refused' && (step.reason === 'unreachable' || step.reason === 'invalid')) {
@@ -363,6 +380,31 @@ class OneTest {
     // Accepted and both reads served, but NIP-11 says `auth_required`: sign_in, with a warning.
     if (doc?.auth === true) return answered(host, 'sign_in', ms, true, doc);
     return answered(host, ms > PRECHECK_SLOW_MS ? 'slow' : 'ready', ms, false, doc);
+  }
+
+  /** The check lane's answer (shared link on), or undefined; it ends at the bound too. */
+  #lane(url: string, eventId: string): Promise<string | undefined> {
+    const check = this.#io.checkServed;
+    if (check === undefined || this.#aborted) return Promise.resolve(undefined);
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (value: string | undefined): void => {
+        if (done) return;
+        done = true;
+        this.#aborters.delete(stop);
+        resolve(value);
+      };
+      const stop = (): void => finish(undefined);
+      this.#aborters.add(stop);
+      try {
+        check(url, eventId).then(
+          (outcome) => finish(outcome),
+          () => finish(undefined),
+        );
+      } catch {
+        finish(undefined);
+      }
+    });
   }
 
   /** Step 2's lookup; it ends at the bound even if the resolver never answers. */
@@ -618,6 +660,7 @@ export async function precheckServers(
   const io: Io = {
     resolver: options.resolver,
     connector: options.connector,
+    checkServed: options.checkServed,
     nip11: options.nip11,
     timers: options.timers ?? defaultTimers,
     now: options.now ?? (() => Date.now()),

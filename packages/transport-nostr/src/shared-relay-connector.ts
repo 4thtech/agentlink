@@ -559,4 +559,23 @@ export class FallbackConnector implements RelayConnector {
   open(target: RelayTarget, handlers: RelaySocketHandlers): RelaySocket {
     return this.shared.openOr(target, handlers, (h) => this.direct.open(target, h));
   }
+
+  /** The shared link's check lane (D-159 (9)); `unavailable`: the pool checks on its own. */
+  checkServed(
+    relay: string,
+    eventId: string,
+    options: ReadbackOptions = {},
+  ): Promise<SharedCheckOutcome> {
+    return this.shared.checkServed(relay, eventId, options);
+  }
+
+  /** Ends the channel to the shared link (when the pool on it closes); direct sockets are the pool's. */
+  close(): void {
+    this.shared.close();
+  }
+
+  /** The program's own connection (the pool's fresh check when the lane is unavailable). */
+  openOwn(target: RelayTarget, handlers: RelaySocketHandlers): RelaySocket {
+    return this.direct.open(target, handlers);
+  }
 }

@@ -6,7 +6,8 @@
 // 2. the recorded KeyStore backend: for the keychain, the probe and `selectKeyStoreBackend`
 //    (`needs_setup` with the 07 §9.4 copy without a usable keychain), then `openAgentKeyStore`;
 // 3. `openAgentStore` (store, cipher, policy mark);
-// 4. the relay I/O from @4thtech-io/node as the client's transport (07 §4.2);
+// 4. the relay I/O from @4thtech-io/node as the client's transport (07 §4.2), on this process's
+//    shared relay link when it started one (RELAY-SHARED-CONN, `nodeTransport`);
 // 5. the M1a approval channel over the same store, and `AgentLinkClient.create`;
 // 6. the files platform (M1-9d-1, src/runtime/files.ts): the allowed-folder check of `path`
 //    arguments, the encrypted drop (D-48), the SSRF-safe download and the inbox folder.
@@ -29,13 +30,14 @@ import {
   type ApprovalChannel,
   type TransportFactory,
 } from '@4thtech-io/core';
+import type { RelayConnector } from '@4thtech-io/transport-nostr';
 import type { KeyStore } from '@4thtech-io/crypto';
 import type { Logger } from '@4thtech-io/log';
 import { cliLogger } from './log-level.js';
 import {
   nodeHostResolver,
   nodeNip11Fetcher,
-  nodeRelayConnector,
+  processPoolConnector,
   holdAgentFolderShared,
   openAgentKeyStore,
   type AgentFolderLock,
@@ -76,18 +78,45 @@ export interface RuntimeDeps {
   readonly proofs?: (options: { readonly home: string }) => NodeProofs | undefined;
 }
 
+/**
+ * RELAY-SHARED-CONN L4 (D-159 (1), (2); 07 §4.2 "Seam"): the relay transport of every agent this
+ * process opens. Each RelayPool asks the process for its connector with the agent's own
+ * `mayAuthenticate`: the shared relay link with a direct fallback when this process started one
+ * (the MCP process, the desktop host; AGENTLINK_SHARED_RELAYS on), the direct connector otherwise
+ * (one-shot commands, or sharing off). Closing the transport ends that pool's channel to the link.
+ */
+export function nodeTransport(
+  poolConnector: (
+    mayAuthenticate: (relayUrl: string) => boolean,
+  ) => RelayConnector & { close?(): void } = processPoolConnector,
+): TransportFactory {
+  return (deps) => {
+    const connector = poolConnector(deps.mayAuthenticate);
+    const transport = nostrTransport({
+      connector,
+      addressCheck: { resolver: nodeHostResolver() },
+      nip11: nodeNip11Fetcher(),
+    })(deps);
+    return {
+      ...transport,
+      close: () => {
+        try {
+          transport.close?.();
+        } finally {
+          connector.close?.();
+        }
+      },
+    };
+  };
+}
+
 export const nodeRuntimeDeps: RuntimeDeps = Object.freeze<RuntimeDeps>({
   probeKeychain: () => probeOsKeychain(),
   openKeyStore: (backend: KeyStoreBackendKind, agentId: string) =>
     openAgentKeyStore(backend, agentId),
   openStore: (backend: KeyStoreBackendKind, agentId: string, path: string) =>
     openAgentStore(backend, agentId, path),
-  transport: () =>
-    nostrTransport({
-      connector: nodeRelayConnector(),
-      addressCheck: { resolver: nodeHostResolver() },
-      nip11: nodeNip11Fetcher(),
-    }),
+  transport: () => nodeTransport(),
   createClient: (options) => AgentLinkClient.create(options),
   proofs: ({ home }) => nodeProofs({ home }),
 });

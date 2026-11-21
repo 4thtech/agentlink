@@ -27,10 +27,18 @@ import {
   precheckServers,
   type HostResolver,
   type Nip11Fetcher,
+  type PrecheckOptions,
   type PrecheckResult,
   type RelayConnector,
 } from '@4thtech-io/transport-nostr';
-import { nodeHostResolver, nodeNip11Fetcher, nodeRelayConnector } from '../../relay-io.js';
+import { nodeHostResolver, nodeNip11Fetcher } from '../../relay-io.js';
+import {
+  processCheckServed,
+  processPoolConnector,
+  processSharedLinkView,
+  type SharedLinkView,
+} from '../../shared-relay-process.js';
+import { SHARED_LINK_OFF, sharedLinkOf } from './network.js';
 import {
   NETWORK_TEST_MAX_BODY_BYTES,
   NETWORK_TEST_PATH,
@@ -47,8 +55,12 @@ const MAX_URL_CHARS = 256;
 /** The relay I/O the test uses. Production: the Node connector, resolver and NIP-11 fetcher. */
 export interface NetworkTestIo {
   readonly resolver: HostResolver;
-  readonly connector: RelayConnector;
+  readonly connector: RelayConnector & { close?(): void };
   readonly nip11?: Nip11Fetcher;
+  /** RELAY-SHARED-CONN (D-159 (9)): the shared link's check lane, when it is on. */
+  readonly checkServed?: PrecheckOptions['checkServed'];
+  /** RELAY-SHARED-CONN (08 §1): the shared state answered beside the results. Absent: off. */
+  readonly sharedLink?: () => Promise<SharedLinkView>;
 }
 
 const INVALID: LocalUiResult = Object.freeze({
@@ -94,11 +106,49 @@ function resultOf(r: PrecheckResult): JsonObject {
   };
 }
 
-const productionIo = (): NetworkTestIo => ({
-  resolver: nodeHostResolver(),
-  connector: nodeRelayConnector(),
-  nip11: nodeNip11Fetcher(),
-});
+/**
+ * RELAY-SHARED-CONN (D-159 (9)): with this process's shared link on, the test's write and reads go
+ * over it (a connector of its own that never logs in) and its read by id through the check lane;
+ * otherwise the Node connector, as before.
+ */
+const productionIo = (): NetworkTestIo => {
+  const checkServed = processCheckServed();
+  return {
+    resolver: nodeHostResolver(),
+    connector: processPoolConnector(() => false),
+    nip11: nodeNip11Fetcher(),
+    ...(checkServed === undefined ? {} : { checkServed }),
+    sharedLink: processSharedLinkView,
+  };
+};
+
+/** Runs the precheck over `io`, then closes the io's connector (its channel to the shared link). */
+async function precheckWith(
+  io: NetworkTestIo,
+  servers: readonly string[],
+): Promise<readonly PrecheckResult[]> {
+  const { resolver, connector, nip11, checkServed } = io;
+  try {
+    return await precheckServers(servers, {
+      resolver,
+      connector,
+      ...(nip11 === undefined ? {} : { nip11 }),
+      ...(checkServed === undefined ? {} : { checkServed }),
+    });
+  } finally {
+    try {
+      connector.close?.();
+    } catch {
+      // a closed channel is closed already
+    }
+  }
+}
+
+/** The shared state for the answer: counts only, off when it cannot be read. */
+async function sharedLinkFor(io: NetworkTestIo): Promise<JsonObject> {
+  if (io.sharedLink === undefined) return SHARED_LINK_OFF;
+  return sharedLinkOf(await io.sharedLink().catch(() => undefined));
+}
 
 /**
  * NET-OWNER-SET (IR L1): the one budget of server tests in this process: PRECHECK_RATE_LIMIT (10) a
@@ -145,16 +195,16 @@ export function createNetworkTestRoute(
       const servers = addressesOf(body);
       if (servers === undefined) return INVALID;
       try {
+        let shared: NetworkTestIo | undefined;
         const results = await budget.run(() => {
-          const { resolver, connector, nip11 } = io();
-          return precheckServers(servers, {
-            resolver,
-            connector,
-            ...(nip11 === undefined ? {} : { nip11 }),
-          });
+          shared = io();
+          return precheckWith(shared, servers);
         });
-        if (results === 'busy') return BUSY;
-        return { status: 200, body: { results: results.map(resultOf) } };
+        if (results === 'busy' || shared === undefined) return BUSY;
+        return {
+          status: 200,
+          body: { results: results.map(resultOf), sharedLink: await sharedLinkFor(shared) },
+        };
       } catch {
         return { status: 503, body: { error: 'unavailable' } };
       }
@@ -173,14 +223,7 @@ export async function testOwnServers(
 ): Promise<readonly PrecheckResult[] | 'busy' | 'invalid'> {
   const addresses = addressesOf({ servers: [...servers] });
   if (addresses === undefined) return 'invalid';
-  return processPrecheckBudget.run(() => {
-    const { resolver, connector, nip11 } = productionIo();
-    return precheckServers(addresses, {
-      resolver,
-      connector,
-      ...(nip11 === undefined ? {} : { nip11 }),
-    });
-  });
+  return processPrecheckBudget.run(() => precheckWith(productionIo(), addresses));
 }
 
 /** The route the app registers (routes.ts): the Node relay I/O, one limit for the process. */

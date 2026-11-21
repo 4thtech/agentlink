@@ -21,6 +21,7 @@ import {
   type LocalUiNetworkProbe,
   type LocalUiNetworkSnapshot,
 } from './api/network.js';
+import { processSharedLinkView, type SharedLinkView } from '../shared-relay-process.js';
 
 /** A probe starts at most this often while the view is read. */
 export const NETWORK_PROBE_MS = 15_000;
@@ -67,6 +68,8 @@ export interface NetworkViewClient {
 export interface NetworkViewOptions {
   /** The clock in milliseconds. */
   readonly now: () => number;
+  /** RELAY-SHARED-CONN: the shared server connection (default: this process's link). */
+  readonly sharedLink?: () => Promise<SharedLinkView>;
 }
 
 export interface NetworkViewReader {
@@ -160,6 +163,9 @@ export function createNetworkReader(
           .filter((relay) => !servers.own.includes(relay))
           .map((relay) => ({ relay, kind: 'legacy' as const })),
       ];
+      const sharedLink = await (options.sharedLink ?? processSharedLinkView)().catch(
+        () => undefined,
+      );
       const snapshot: LocalUiNetworkSnapshot = {
         agent: servers.paused ? 'paused' : 'running',
         mode: servers.mode,
@@ -185,6 +191,7 @@ export function createNetworkReader(
         ...(servers.previousUntil == null ? {} : { previousUntil: servers.previousUntil }),
         ...(servers.change === undefined ? {} : { change: servers.change }),
         contacts: { total: reach.total, sharing: reach.sharing },
+        ...(sharedLink === undefined ? {} : { sharedLink }),
         ...('lists' in reach && reach.lists !== undefined ? { contactLists: reach.lists } : {}),
       };
       return networkBody(snapshot, options.now(), o.contactHosts);

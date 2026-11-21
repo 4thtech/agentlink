@@ -195,6 +195,45 @@ export class SharedRelayLink {
     return this.shared;
   }
 
+  /**
+   * A client connector of its own for one more RelayPool on this link (L4: one per agent a process
+   * opens), with that pool's `mayAuthenticate`. Each is its own program on the link, so the check
+   * lane never batches ids of different IDs together (D-159, owner decision 1).
+   */
+  newConnector(mayAuthenticate?: (relayUrl: string) => boolean): SharedRelayConnector {
+    return new SharedRelayConnector({
+      dial: this.dial,
+      token: this.token,
+      cliVersion: this.options.cliVersion,
+      ...(this.logger === undefined ? {} : { logger: this.logger }),
+      retryAfterMs: 0,
+      ...(mayAuthenticate === undefined ? {} : { mayAuthenticate }),
+    });
+  }
+
+  /**
+   * For `agentlink doctor` (11 §5.15), without joining the election: the number of programs on the
+   * shared link (after the two-way token proof), `none` when no program holds it, or undefined
+   * when the endpoint could not be checked or did not prove the token.
+   */
+  async probeStatus(): Promise<number | 'none' | undefined> {
+    const endpoint = this.endpoint;
+    if (endpoint === undefined) return undefined;
+    if (endpoint.kind === 'unix') {
+      const socket = await checkSocket(endpoint.path, this.lstatFn, this.uid);
+      if (socket === 'missing') return 'none';
+      if (socket !== 'ok' || !(await checkDir(endpoint.dir, this.lstatFn, this.uid))) {
+        return undefined;
+      }
+    }
+    const alive = await this.probe(endpoint.path);
+    if (alive === 'refused') return 'none';
+    if (alive !== 'alive') return undefined;
+    const reply = await this.control(CONTROL_STATUS, 'reply');
+    const match = typeof reply === 'string' ? STATUS_REPLY.exec(reply) : null;
+    return match === null ? undefined : Number(match[1]);
+  }
+
   /** Runs the election now, without the random delay (a pending one is cut short). */
   start(): Promise<SharedLinkRole> {
     if (this.election !== undefined) {
@@ -756,6 +795,12 @@ export interface RelayConnectorChoice {
   readonly link: SharedRelayLink | undefined;
   /** The client connector (its check lane: checkServed), when on. */
   readonly shared: SharedRelayConnector | undefined;
+  /**
+   * L4: the connector for one more RelayPool in this process (one per agent): its own client
+   * connector on the link with that pool's `mayAuthenticate`, with the direct fallback; the direct
+   * connector when off.
+   */
+  forPool(mayAuthenticate: (relayUrl: string) => boolean): RelayConnector;
 }
 
 /** Test seam behind createRelayConnector: the direct connector and the address check injected. */
@@ -769,6 +814,7 @@ export async function createRelayConnectorWith(
     connector: options.direct,
     link: undefined,
     shared: undefined,
+    forPool: () => options.direct,
   };
   if (!sharedRelaysEnabled(options.env ?? process.env)) return off;
   const token = await ensureLinkToken(options.home).catch(() => undefined);
@@ -779,7 +825,13 @@ export async function createRelayConnectorWith(
   const link = new SharedRelayLink({ ...options, token });
   const shared = link.connector();
   void link.start();
-  return { connector: new FallbackConnector(shared, options.direct), link, shared };
+  return {
+    connector: new FallbackConnector(shared, options.direct),
+    link,
+    shared,
+    forPool: (mayAuthenticate) =>
+      new FallbackConnector(link.newConnector(mayAuthenticate), options.direct),
+  };
 }
 
 /**

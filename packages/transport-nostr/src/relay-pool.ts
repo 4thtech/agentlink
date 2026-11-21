@@ -531,6 +531,27 @@ export class RelayPool {
     if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'unchecked';
     const signal = options.signal;
     if (signal?.aborted === true) return 'unchecked';
+    // RELAY-SHARED-CONN (D-159 (9)): with the shared link, the check goes through its check lane
+    // (batched per program only, never on the publishing connection); `unavailable` falls through
+    // to today's fresh connection of this program's own.
+    const lane = this.connector.checkServed;
+    if (lane !== undefined) {
+      let outcome: ReadbackOutcome | 'unavailable';
+      try {
+        outcome = await lane.call(this.connector, relay, eventId, {
+          ...(signal === undefined ? {} : { signal }),
+        });
+      } catch {
+        outcome = 'unavailable';
+      }
+      if (outcome !== 'unavailable') {
+        return outcome === 'served' || outcome === 'missing' ? outcome : 'unchecked';
+      }
+      // The lane's await may have seen a cancel or a close (no narrowing across it).
+      if (this.closed || (signal as ReadbackSignal | undefined)?.aborted === true) {
+        return 'unchecked';
+      }
+    }
     if (this.readbacks < MAX_READBACKS) this.readbacks += 1;
     else if (!(await this.waitForSlot(signal))) return 'unchecked';
     try {
@@ -666,7 +687,10 @@ export class RelayPool {
             return;
           }
           try {
-            socket = this.connector.open(target, {
+            // A connection of this program's own (never a virtual one on the shared link).
+            const connector = this.connector;
+            const opener = connector.openOwn?.bind(connector) ?? connector.open.bind(connector);
+            socket = opener(target, {
               onOpen: () => {
                 open = true;
                 sendReq();
