@@ -29,4 +29,21 @@ describe('WIN-UPDATE: the update links the core accepts', () => {
     });
     for (const url of Object.values(fixture.links)) expect(isDownloadUrlFor(url, v)).toBe(true);
   });
+
+  it('the shell accepts no link the list lacks', () => {
+    const v = fixture.version;
+    const known = new Set(Object.values(fixture.links));
+    const other = macDownloadUrl('0.5.99', 'arm64');
+    const notInList = [
+      other,
+      winDownloadUrl('0.5.99'),
+      releasePageUrl('0.5.99'),
+      winDownloadUrl(v).replace('win-x64', 'win-arm64'),
+      `${winDownloadUrl(v)}#x`,
+    ];
+    for (const url of notInList) {
+      expect(known.has(url)).toBe(false);
+      expect(isDownloadUrlFor(url, v)).toBe(false);
+    }
+  });
 });

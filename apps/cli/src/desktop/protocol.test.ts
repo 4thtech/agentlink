@@ -216,6 +216,9 @@ describe('app update messages', () => {
       { ...win, download: EXE.replace('https://', 'http://') },
       { ...win, download: `${EXE}?x=1` },
       { ...win, download: EXE.replace('setup.exe', 'setup.msi') },
+      { ...win, download: `${EXE}#x` },
+      { ...win, download: EXE.replace('setup.exe', 'setup%2Eexe') },
+      { ...win, download: EXE.replace('AgentLink-', 'AgentLink%2D') },
     ]) {
       expect(parseShellMessage(line(bad))).toBeUndefined();
     }
