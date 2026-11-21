@@ -270,7 +270,9 @@ describe('network diagram: contacts', () => {
     const drawn = [...svg.querySelectorAll('[data-node-state]')];
     expect(drawn).toHaveLength(5);
     // The one that cannot be reached is the last in the answer, yet drawn first.
-    expect(drawn[0]?.textContent).toContain('s11.example.org');
+    expect(/[a-z0-9-]+\.example\.org/.exec(drawn[0]?.textContent ?? '')?.[0]).toBe(
+      's11.example.org',
+    );
     expect(slot().querySelectorAll('.nwd-stack .nwd-stack-item')).toHaveLength(5);
     const more = [...slot().querySelectorAll('.nwd-more button')];
     expect(more.map((b) => b.textContent)).toEqual([S.diagramMoreServers(7)]);
@@ -278,6 +280,27 @@ describe('network diagram: contacts', () => {
     await act(async () => (more[0] as HTMLElement).click());
     // Pressing it opens the full list below: all 12 rows, no "Show all" left to press.
     expect(host.querySelectorAll('.nw-list > .nw-srv[data-state]')).toHaveLength(12);
+  });
+
+  it('draws own servers first (problems first), then old read-only ones, even when those are unreachable', async () => {
+    const list = [
+      server({ host: 'old1.example.org', kind: 'legacy', sends: false, state: 'unreachable' }),
+      server({ host: 'old2.example.org', kind: 'legacy', sends: false, state: 'unreachable' }),
+      ...Array.from({ length: 5 }, (_, i) =>
+        server({ host: `own${String(i)}.example.org`, state: i === 4 ? 'slow' : 'ready' }),
+      ),
+    ];
+    await mount(() =>
+      Promise.resolve(ok(answer({ servers: list, contacts: { total: 0, sharing: 0 } }))),
+    );
+    const svg = wide() as SVGElement;
+    const drawn = [...svg.querySelectorAll('[data-node-state]')].map((n) => n.textContent ?? '');
+    expect(drawn).toHaveLength(5);
+    const hostOf = (t: string): string => /[a-z0-9-]+\.example\.org/.exec(t)?.[0] ?? '';
+    const hosts = drawn.map(hostOf);
+    expect(hosts[0]).toBe('own4.example.org');
+    expect(hosts.sort()).toEqual([0, 1, 2, 3, 4].map((i) => `own${String(i)}.example.org`));
+    expect(slot().querySelector('.nwd-more')?.textContent).toContain(S.diagramMoreServers(2));
   });
 
   it('falls back to the server column alone when the contacts read fails, and shows the cards', async () => {

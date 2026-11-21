@@ -422,9 +422,16 @@ export function UpdatesPage({
     (view.state === 'available' || view.state === 'install_failed' || RUNNING.includes(view.state));
   const settled = load.kind !== 'loading';
   const appWindow = view === undefined ? desktop : view.install === 'desktop';
-  // Not when the check just said this is the newest version (IR-FIRSTRUN-EXIT-1).
-  const upToDate = view?.state === 'current';
-  const windowsFallback = settled && appWindow && os === 'windows' && !versionCard && !upToDate;
+  // WIN-UPDATE (owner, 21 Nov 2026): the manual Windows download only after a definite failure: the
+  // check failed or was offline, or the state could not be read or is not served here. Never while
+  // checking, before a check (idle), with checks off, or when up to date (IR-FIRSTRUN-EXIT-1). An
+  // offered or failed update has its own card (Update now, or Ready with the setup link).
+  const checkFailed =
+    load.kind === 'failed' ||
+    load.kind === 'not_here' ||
+    view?.state === 'failed' ||
+    view?.state === 'offline';
+  const windowsFallback = appWindow && os === 'windows' && !versionCard && checkFailed;
   const browserHow = settled && !appWindow && !versionCard;
   // BROWSER-UPDATE: the browser app too, when its server can update here.
   const inApp =

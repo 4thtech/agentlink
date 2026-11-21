@@ -55,7 +55,7 @@ export interface DiagramContact {
 }
 
 export interface DiagramModel {
-  /** The drawn servers: problems first, then own before old (at most MAX_DIAGRAM_SERVERS). */
+  /** The drawn servers: own servers first (problems first), then old read-only (at most MAX_DIAGRAM_SERVERS). */
   readonly servers: readonly NetworkServer[];
   /** Servers that are not drawn (the list below has them). */
   readonly moreServers: number;
@@ -71,8 +71,8 @@ export function buildDiagram(
   answer: NetworkAnswer,
   names: ReadonlyMap<string, string> | undefined,
 ): DiagramModel {
-  // Problems first (never left out), then own before old; the sort is stable.
-  const rank = (s: NetworkServer): number => (isProblem(s) ? 0 : 2) + (s.kind === 'own' ? 0 : 1);
+  // Own servers first (problems first within them), then the old read-only ones; the sort is stable.
+  const rank = (s: NetworkServer): number => (s.kind === 'own' ? 0 : 2) + (isProblem(s) ? 0 : 1);
   const first = [...answer.servers].sort((a, b) => rank(a) - rank(b));
   const servers = first.slice(0, MAX_DIAGRAM_SERVERS);
   const moreServers = first.length - servers.length;

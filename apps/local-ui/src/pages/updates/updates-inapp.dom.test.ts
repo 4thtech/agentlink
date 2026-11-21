@@ -12,6 +12,7 @@ import {
   APP_UPDATE_RESTART_PATH,
   parseUpdate,
 } from './data.js';
+import { SETUP_EXIT } from '../start/strings.js';
 import { UpdatesPage } from './index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -208,6 +209,30 @@ describe('the Windows app: Update now, the download link only as the fallback', 
     });
     await settle();
     expect(calls.posts.map((c) => c.path)).toContain(APP_UPDATE_INSTALL_PATH);
+  });
+  // WIN-UPDATE (owner, 21 Nov 2026): in the Windows app window, an installable update shows
+  // Update now and never the manual "Download the new version" card beside it.
+  it('in the Windows app window: Update now and no manual download card', async () => {
+    const get = (): Promise<ApiResult<unknown>> =>
+      Promise.resolve(ok(at('available', { download: SETUP })));
+    await act(async () => {
+      root.render(
+        h(UpdatesPage, {
+          api: { get } as unknown as ApiClient,
+          pollMs: 0,
+          os: 'windows',
+          desktop: true,
+        }),
+      );
+    });
+    await settle();
+    expect(button('Update now')).toBeDefined();
+    expect(text()).toContain('AgentLink 0.5.3 is available');
+    expect(
+      [...host.querySelectorAll('a')].find(
+        (a) => a.textContent?.trim() === SETUP_EXIT.windowsDownload,
+      ),
+    ).toBeUndefined();
   });
   it('after a failed update: "Couldn’t update here" with the setup link', async () => {
     await mount(() =>

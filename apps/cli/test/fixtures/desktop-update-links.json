@@ -1,0 +1,10 @@
+{
+  "_comment": "WIN-UPDATE: every link the desktop shell may send for an update (apps/desktop/src/shared/app-update.ts) and the core must accept (apps/cli/src/desktop/protocol.ts isUpdateLinkFor). Read by apps/desktop/test/unit/update-links-contract.test.ts and apps/cli/test/desktop-update-links.test.ts so the two can't drift.",
+  "version": "0.5.16",
+  "links": {
+    "macArm64": "https://github.com/4thtech/agentlink/releases/download/v0.5.16/AgentLink-0.5.16-mac-arm64.dmg",
+    "macX64": "https://github.com/4thtech/agentlink/releases/download/v0.5.16/AgentLink-0.5.16-mac-x64.dmg",
+    "winX64": "https://github.com/4thtech/agentlink/releases/download/v0.5.16/AgentLink-0.5.16-win-x64-setup.exe",
+    "releasePage": "https://github.com/4thtech/agentlink/releases/tag/v0.5.16"
+  }
+}

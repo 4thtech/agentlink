@@ -185,6 +185,45 @@ describe('app update messages', () => {
     expect(encodeShellMessage(ok as never)).toBe(`${line(ok)}\n`);
   });
 
+  // WIN-UPDATE (owner, 21 Nov 2026): the Windows shell sends its setup link (the shell's
+  // app-update.ts winDownloadUrl). The core dropped every such line, so a Windows app never showed
+  // an update: "Couldn't read this just now", or "Checking…" that never ended.
+  it('WIN-UPDATE: accepts the Windows setup link, offered and in-app', () => {
+    const EXE =
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-win-x64-setup.exe';
+    const win = { ...ok, download: EXE };
+    for (const v of [
+      win,
+      { ...win, installable: true },
+      { ...win, installable: true, state: 'downloading', percent: 7 },
+      { ...win, installable: true, state: 'verifying' },
+      { ...win, installable: true, state: 'ready' },
+      { ...win, installable: true, state: 'restarting' },
+      { ...win, state: 'install_failed' },
+    ]) {
+      expect(parseShellMessage(line(v)), v.state).toEqual(v);
+    }
+    for (const bad of [
+      { ...win, download: EXE.replaceAll('0.5.2', '0.5.3') },
+      { ...win, download: EXE.replace('win-x64', 'win-arm64') },
+      {
+        ...win,
+        download: EXE.replace('AgentLink-0.5.2-win-x64-setup.exe', 'AgentLink-win-x64-setup.exe'),
+      },
+      { ...win, download: EXE.replace('/download/v0.5.2/', '/latest/download/') },
+      { ...win, download: EXE.replace('github.com/4thtech/agentlink', 'github.com/4thtech/other') },
+      { ...win, download: EXE.replace('https://github.com', 'https://example.com') },
+      { ...win, download: EXE.replace('https://', 'http://') },
+      { ...win, download: `${EXE}?x=1` },
+      { ...win, download: EXE.replace('setup.exe', 'setup.msi') },
+      { ...win, download: `${EXE}#x` },
+      { ...win, download: EXE.replace('setup.exe', 'setup%2Eexe') },
+      { ...win, download: EXE.replace('AgentLink-', 'AgentLink%2D') },
+    ]) {
+      expect(parseShellMessage(line(bad))).toBeUndefined();
+    }
+  });
+
   it.each([
     ['an unknown state', { ...ok, state: 'installing' }],
     ['an extra key', { ...ok, x: 1 }],

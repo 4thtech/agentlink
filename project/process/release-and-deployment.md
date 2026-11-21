@@ -346,6 +346,7 @@ Agents prepare every item except the npm `latest` approval click; services deplo
 - [ ] Post-release: health check and smoke tests green, or rolled back with `DEPLOY_FREEZE` set.
 - [ ] Deploy record completed and filed; owner's sync file and Curator handoff updated.
 - [ ] Public docs pass done for this release (patches and M4/M5 included): `docs/` updated per `docs/MAINTAINING.md` §4 and merged (§4.9); the versioned Mac download links in the README and guides point at this release ([RB-09](../runbooks/merge-and-release.md) step 11).
+- [ ] Worktree cleanup after the release: remove every worker worktree whose branch has merged (`git worktree remove <path>`). Save any unmerged or dirty work to a pushed branch first, then remove it. Run `git worktree prune`, then check `git worktree list | wc -l` is small (only the main checkout and worktrees still in use). Details and limits: [RB-24](../runbooks/dev-machine-resources.md).
 
 ### 5.2 Deploy record
 

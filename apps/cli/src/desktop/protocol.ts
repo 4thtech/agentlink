@@ -209,12 +209,17 @@ export function isNewerVersion(latest: string, current: string): boolean {
   return false;
 }
 
-/** True when `url` is exactly one of the links the shell builds for `version`. */
+/**
+ * True when `url` is exactly one of the links the shell builds for `version` (the shell's
+ * app-update.ts isDownloadUrlFor; apps/cli/test/desktop-update-links.test.ts keeps them equal).
+ */
 export function isUpdateLinkFor(url: unknown, version: string): boolean {
   if (typeof url !== 'string' || !RELEASE_VERSION.test(version)) return false;
   return (
     url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-arm64.dmg` ||
     url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-x64.dmg` ||
+    // WIN-UPDATE: the Windows setup (the shell's winDownloadUrl, x64 only).
+    url === `${RELEASES}/download/v${version}/AgentLink-${version}-win-x64-setup.exe` ||
     url === `${RELEASES}/tag/v${version}`
   );
 }
