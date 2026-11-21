@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-11-21
+
+### Changed
+
+- The user guide, README, status page, security model and knowledge base describe AgentLink 0.5.15 as released: use your own message-network servers (Test, owner approval, a list of 2 to 8, 30-day overlap, fully quiet option, `agentlink owner servers`) and the compact live Message network view; next is the on-chain spending allowance and signed Mac helper before mainnet (DOCS-REL-0515, S0).
+
+### Fixed
+
+- Windows app: updates now install from inside the app (Settings › Updates › Update now), and the "Download the new version" card shows only when a check fails, not while it runs or when you are up to date (WIN-UPDATE-0516, S2). If you use the Windows app 0.5.14 or 0.5.15, download 0.5.16 once by hand from [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and install it over your current app; after that, updates install from inside the app.
+
 ## [0.5.15] - 2026-11-20
 
 ### Added
@@ -1509,7 +1519,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.15...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.16...HEAD
+[0.5.16]: https://github.com/4thtech/agentlink/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/4thtech/agentlink/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/4thtech/agentlink/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/4thtech/agentlink/compare/v0.5.12...v0.5.13
