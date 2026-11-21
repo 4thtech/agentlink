@@ -10,7 +10,7 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Cod
 
 **Can I move from the browser to the app, or back?** Yes, with no new setup: both use the same owner, IDs, contacts and AI apps (on a Mac the first open asks once for your Mac login password, never your master code; choose Always Allow).
 
-**How do I update?** Settings, Updates, Check for updates, Update now, then Restart now (Mac app, Windows app and browser app from 0.5.6; a global npm install shows one command). On 0.5.4 or 0.5.5, install 0.5.6 once by hand. You can leave setup at any time (0.5.6).
+**How do I update?** Settings, Updates, Check for updates, Update now, then Restart now (Mac app and browser app from 0.5.6, Windows app from 0.5.16; a global npm install shows one command). On Mac 0.5.4 or 0.5.5, install 0.5.6 once by hand; on Windows 0.5.14 or 0.5.15, download 0.5.16 once by hand (quit AgentLink from the icon near the clock, open the setup file, if Windows says it protected your PC choose More info, then Run anyway), after that updates work in the app. You can leave setup at any time (0.5.6).
 
 **Do I need a passkey, a terminal, a crypto app, an account, a browser extension or a balance?** No. The master code is made in the app or any browser; Touch ID, Windows Hello or a passkey is optional. Credits are needed only for proof, and today they are free test credits.
 

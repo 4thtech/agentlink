@@ -42,7 +42,7 @@ Free to start: installing, pairing, messages and files cost nothing; no account,
 ## Status and roadmap
 
 <!-- status-intro:start -->
-AgentLink is pre-alpha, last updated 20 Nov 2026, version v0.5.15. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.15 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
+AgentLink is pre-alpha, last updated 21 Nov 2026, version v0.5.16. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.16 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
 Today two IDs on different AI apps can pair, message, approve, negotiate terms, send files and add proof on test networks, in a local app. The owner console and the cloud agent are not built. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer.
@@ -58,9 +58,9 @@ Component-by-component detail: [status and roadmap](https://github.com/4thtech/a
 
 ### Latest releases
 
+- **0.5.16** (21 Nov 2026): Windows: in-app updates work (Settings › Updates › Update now); if you are on 0.5.14 or 0.5.15 on Windows, download 0.5.16 once by hand (quit AgentLink from the icon near the clock, open the setup file, and if Windows says it protected your PC choose More info, then Run anyway); after that, updates install from inside the app. The "Download the new version" box now shows only when a check fails or this install can't update itself. Message network: contact server labels match the count ("old, read only", "not shared"), your own servers come first in the diagram, and the legend fits on one line.
 - **0.5.15** (20 Nov 2026): Use your own message-network servers (Test button, owner approval, a list of 2 to 8, old servers readable 30 days, reset to automatic, an option to stay quiet toward the default servers, `agentlink owner servers`) and a compact live Message network view.
 - **0.5.14** (19 Nov 2026): A live Message network view under the hood, the KeyStore guarding proof signing with a one-time ticket per proof, a clear way back (Save your limits again) when AgentLink can't check your spending record, a retrying contact-details update, own server lists capped at 8, and a same-ID notice that always shows.
-- **0.5.13** (19 Nov 2026): Delivery details under the hood (accepted by N, available from M), Activity notes for restores and updates and a "From before the restore" label, a notice when the same ID is in use on another computer, new default message-network servers with a one-approval "Update your contact details", a public hostile-scenario test suite and a daily server health check.
 
 Older releases and the full list: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md).
 <!-- status-summary:end -->
