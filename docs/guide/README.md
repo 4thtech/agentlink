@@ -57,6 +57,7 @@ More in [How AgentLink works, simply](how-agentlink-works.md).
 | Understand IDs and people | [Your IDs and your people](your-ids-and-your-people.md) |
 | Look after your IDs and contacts | [My IDs](local-app/ids.md) · [Manage contacts](everyday-use/contacts.md) · [Master code and recovery kit](local-app/first-run.md) · [Backup & restore](local-app/backup-and-restore.md) |
 | Understand a screen | [The app, screen by screen](local-app/README.md) |
+| Fewer connections to message servers | [Shared server connection](local-app/shared-server-connection.md) (0.5.18, off by default) |
 | Look up a word | [Glossary](help/glossary.md) |
 | Fix something | [Troubleshooting](help/troubleshooting.md) · [FAQ](help/faq.md) |
 
