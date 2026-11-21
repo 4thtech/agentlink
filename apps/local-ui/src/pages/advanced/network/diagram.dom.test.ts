@@ -270,7 +270,9 @@ describe('network diagram: contacts', () => {
     const drawn = [...svg.querySelectorAll('[data-node-state]')];
     expect(drawn).toHaveLength(5);
     // The one that cannot be reached is the last in the answer, yet drawn first.
-    expect(drawn[0]?.textContent).toContain('s11.example.org');
+    expect(/[a-z0-9-]+\.example\.org/.exec(drawn[0]?.textContent ?? '')?.[0]).toBe(
+      's11.example.org',
+    );
     expect(slot().querySelectorAll('.nwd-stack .nwd-stack-item')).toHaveLength(5);
     const more = [...slot().querySelectorAll('.nwd-more button')];
     expect(more.map((b) => b.textContent)).toEqual([S.diagramMoreServers(7)]);
@@ -294,9 +296,10 @@ describe('network diagram: contacts', () => {
     const svg = wide() as SVGElement;
     const drawn = [...svg.querySelectorAll('[data-node-state]')].map((n) => n.textContent ?? '');
     expect(drawn).toHaveLength(5);
-    expect(drawn[0]).toContain('own4.example.org');
-    expect(drawn.some((t) => t.includes('old1.example.org'))).toBe(false);
-    expect(drawn.every((t) => t.includes('own'))).toBe(true);
+    const hostOf = (t: string): string => /[a-z0-9-]+\.example\.org/.exec(t)?.[0] ?? '';
+    const hosts = drawn.map(hostOf);
+    expect(hosts[0]).toBe('own4.example.org');
+    expect(hosts.sort()).toEqual([0, 1, 2, 3, 4].map((i) => `own${String(i)}.example.org`));
     expect(slot().querySelector('.nwd-more')?.textContent).toContain(S.diagramMoreServers(2));
   });
 
