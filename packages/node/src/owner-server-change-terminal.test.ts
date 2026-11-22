@@ -29,7 +29,7 @@ import { HARNESS_MARKERS, type OwnerTerminal } from './owner-terminal.js';
 import type { ServerTestRun } from './server-change-plan.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
-const START = ['wss://relay.primal.net', 'wss://offchain.pub'];
+const START = ['wss://relay.primal.net', 'wss://nostr.data.haus'];
 const own = (n: number, tag = 'own'): string[] =>
   Array.from({ length: n }, (_, i) => `wss://${tag}${i + 1}.example.org`);
 

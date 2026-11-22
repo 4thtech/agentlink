@@ -25,7 +25,7 @@ describe('default relay set: single source', () => {
 
   it('the source file lists the D-75 relays', () => {
     expect(hosts).toEqual([
-      'offchain.pub',
+      'nostr.data.haus',
       'relay.primal.net',
       'relay.snort.social',
       'nostr.bitcoiner.social',

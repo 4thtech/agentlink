@@ -8,7 +8,7 @@ Before the J9 dogfood and before external testers; whenever the default list cha
 
 **Daily read-only check (0.5.13, RELAY-DEFAULTS-HEALTH).** `.github/workflows/relay-health.yml` runs `node tools/relays/vet.mjs --live --id-readback` every day (05:41 UTC), on manual dispatch, and on a pull request that changes `packages/transport-nostr/src/default-relays.ts` or `tools/relays/**`. It sends no event and no login, uses no secret and has only `contents: read`. Per relay it samples recent kind-1059 ids and asks for one by id on a fresh connection. The results go to the job summary. It is not part of `ci-gate`, and a failure never blocks a merge: an unreachable relay is the finding, and the job fails only when the check itself breaks. Read the summary after a change to the list, and when users report that messages are slow to arrive; a relay that fails from GitHub's runners may still work elsewhere, so treat it as a signal, not a verdict.
 
-**The default set today (0.5.13, RELAY-DEFAULTS-SWAP, D-75 as amended).** `wss://offchain.pub`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.bitcoiner.social`. `wss://nos.lol` and `wss://nostr.mom` left the default set because some networks cannot reach them. They are still read, never published to, as `LEGACY_READ_RELAYS` (`packages/transport-nostr/src/legacy-relays.ts`), at least until 2027-03-02 (card LEGACY-RELAYS-REMOVAL). That file is not part of the default set, and `tools/relays/vet.mjs` never reads it.
+**The default set today (0.5.17, RELAY-DEFAULTS-SWAP-2, D-75 as amended).** `wss://nostr.data.haus`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.bitcoiner.social`. `wss://nos.lol` and `wss://nostr.mom` left the default set in 0.5.13 because some networks cannot reach them, and `wss://offchain.pub` in 0.5.17 because it refuses extra connections from one computer (table below). They are still read, never published to, as `LEGACY_READ_RELAYS` (`packages/transport-nostr/src/legacy-relays.ts`), at least until 2027-03-02 (card LEGACY-RELAYS-REMOVAL). That file is not part of the default set, and `tools/relays/vet.mjs` never reads it.
 
 ## Who runs it
 The orchestrator or a builder (Sonnet or above) on a machine with network access. The owner confirms the sign-off.
@@ -71,3 +71,25 @@ Not yet measured for the final four: retention beyond 0 minutes (use `--recheck`
 | `wss://nostr.oxtr.dev` | yes | yes | yes | 131 072 (ok) | none, open reads |
 
 Retention and uptime are not measured for any of them. The owner chose nostr.mom and relay.snort.social from this table.
+
+### Per-computer connection limit and replacement vetting (RELAY-DEFAULTS-SWAP-2, 21 Nov 2026)
+
+offchain.pub: with 2 connections held from one computer, 11 of 12 new connects were refused; port 80 accepted, so the limit is a firewall rule (about 2 per address). AgentLink opens a pool per process, so offchain.pub left the default set (owner decision, 21 Nov 2026).
+
+Replacement candidates, `vet.mjs` with 5 concurrent connections:
+
+| Relay | Result |
+|---|---|
+| `wss://nostr.data.haus` | **pass**: 5/5 connections, connect 630 to 700 ms, publish ok, `#p` read without AUTH ok, id read-back served, NIP-11 no auth, max message 131 072 |
+| `wss://relay.nostr.net` | fail: `#p` reads need NIP-42 AUTH that the relay cannot complete |
+| `wss://relay.damus.io` | fail: 3/5 connections, `#p` read failed |
+| `wss://nostr.einundzwanzig.space` | fail: publish rejected |
+| `wss://nostr-01.yakihonne.com` | fail: `#p` read failed |
+| `wss://nostr.oxtr.dev` | fail: 0/5 connections |
+| `wss://relay.nostr.bg`, `wss://relay.0xchat.com` | fail: no DNS |
+| `wss://nostr.fmt.wiz.biz` | fail: NIP-11 error |
+| `wss://relay.mostr.pub` | fail: HTTP 301 |
+| `wss://relay.nostr.band` | fail: down |
+| `wss://nostr-pub.wellorder.net` | fail: HTTP 503 |
+
+24 h re-check on 22 Nov 2026 at 17:21 CET: nostr.data.haus still had the test event (age 1449 min), so it passes. relay.damus.io and nostr.oxtr.dev did not keep theirs. The 7-day re-check is due 28 Nov 2026 for full sign-off.

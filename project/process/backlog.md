@@ -11704,6 +11704,12 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 #### RELAY-PER-IP-LIMIT · A default server that refuses a third connection
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3; `project/runbooks/relay-vetting.md`
 - **Goal:** offchain.pub appears to refuse a third connection from one computer; with several AI apps connected (one connection each) a user could be refused there. Measure the limit, and if confirmed reconsider it as a default.
+- **Done:** measured 21 Nov 2026 (about 2 per address); handled by RELAY-DEFAULTS-SWAP-2.
+
+#### RELAY-DEFAULTS-SWAP-2 · Replace offchain.pub as a default server (0.5.17)
+- **Status:** in progress (0.5.17) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 07 §4.3; D-75 (amended 21 Nov 2026); `project/runbooks/relay-vetting.md`
+- **Goal:** (owner decision, Tali, 21 Nov 2026: "Swap now"): offchain.pub refuses more than about 2 connections per computer (RELAY-PER-IP-LIMIT, measured). nostr.data.haus, the only one of 10 candidates that passed vetting, takes its place; offchain.pub becomes a read-only legacy server with the existing dates.
+- **Done when:** `DEFAULT_RELAYS` and `LEGACY_READ_RELAYS` changed; a card listing offchain.pub shows "Update your contact details" once; offchain.pub is read, never published to; docs, knowledge and runbook updated; the 24 h recheck done before release.
 
 #### NET-VIEW-FIXES · Message network view fixes (0.5.15)
 - **Status:** backlog (0.5.15 lane 1; takes in NET-PROBE-SLOTS and NET-CONTACT-REACH-COST) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 07 §4.3 "Message network view"; 08 §1; D-158 (8)

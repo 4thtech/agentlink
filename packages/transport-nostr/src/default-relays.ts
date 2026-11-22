@@ -6,7 +6,7 @@
 
 /** The default public relays (D-75). Vetted with `tools/relays/vet.mjs`; see `project/runbooks/relay-vetting.md`. */
 export const DEFAULT_RELAYS: readonly string[] = Object.freeze([
-  'wss://offchain.pub',
+  'wss://nostr.data.haus',
   'wss://relay.primal.net',
   'wss://relay.snort.social',
   'wss://nostr.bitcoiner.social',

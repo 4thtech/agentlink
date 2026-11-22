@@ -35,7 +35,7 @@ import {
 import { LocalUiRouteRegistry } from './local-ui/routes.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 
-const START = ['wss://relay.primal.net', 'wss://offchain.pub'];
+const START = ['wss://relay.primal.net', 'wss://nostr.data.haus'];
 const OWN = ['wss://one.example.org', 'wss://two.example.org', 'wss://three.example.org'];
 const approvals: ApprovalChannel = {
   request: (request) => Promise.resolve({ approvalId: request.approvalId }),

@@ -148,7 +148,7 @@ describe('agentlink owner update-contact-details †', () => {
 });
 
 describe('an ID already up to date', () => {
-  beforeEach(() => setUp(['wss://relay.primal.net', 'wss://offchain.pub']));
+  beforeEach(() => setUp(['wss://relay.primal.net', 'wss://nostr.data.haus']));
 
   it('asks for nothing and says so', async () => {
     const r = await run();

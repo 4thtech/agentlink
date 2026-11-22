@@ -99,7 +99,7 @@ interface Fake {
 
 function setup(over: Partial<Fake> = {}, budget: PrecheckBudget = new PrecheckBudget()) {
   const state: Fake = {
-    relays: ['wss://relay.primal.net', 'wss://offchain.pub'],
+    relays: ['wss://relay.primal.net', 'wss://nostr.data.haus'],
     leaving: [],
     announceDefault: true,
     paused: false,
@@ -187,7 +187,7 @@ describe('POST /api/ui/network/servers: the review signs nothing', () => {
     expect(body(res)['servers']).toEqual([
       { host: 'own1.example.org', role: 'own', outcome: 'ready' },
       { host: 'own2.example.org', role: 'own', outcome: 'ready' },
-      { host: 'offchain.pub', role: 'automatic', outcome: 'ready' },
+      { host: 'nostr.data.haus', role: 'automatic', outcome: 'ready' },
       { host: 'relay.primal.net', role: 'automatic', outcome: 'ready' },
     ]);
     expect(body(res)['leaving']).toEqual([]);
