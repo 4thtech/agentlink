@@ -168,7 +168,8 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     const body = res.body as {
       results: { host: string | null; outcome: string; reason: string | null }[];
     };
-    expect(Object.keys(body)).toEqual(['results']);
+    // RELAY-SHARED-CONN L4 (08 §1): the shared state beside the results (off: no link here).
+    expect(Object.keys(body)).toEqual(['results', 'sharedLink']);
     expect(body.results.map((r) => [r.host, r.outcome, r.reason])).toEqual([
       [HOST_A, 'ready', null],
       [HOST_B, 'refused', 'not_accepted'],

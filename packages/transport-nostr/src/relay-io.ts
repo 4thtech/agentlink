@@ -51,6 +51,29 @@ export interface RelaySocket {
  */
 export interface RelayConnector {
   open(target: RelayTarget, handlers: RelaySocketHandlers): RelaySocket;
+  /**
+   * RELAY-SHARED-CONN (D-159 (9); D-156 (7) as amended): a connector on the shared relay link offers
+   * the link's check lane. The pool's availability check goes there (never on the publishing
+   * connection); `unavailable` means the link cannot be used now, and the pool then makes today's
+   * check on a fresh connection of its own. Never rejects.
+   */
+  checkServed?(
+    relay: string,
+    eventId: string,
+    options?: { readonly signal?: RelayCheckSignal },
+  ): Promise<'served' | 'missing' | 'unchecked' | 'unavailable'>;
+  /**
+   * A connection of the program's own, never on the shared link: the pool's fresh login-free check
+   * when the lane is unavailable. Absent: `open`.
+   */
+  openOwn?(target: RelayTarget, handlers: RelaySocketHandlers): RelaySocket;
+}
+
+/** A cancel switch in the shape of an AbortSignal (this package has no DOM types). */
+export interface RelayCheckSignal {
+  readonly aborted: boolean;
+  addEventListener(type: 'abort', listener: () => void): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
 }
 
 /** Resolves a host name to its A and AAAA answers (07 §4.2 step 1). */

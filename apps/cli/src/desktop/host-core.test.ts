@@ -1221,3 +1221,53 @@ describe('TRAY-PIPE: what the icon shows (tray-state, tray-pulse, shell-prefs)',
     await run;
   });
 });
+
+// RELAY-SHARED-CONN L4 (D-159 (8); 07 §4.2 "Hand-over"; 08 §1 "who hosts it"): the desktop host
+// starts its shared relay link (which asks an MCP holder to hand over) before its server opens any
+// ID, so the long-lived host usually holds the link; it closes the link last when it stops.
+describe('RELAY-SHARED-CONN: the desktop host and the shared relay link', () => {
+  it('starts the link (asking for the hand-over) before the server, and closes it on stop', async () => {
+    const s = setup();
+    const order: string[] = [];
+    const run = runDesktopHost({
+      ...s.deps,
+      relayLink: {
+        start: () => {
+          order.push('link start');
+          return Promise.resolve();
+        },
+        close: () => {
+          order.push('link close');
+          return Promise.resolve();
+        },
+      },
+      startServer: (options, sink) => {
+        order.push('start');
+        return s.deps.startServer(options, sink);
+      },
+    });
+    await until(() => readies(s.pipe.sent).length === 1);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+    expect(order).toEqual(['link start', 'start', 'link close']);
+  });
+
+  it('a link that fails to start never stops the app; it is still closed on stop', async () => {
+    const s = setup();
+    const order: string[] = [];
+    const run = runDesktopHost({
+      ...s.deps,
+      relayLink: {
+        start: () => Promise.reject(new Error('endpoint')),
+        close: () => {
+          order.push('link close');
+          return Promise.resolve();
+        },
+      },
+    });
+    await until(() => readies(s.pipe.sent).length === 1);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+    expect(order).toEqual(['link close']);
+  });
+});

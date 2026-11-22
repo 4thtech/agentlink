@@ -29,6 +29,7 @@
 //     announceDefault: boolean,                 // 0.5.15: false after the announce opt-out
 //     change: null | 'paused' | 'rotation_pending', // 0.5.15: why changing servers is off now
 //     previousUntil: unixSec | null,            // 0.5.15: the latest end of the leaving servers
+//     sharedLink: { on: boolean, programs: int }, // RELAY-SHARED-CONN: counts only (D-159)
 //     contactHosts?: [ { ref, servers, shared, hosts: [host] } ] } // only with contacts=hosts
 // Hosts (D1): the origin host only, never the scheme, a path, a query or credentials; a contact's
 // hosts are inbound content (I-5): only lowercase DNS text that passes the relay URL rule (04 §4)
@@ -131,6 +132,8 @@ export interface LocalUiNetworkSnapshot {
   readonly announceDefault?: boolean;
   readonly previousUntil?: number;
   readonly change?: null | 'paused' | 'rotation_pending';
+  /** RELAY-SHARED-CONN (08 §1): this computer's shared server connection. Absent: off. */
+  readonly sharedLink?: { readonly on: boolean; readonly programs: number };
   readonly contactLists?: readonly {
     readonly contactId: string;
     readonly relays: readonly string[];
@@ -183,8 +186,36 @@ export interface LocalUiNetworkBody extends JsonObject {
   readonly change: null | 'paused' | 'rotation_pending';
   /** 0.5.15: the latest end of the leaving servers (unix seconds), or null. */
   readonly previousUntil: number | null;
+  /** RELAY-SHARED-CONN (08 §1, 11 §5.15): a boolean and a count only. */
+  readonly sharedLink: LocalUiSharedLink;
   readonly contactHosts?: readonly LocalUiNetworkContactHosts[];
 }
+
+/** `sharedLink` of the network answer and the server test answer (08 §1). */
+export interface LocalUiSharedLink extends JsonObject {
+  readonly on: boolean;
+  readonly programs: number;
+}
+
+/** Programs answered at most (the link serves 32; room for a bigger cap later). */
+const MAX_PROGRAMS = 1_000;
+
+/** The allowlisted `sharedLink`: `{on, programs}` only; off (0) for anything that is not that. */
+export function sharedLinkOf(value: unknown): LocalUiSharedLink {
+  if (typeof value !== 'object' || value === null) return SHARED_LINK_OFF;
+  const { on, programs } = value as { on?: unknown; programs?: unknown };
+  if (on !== true) return SHARED_LINK_OFF;
+  const n =
+    typeof programs === 'number' &&
+    Number.isSafeInteger(programs) &&
+    programs >= 0 &&
+    programs <= MAX_PROGRAMS
+      ? programs
+      : 0;
+  return Object.freeze({ on: true, programs: n });
+}
+
+export const SHARED_LINK_OFF: LocalUiSharedLink = Object.freeze({ on: false, programs: 0 });
 
 /**
  * D1: the origin host of a relay URL, `host` or `host:port` (port only when it is not 443), or null
@@ -304,6 +335,7 @@ export const NETWORK_NEEDS_SETUP: LocalUiNetworkBody = Object.freeze({
   announceDefault: true,
   change: null,
   previousUntil: null,
+  sharedLink: SHARED_LINK_OFF,
 });
 
 /** The answer when the agent's state could not be read. */
@@ -363,6 +395,7 @@ export function networkBody(
       snapshot.previousUntil > 0
         ? snapshot.previousUntil
         : null,
+    sharedLink: sharedLinkOf(snapshot.sharedLink),
   };
   if (!contactHosts) return Object.freeze(body);
   const rows: LocalUiNetworkContactHosts[] = [];

@@ -321,7 +321,7 @@ export function relayOrigin(url: string): string {
 }
 
 /** Splits a validated relay URL into host and port without a URL parser (04 §4). */
-function relayParts(url: string): { host: string; port: number } | undefined {
+export function relayParts(url: string): { host: string; port: number } | undefined {
   const m = RELAY_PARTS.exec(url);
   if (m === null) return undefined;
   return { host: m[1] as string, port: m[2] === undefined ? 443 : Number(m[2]) };
@@ -531,6 +531,27 @@ export class RelayPool {
     if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'unchecked';
     const signal = options.signal;
     if (signal?.aborted === true) return 'unchecked';
+    // RELAY-SHARED-CONN (D-159 (9)): with the shared link, the check goes through its check lane
+    // (batched per program only, never on the publishing connection); `unavailable` falls through
+    // to today's fresh connection of this program's own.
+    const lane = this.connector.checkServed;
+    if (lane !== undefined) {
+      let outcome: ReadbackOutcome | 'unavailable';
+      try {
+        outcome = await lane.call(this.connector, relay, eventId, {
+          ...(signal === undefined ? {} : { signal }),
+        });
+      } catch {
+        outcome = 'unavailable';
+      }
+      if (outcome !== 'unavailable') {
+        return outcome === 'served' || outcome === 'missing' ? outcome : 'unchecked';
+      }
+      // The lane's await may have seen a cancel or a close (no narrowing across it).
+      if (this.closed || (signal as ReadbackSignal | undefined)?.aborted === true) {
+        return 'unchecked';
+      }
+    }
     if (this.readbacks < MAX_READBACKS) this.readbacks += 1;
     else if (!(await this.waitForSlot(signal))) return 'unchecked';
     try {
@@ -666,7 +687,10 @@ export class RelayPool {
             return;
           }
           try {
-            socket = this.connector.open(target, {
+            // A connection of this program's own (never a virtual one on the shared link).
+            const connector = this.connector;
+            const opener = connector.openOwn?.bind(connector) ?? connector.open.bind(connector);
+            socket = opener(target, {
               onOpen: () => {
                 open = true;
                 sendReq();
@@ -1137,6 +1161,8 @@ export class RelayPool {
   }
 
   private waitForChallenge(conn: Connection): Promise<string | undefined> {
+    // A connection that already closed gets no challenge: no wait (it would last OK_TIMEOUT_MS).
+    if (conn.state === 'closed') return Promise.resolve(undefined);
     return new Promise((resolve) => {
       const waiter = (challenge: string | undefined): void => {
         this.timers.clearTimeout(timer);

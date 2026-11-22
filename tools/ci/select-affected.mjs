@@ -221,6 +221,8 @@ export const HEAVY_LANE = Object.freeze({
     'packages/node/src/keychain',
     'packages/node/src/os-keychain',
     'packages/node/src/local-ui/api/files',
+    // The shared server connection: its Unix socket and Windows named pipe tests are OS-specific (D-159).
+    'packages/node/src/shared-relay-',
     'packages/node/package.json',
     'packages/node/vitest.config',
     'packages/core/src/path-guard',

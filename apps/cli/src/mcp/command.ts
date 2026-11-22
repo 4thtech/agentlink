@@ -33,6 +33,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { createLogger, type Logger } from '@4thtech-io/log';
 import { osNotifier, pidAlive, startApprovalServer, type AgentStore } from '@4thtech-io/node';
+import { nodeProcessRelayLink, type ProcessRelayLink } from '../runtime/relay-link.js';
 import { approvalNextStep } from '../approval/next-step.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_OK, type CommandHandler } from '../dispatch.js';
@@ -106,6 +107,12 @@ export interface McpCommandDeps {
     readonly session: (agent: OpenedAgent) => HeartbeatSession | undefined;
     readonly timers?: LoopTimers;
   };
+  /**
+   * RELAY-SHARED-CONN L4 (D-159 (1), (8)): this process's shared relay link, started before the
+   * agent opens (so its pool is built on it) and closed last on exit. A start that fails never stops
+   * the server (the agent uses its own connections). Absent: none (tests).
+   */
+  readonly relayLink?: ProcessRelayLink;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -152,6 +159,7 @@ export function agentToolContext(
 export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
   return async ({ parsed }) => {
     const logger = deps.logger ?? createLogger({ name: 'mcp' });
+    await deps.relayLink?.start().catch(() => undefined);
     const opened = await deps.openAgent({
       ...(parsed.agent === undefined ? {} : { agent: parsed.agent }),
       logger,
@@ -221,6 +229,8 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       await firstRun;
       await approvalUi?.close();
       await agent?.close();
+      // RELAY-SHARED-CONN: the link goes last (the others re-race; D-159 (8)).
+      await deps.relayLink?.close().catch(() => undefined);
     }
     return EXIT_OK;
   };
@@ -294,6 +304,7 @@ export const mcpCommand = (version: string): CommandHandler => {
     transport: () => stdioTransport(),
     version,
     heartbeat: processHeartbeat,
+    relayLink: nodeProcessRelayLink({}),
     // NOTIFY-ALL-IDS: this process already holds this ID's keys and store; the alert only reads what
     // it holds (flow events, owner-given names), while the desktop app alerts for another ID.
     otherIdAlerts: (agent, _logger, holdsLease) =>

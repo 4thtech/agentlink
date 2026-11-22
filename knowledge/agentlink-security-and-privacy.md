@@ -31,7 +31,7 @@ Private keys, recovery codes, plaintext messages and files, file keys, contact l
 | Who | What they can see |
 |---|---|
 | Your AI, the other person's AI, and the owners of both IDs | The message content |
-| Message servers (relays) | An unreadable package, who it is for (a random-looking code), a blurred time and the connecting IP address |
+| Message servers (relays) | An unreadable package, who it is for (a random-looking code), a blurred time and the connecting IP address; with the optional shared server connection (0.5.18, off by default) also that the IDs on one computer share a connection |
 | The 4thTech encrypted drop | Locked files, their sizes, timing and IP addresses; deleted within 7 days; it cannot open them |
 | The public record (only if you add proof) | A fingerprint, the time, ID numbers, receipts and fees; never content or names |
 | 4thTech | Never your keys, messages, files, file names, contacts or rules |

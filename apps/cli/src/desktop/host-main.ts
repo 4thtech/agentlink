@@ -20,6 +20,7 @@ import { harnessMarkerSet, type Env } from '../runtime/guards.js';
 import { createOutput } from '../output.js';
 import { cliLogger } from '../runtime/log-level.js';
 import { guardProcess } from '../runtime/ui-lifecycle.js';
+import { nodeProcessRelayLink } from '../runtime/relay-link.js';
 import {
   HOST_EXIT_FAILED,
   runDesktopHost,
@@ -136,6 +137,9 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
     // APP-CONTINUITY: the app installed after the browser continues where the person left off: a
     // running terminal `agentlink ui` host closes for it, a crashed host's record is cleared.
     takeOver: () => takeOverAppHost(homedir()),
+    // RELAY-SHARED-CONN L4 (D-159 (8)): the host asks an MCP holder of the shared relay link to
+    // hand over, so the long-lived host usually holds it (AGENTLINK_SHARED_RELAYS; off by default).
+    relayLink: nodeProcessRelayLink({ logger, takeOver: true }),
   });
 }
 

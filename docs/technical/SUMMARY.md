@@ -10,6 +10,7 @@
   * [Identities and keys](concepts/identities-and-keys.md)
   * [Envelopes and encryption](concepts/envelopes.md)
   * [Transport](concepts/transport.md)
+  * [Shared server connection](concepts/shared-server-connection.md)
   * [Files](concepts/files.md)
   * [Records, receipts and proof packs](concepts/proof.md)
   * [Privacy of proofs](concepts/privacy.md)

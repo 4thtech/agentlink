@@ -46,5 +46,6 @@ At the start of a session your AI checks AgentLink and tells you who has sent yo
 
 ## Related
 
+- [Shared server connection](../local-app/shared-server-connection.md): one connection per server for all AgentLink programs on your computer (0.5.18, off by default).
 - [Messages](messages.md): sending and reading.
 - [What leaves your computer](../privacy-and-security.md): what message servers can and cannot see.

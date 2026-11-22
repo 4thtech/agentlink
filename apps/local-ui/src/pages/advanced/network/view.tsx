@@ -333,6 +333,11 @@ export function NetworkView({
           {S.lastChecked(agoText(answer.checkedAt, clock))}
         </p>
       )}
+      {answer.agent !== 'running' ? null : (
+        <p className="al-text-body-sm al-muted nw-shared">
+          {answer.sharedLink.on ? S.sharedOn(answer.sharedLink.programs) : S.sharedOff}
+        </p>
+      )}
       <ServersEntry />
     </section>
   );

@@ -66,4 +66,6 @@ agentlink owner servers reset
 - The test shares the app's limit of 10 tests a minute.
 - A paused ID must be resumed before you change servers.
 
+Several programs on one computer can share one connection to each server; see [Shared server connection](shared-server-connection.md) (new in 0.5.18, off by default).
+
 Back to [Under the hood](under-the-hood.md) or [The local app](README.md).
