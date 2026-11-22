@@ -32,6 +32,8 @@ A message is counted once, even if several servers hand it over.
 
 *New in 0.5.13.* With [Under the hood](../local-app/under-the-hood.md) on, a sent message also shows Message network: accepted by 3, available from 2: how many servers took it, and how many of those handed it back. If it says "Sent, availability unknown", it shows no counts. New AgentLink IDs use new default servers; an earlier ID moves over with [Update your contact details](../local-app/update-contact-details.md).
 
+*New in 0.5.17.* A new server replaces offchain.pub as one of the four automatic message servers, because offchain.pub refuses more than about two connections from one computer. offchain.pub is now an old, read-only server until 2 Mar 2027, and each ID shows [Update your contact details](../local-app/update-contact-details.md) once; an ID that does not approve keeps working.
+
 ## Status first
 
 At the start of a session your AI checks AgentLink and tells you who has sent you something: "Marko sent you 2 messages. Want me to read them?" It reads the messages only when you ask.
