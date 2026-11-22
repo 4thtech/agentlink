@@ -179,6 +179,7 @@ describe('NET-PRECHECK: the network test gate', () => {
           roundTripMs: expect.any(Number) as number,
         },
       ],
+      sharedLink: { on: false, programs: 0 },
     });
     expect(keychainReads).not.toHaveBeenCalled();
     expect(signs).not.toHaveBeenCalled();
