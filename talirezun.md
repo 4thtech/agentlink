@@ -140,3 +140,9 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 ## 2026-11-21 — 0.5.17 ready, 0.5.18 (shared server connection) built
 - 0.5.17 on rel0517/integration: nostr.data.haus replaces offchain.pub as an automatic message server (offchain.pub refuses more than ~2 connections per computer; relay.nostr.net failed vetting). Waits for the 24 h server re-check on 22 Nov, then release; first real Windows in-app update test.
 - 0.5.18 on rel0518/integration: AgentLink programs on one computer can share one connection per message server (D-159), off by default in 0.5.18, on by default later. Spec, build, wiring and detailed docs done tests-first; independent review and security audit passed after one fix round. Ships after 0.5.17.
+
+## 2026-11-22 — 0.5.17 released
+- 0.5.17 LIVE: npm latest, GitHub release v0.5.17, signed desktop update. Release PR #863, version PR #864, docs PR #865, wiki #44.
+- nostr.data.haus replaces offchain.pub as an automatic message server (24 h retention check passed; 7-day check 28 Nov). Each ID updates its contact details once.
+- Owner confirmed: the first Windows in-app update (0.5.16 → 0.5.17) worked; Mac too; 4 of 4 servers connected.
+- Next: 0.5.18 shared server connection (off by default), then 0.5.19 polish.
