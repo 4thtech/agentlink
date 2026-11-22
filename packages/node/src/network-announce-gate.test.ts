@@ -239,7 +239,7 @@ describe('POST /api/ui/network/announce through the real gates', () => {
 
 describe('POST /api/ui/network/announce on a list with default servers', () => {
   beforeAll(() => {
-    START = ['wss://relay.primal.net', 'wss://offchain.pub'];
+    START = ['wss://relay.primal.net', 'wss://nostr.data.haus'];
   });
   afterAll(() => {
     START = OWN;

@@ -20,7 +20,7 @@ import { KeychainOwnerKeyStore, newOwnerSeed, storeOwnerSeed } from './owner-key
 import { signServerChange, type ServerChangeOutcome } from './owner-relay-migration.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
-const START = ['wss://relay.primal.net', 'wss://offchain.pub'];
+const START = ['wss://relay.primal.net', 'wss://nostr.data.haus'];
 const own = (n: number, tag = 'own'): string[] =>
   Array.from({ length: n }, (_, i) => `wss://${tag}${i + 1}.example.org`);
 
