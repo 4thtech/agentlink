@@ -92,4 +92,4 @@ Replacement candidates, `vet.mjs` with 5 concurrent connections:
 | `wss://relay.nostr.band` | fail: down |
 | `wss://nostr-pub.wellorder.net` | fail: HTTP 503 |
 
-Due 22 Nov 2026, before the 0.5.17 release: `node tools/relays/vet.mjs --recheck` for nostr.data.haus (24 h retention and uptime).
+24 h re-check on 22 Nov 2026 at 17:21 CET: nostr.data.haus still had the test event (age 1449 min), so it passes. relay.damus.io and nostr.oxtr.dev did not keep theirs. The 7-day re-check is due 28 Nov 2026 for full sign-off.
