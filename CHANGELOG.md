@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-11-22
+
+### Changed
+
+- The user guide, README, status page and knowledge base describe AgentLink 0.5.16 as released: Windows in-app updates (Settings › Updates › Update now) with the one-time manual download for 0.5.14 and 0.5.15, and the tidier Message network view (DOCS-REL-0516, S0).
+- AgentLink now uses nostr.data.haus instead of offchain.pub as one of its automatic message servers, because offchain.pub refuses extra connections from one computer. offchain.pub is still read, never written to. You'll see "Update your contact details" once; one click with Touch ID or your master code (RELAY-DEFAULTS-SWAP-2, S1, D-75, 07 §4.3).
+
 ## [0.5.16] - 2026-11-21
 
 ### Changed
@@ -1519,7 +1526,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.16...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.17...HEAD
+[0.5.17]: https://github.com/4thtech/agentlink/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/4thtech/agentlink/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/4thtech/agentlink/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/4thtech/agentlink/compare/v0.5.13...v0.5.14

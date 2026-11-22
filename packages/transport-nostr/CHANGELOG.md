@@ -1,5 +1,14 @@
 # @4thtech-io/transport-nostr
 
+## 0.5.17
+
+### Patch Changes
+
+- ee0bfdf: AgentLink now uses nostr.data.haus instead of offchain.pub as one of its automatic message servers, because offchain.pub refuses extra connections from one computer. You'll see "Update your contact details" once; one click with Touch ID or your master code (RELAY-DEFAULTS-SWAP-2).
+- @4thtech-io/crypto@0.5.17
+  - @4thtech-io/log@0.5.17
+  - @4thtech-io/types@0.5.17
+
 ## 0.5.16
 
 ### Patch Changes
