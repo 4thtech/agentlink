@@ -93,7 +93,7 @@ function deps(): OwnerCommandDeps {
           input.request.kind === 'reset'
             ? [
                 { host: 'relay.primal.net', role: 'automatic', outcome: 'ready' },
-                { host: 'offchain.pub', role: 'automatic', outcome: 'ready' },
+                { host: 'nostr.data.haus', role: 'automatic', outcome: 'ready' },
               ]
             : [
                 { host: 'a.example.org', role: 'own', outcome: 'ready' },
