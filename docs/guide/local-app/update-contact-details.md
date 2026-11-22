@@ -3,9 +3,13 @@
 <!-- ai-knowledge: summary
 summary: How to move an earlier ID to AgentLink's new default message servers with one approval, on Home or with agentlink owner update-contact-details, and what happens to your contacts. -->
 
-*New in 0.5.13.*
+*New in 0.5.13; shown again once in 0.5.17.*
 
-AgentLink moved to more reliable message servers. An ID you made before that still lists the old ones on its contact details. Update your contact details moves it to the new ones. It takes one approval from you, and then your contacts learn your new details by themselves.
+AgentLink moved to more reliable message servers. An ID you made before that still lists the old ones on its contact details.
+
+*New in 0.5.17.* AgentLink swapped one automatic server: a new one replaces offchain.pub, because offchain.pub refuses more than about two connections from one computer, so with several AI apps it showed "Can't reach". Every ID that lists offchain.pub shows this notice once more. offchain.pub stays as an old, read-only server until 2 Mar 2027, so nothing waiting there is lost.
+
+In short: Update your contact details moves it to the new ones. It takes one approval from you, and then your contacts learn your new details by themselves.
 
 ## Do it in the app
 
@@ -27,6 +31,7 @@ It asks for your master code, then prints Contact details updated. Your contacts
 
 - Only you can do it. It needs Touch ID or your master code. Your AI cannot do it for you, and no AI tool can.
 - Your contacts do nothing. They receive your new details automatically.
+- Nothing breaks if you do not approve. An ID that does not update keeps working. It just keeps listing the old server for contacts who read your details, so approve when you can.
 - Nothing breaks if you wait. For now AgentLink still reads from the old servers too, so nothing waiting there is lost, and it still reaches contacts whose invite lists them. New invites list only the new servers.
 - If no message server takes it. AgentLink publishes it again on its next pass (since 0.5.14), so you do not need to do anything.
 - Your own list of message servers holds 2 to 8 servers; AgentLink keeps the first 8 of yours when it updates your details and says how many it left out (under Under the hood). Contacts' lists keep their limit of 16.

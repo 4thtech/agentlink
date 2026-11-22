@@ -43,7 +43,7 @@ What other people wrote, including file names, is shown as plain text in a box m
 
 ## Update your contact details
 
-*New in 0.5.13.* If your ID was made before AgentLink's new default message-network servers, a notice on Home says Update your contact details. One approval (Touch ID or your master code) moves it, and your contacts learn the new details by themselves. See [Update your contact details](update-contact-details.md).
+*New in 0.5.13; shown again once in 0.5.17, when a new server replaced offchain.pub as an automatic server.* If your ID was made before AgentLink's new default message-network servers, a notice on Home says Update your contact details. One approval (Touch ID, Windows Hello or your master code) moves it, and your contacts learn the new details by themselves. See [Update your contact details](update-contact-details.md).
 
 ## When the message network can't be reached
 
