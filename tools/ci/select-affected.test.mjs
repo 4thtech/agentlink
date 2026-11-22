@@ -422,6 +422,12 @@ describe('heavy lane: which heavy jobs a pull request runs (by area)', () => {
     expect(running(['packages/node/src/inbox-folder.ts'])).toEqual(['node-os']);
   });
 
+  it('a shared server connection change runs node-os', () => {
+    for (const f of ['link', 'endpoint', 'process']) {
+      expect(running([`packages/node/src/shared-relay-${f}.ts`])).toEqual(['node-os']);
+    }
+  });
+
   it('a path-guard change runs path-guard and node-os', () => {
     expect(running(['packages/node/src/allowed-path.ts'])).toEqual(['node-os', 'path-guard']);
     expect(running(['packages/core/src/path-guard.ts'])).toEqual(['node-os', 'path-guard']);
