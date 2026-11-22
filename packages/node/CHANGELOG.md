@@ -1,5 +1,14 @@
 # @4thtech-io/node
 
+## 0.5.17
+
+### Patch Changes
+
+- Updated dependencies [ee0bfdf]
+  - @4thtech-io/transport-nostr@0.5.17
+  - @4thtech-io/core@0.5.17
+  - @4thtech-io/crypto@0.5.17
+
 ## 0.5.16
 
 ### Patch Changes
