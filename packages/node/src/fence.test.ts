@@ -53,6 +53,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // NET-CLI (D-158; 06 §8): `owner servers set | reset` at this user's keychain and own TTY
       // prompt; no owner-store, terminal or planner seam (the seam variant stays inside).
       'changeServersAtTerminal',
+      // RELAY-SHARED-CONN: the process-wide shared server link (L3/L4). No key or secret crosses it;
+      // only ciphertext frames, over the owner-only local channel; a failure falls back to own sockets.
+      'closeProcessRelayLink',
       'createFileKeyStoreAgent',
       'createInboxFile',
       'createOsKeychainAgent',
@@ -116,6 +119,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // RET-3: a no-replace rename used by the Trash mover (no key, no store).
       'placeNoReplace',
       'probeOsKeychain',
+      'probeSharedRelayLink',
+      'processCheckServed',
+      'processPoolConnector',
+      'processSharedLinkView',
       'quarantineMark',
       'resolveAllowedFile',
       // UX1113-R1 (D-147; 06 §8 `agentlink restore`): the terminal restore on this user's keychain,
@@ -134,6 +141,7 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // WP-D3: the same server for the desktop host; session links go to the pipe sink, never the
       // OS opener (approval-server-link-sink.test.ts).
       'startApprovalServerWithLinkSink',
+      'startProcessRelayLink',
       // NET-CLI: `owner servers test`, the app's server test under the process budget (no presence,
       // no resolver or socket seam).
       'testOwnServers',
