@@ -409,7 +409,9 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
   // each, after a warm-up): a linear scan grows ~4x, a quadratic one ~16x. A loaded runner slows
   // both sizes alike, so the growth ratio holds where an absolute bound does not; the small
   // time is floored so timer noise on a very fast render cannot inflate the ratio. The absolute
-  // ceiling stays as a backstop.
+  // ceiling stays as a backstop. The autolink pattern draws a full budget of pieces from ~8 KB on,
+  // so its render time is flat past that (about 14 ms): it is timed at 8 KB and at 256 KB, where a
+  // linear scan stays ~1x and any scan that grows with the input shows far above the limit.
   const SCAN_CASES: Record<string, (size: number) => string> = {
     'bare URL then punctuation': (n) => `http://x${'!'.repeat(n)}a`,
     'open brackets then one close': (n) => `${'['.repeat(n)}]`,
@@ -417,6 +419,8 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     'autolinks with spaces then one close': (n) => `${'<https://a '.repeat(Math.floor(n / 11))}>`,
   };
   const SCAN_SMALL = K256 / 4;
+  /** Patterns whose drawn work saturates early are compared with a smaller input instead. */
+  const SCAN_SMALL_FOR: Record<string, number> = { 'autolinks with spaces then one close': 8_192 };
   /** Smallest small-size time counted, ms: below this the timer's own noise dominates. */
   const SCAN_FLOOR_MS = 2;
   /** Linear is ~4x for 4x the input, quadratic ~16x; 10x sits between with room for noise. */
@@ -429,11 +433,11 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     return performance.now() - start;
   };
   it.each(Object.keys(SCAN_CASES))(
-    '%s: 4x the input takes under 10x the time (linear, not quadratic)',
+    '%s: a larger input takes under 10x the time (linear, not quadratic)',
     { timeout: 120_000 },
     (name) => {
       const make = SCAN_CASES[name] as (size: number) => string;
-      const small = make(SCAN_SMALL);
+      const small = make(SCAN_SMALL_FOR[name] ?? SCAN_SMALL);
       const large = make(K256);
       timeRender(small); // warm-up
       let tSmall = Infinity;
@@ -446,7 +450,7 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
       const growth = tLarge / Math.max(tSmall, SCAN_FLOOR_MS);
       expect(
         growth,
-        `${name}: ${tSmall.toFixed(1)} ms -> ${tLarge.toFixed(1)} ms = ${growth.toFixed(1)}x for 4x input`,
+        `${name}: ${tSmall.toFixed(1)} ms -> ${tLarge.toFixed(1)} ms = ${growth.toFixed(1)}x for the larger input`,
       ).toBeLessThan(SCAN_GROWTH_MAX);
       expect(tLarge).toBeLessThan(WALL_CLOCK_CEILING_MS);
     },
