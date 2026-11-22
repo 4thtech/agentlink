@@ -111,8 +111,17 @@ export function ServersEntry({
       {paused ? <PausedBanner owner={owner} /> : null}
       {finishing ? <Banner tone="info">{S.finishing}</Banner> : null}
       {recent && !paused && !finishing && status.previousUntil !== null ? (
-        <Banner tone="info" title={S.recentTitle(dayText(progress.changedAt))}>
-          {S.recent(dayText(status.previousUntil))}
+        <Banner
+          tone="info"
+          title={
+            custom
+              ? S.recentTitle(dayText(progress.changedAt))
+              : S.autoTitle(dayText(progress.changedAt))
+          }
+        >
+          {custom
+            ? S.recent(dayText(status.previousUntil))
+            : S.autoRecent(dayText(status.previousUntil))}
         </Banner>
       ) : null}
       {showProgress ? <ProgressCard progress={progress} ownCount={status.ownCount} /> : null}

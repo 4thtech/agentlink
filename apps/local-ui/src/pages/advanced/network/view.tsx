@@ -501,7 +501,7 @@ function Servers({
       )}
       {old.length === 0 ? null : (
         <ul className="nw-list">
-          <li className="nw-srv is-fold is-old">
+          <li className="nw-srv is-fold is-old" title={S.oldGroupHint}>
             <button
               type="button"
               className="nw-srv-top nw-srv-btn"
