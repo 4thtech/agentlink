@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.18] - 2026-11-22
+
+### Added
+
+- The shared server connection is wired in: `agentlink mcp` and the desktop app share one connection to each message server when AGENTLINK_SHARED_RELAYS=1 (off by default in this release), the desktop app takes the connection over when it starts, the availability check and the server Test use the shared check connection, and `agentlink doctor` and Under the hood › Message network show "Shared server connection: on, {n} programs" or "off" (RELAY-SHARED-CONN L4, S2, D-159, 07 §4.2, 04 §4, 08 §1, 11 §5.15).
+
+### Changed
+
+- The user guide, README, status page and knowledge base describe AgentLink 0.5.17 as released: nostr.data.haus replaces offchain.pub as an automatic message server (offchain.pub is old and read only until 2 Mar 2027), the one-time "Update your contact details" notice, and Windows in-app updates from 0.5.16 (DOCS-REL-0517, S0).
+- Spec: AgentLink programs on one computer will share one connection to each message server, so servers that accept only a couple of connections from one computer stop turning programs away. Keys never leave their program, a private local channel keeps other users out, and any problem falls back to today's own connections. It ships switched off for one release first (RELAY-SHARED-CONN, S2, D-159, 07 §4.2, 04 §4).
+
 ## [0.5.17] - 2026-11-22
 
 ### Changed
@@ -1526,7 +1537,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.17...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.18...HEAD
+[0.5.18]: https://github.com/4thtech/agentlink/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/4thtech/agentlink/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/4thtech/agentlink/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/4thtech/agentlink/compare/v0.5.14...v0.5.15
