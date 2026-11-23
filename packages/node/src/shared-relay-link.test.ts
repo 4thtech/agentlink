@@ -766,6 +766,7 @@ describe.runIf(POSIX)('shared link hardening, 0.5.19', () => {
   it('a refused program re-elects on a timer and rejoins a healthy link after the winner restarts', async () => {
     const home = tempHome();
     const fileToken = await ensureLinkToken(home);
+    if (fileToken === undefined) throw new Error('link token unavailable');
     const scheduled: { fn: () => void; ms: number; cleared: boolean }[] = [];
     const timers = {
       setTimeout: (fn: () => void, ms: number): unknown => {
