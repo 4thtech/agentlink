@@ -833,14 +833,16 @@ describe.runIf(POSIX)('shared link hardening, 0.5.19', () => {
           mode: (info.mode & ~0o777) | mode,
         });
       };
-    expect(await checkSocket(socketPath(home), withMode(0o600))).toBe('ok');
-    expect(await checkSocket(socketPath(home), withMode(0o660))).toBe('unsafe');
-    expect(await checkSocket(socketPath(home), withMode(0o606))).toBe('unsafe');
-    // A program that sees such a socket never connects to it.
+    const strict = { privateMode: true };
+    expect(await checkSocket(socketPath(home), withMode(0o600), undefined, strict)).toBe('ok');
+    expect(await checkSocket(socketPath(home), withMode(0o660), undefined, strict)).toBe('unsafe');
+    expect(await checkSocket(socketPath(home), withMode(0o606), undefined, strict)).toBe('unsafe');
+    // A program whose own socket is not private after the bind does not hold the link.
+    await a.link.close();
     const b = makeLink(home, token(), {
       lstat: (path) => (path === socketPath(home) ? withMode(0o666)(path) : lstat(path)),
     });
     expect(await b.link.start()).toBe('unavailable');
-    expect(a.link.stats()?.clients).toBe(0);
+    expect(b.link.stats()).toBeUndefined();
   });
 });

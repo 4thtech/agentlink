@@ -4,8 +4,9 @@
 // - Unix (macOS, Linux, WSL): the socket `<home>/.agentlink/run/relay.sock` in the folder
 //   `<home>/.agentlink/run`, created 0700. `lstat` (never following a link) checks, before a connect
 //   and right after a bind, that the folder is a real folder of this uid with no group or other
-//   permission, and that the socket is a socket of this uid. When that path passes the platform's
-//   socket-path limit (sun_path: 104 bytes with the closing NUL on macOS, 108 on Linux), a short
+//   permission, and that the socket is a socket of this uid with no group or other permission
+//   (mode 0600; a failed chmod after the bind is logged and the link is not held). When that path
+//   passes the platform's socket-path limit (sun_path: 104 bytes with the closing NUL on macOS, 108 on Linux), a short
 //   per-user path is used instead: `<tmpdir>/agentlink-<uid>/r<hash>.sock` (`<hash>` the first
 //   16 hex of SHA-256 of the home path, so each home has its own), else the same under `/tmp`. Its
 //   folder gets the same checks; another user who made that folder first only turns sharing off
@@ -117,11 +118,18 @@ export async function ensureDir(
   return checkDir(dir, lstatFn, uid);
 }
 
+/** Options of `checkSocket`. */
+export interface SocketCheckOptions {
+  /** Also require mode 0600 (no group or other permission): the check right after our own bind. */
+  readonly privateMode?: boolean;
+}
+
 /** `missing`, `ok` (a socket of this uid), or `unsafe` (anything else, a link included). */
 export async function checkSocket(
   path: string,
   lstatFn: LstatFn = lstat,
   uid: () => number | undefined = ownUid,
+  options: SocketCheckOptions = {},
 ): Promise<'missing' | 'ok' | 'unsafe'> {
   let info: Stats;
   try {
@@ -130,6 +138,11 @@ export async function checkSocket(
     return errorCode(error) === 'ENOENT' ? 'missing' : 'unsafe';
   }
   if (info.isSymbolicLink() || !info.isSocket()) return 'unsafe';
+  // Our own socket right after the bind: only this user may connect (no group or other bit). Skipped
+  // on Windows, where a pipe has no such mode (the token proof is the guard there).
+  if (options.privateMode === true && process.platform !== 'win32' && (info.mode & 0o077) !== 0) {
+    return 'unsafe';
+  }
   const own = uid();
   return own !== undefined && info.uid === own ? 'ok' : 'unsafe';
 }

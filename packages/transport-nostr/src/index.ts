@@ -170,6 +170,7 @@ export {
   SHARED_LINK_MAX_CLIENTS,
   SHARED_LINK_MAX_PENDING_HANDSHAKES,
   SharedLinkMux,
+  type SharedLinkAttachOptions,
   type SharedLinkClient,
   type SharedLinkMuxOptions,
   type SharedLinkPeer,

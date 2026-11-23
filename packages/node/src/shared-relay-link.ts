@@ -25,6 +25,14 @@
 //   next election after that time finds a healthy winner when there is one. A token refusal re-reads
 //   the token file. Each election, and a changed token, is a new `epoch`: connectors that were down
 //   or refused try the link again then (D-159 build decisions 8 and 10).
+// - Refused (D-159 build decision 13): a program whose connectors were refused (protocol version or
+//   token) holds no channel, so it would never see the winner go. While refused it runs the election
+//   again on a timer (SHARED_LINK_REPROBE_MS plus up to half of it at random, unref'd, at most
+//   REPROBE_MAX_ROUNDS times until a connector is ready again); each election is a new epoch, so the
+//   connectors try the link once more and join a healthy winner when there is one.
+// - The socket's mode (D-159 build decision 14): a failed chmod after the bind is logged with a fixed
+//   code, and the socket check right after it (mode 0600 on Unix, skipped on Windows) then decides
+//   whether the link is held; a socket that is not private is closed and sharing is off for now.
 // - Counts (D-159 build decision 11): `programs` is the IDs on this computer using the link, the
 //   same number from the winner and from a client: proved channels of ID client connectors only,
 //   never a channel in its handshake, a status question or a server test (`transient`).
@@ -78,6 +86,10 @@ export const SHARED_RELAYS_DEFAULT = false;
 export const SHARED_LINK_RERACE_MAX_MS = 500;
 /** After an unusable endpoint, dials fail at once for this long (the program connects directly). */
 export const SHARED_LINK_COOLDOWN_MS = 5_000;
+/** While refused, the election runs again after this (plus up to half of it at random). */
+export const SHARED_LINK_REPROBE_MS = 30_000;
+/** Re-elections while refused, at most, until a connector is ready again (about an hour). */
+const REPROBE_MAX_ROUNDS = 120;
 
 const ELECTION_ATTEMPTS = 3;
 const ELECTION_BACKOFF_MS = 50;
@@ -144,7 +156,26 @@ export interface SharedRelayLinkOptions extends EndpointPlatform {
     path: string,
     real: (path: string) => Promise<ProbeOutcome>,
   ) => Promise<ProbeOutcome>;
+  /** Test seam: the chmod of the bound socket. */
+  readonly chmod?: (path: string, mode: number) => Promise<void>;
+  /** Test seam: the timer of the re-election while refused (default: unref'd setTimeout). */
+  readonly reprobeTimers?: ReprobeTimers;
 }
+
+/** The timer of the re-election while refused (a seam for tests). */
+export interface ReprobeTimers {
+  setTimeout(fn: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+}
+
+const unrefTimers: ReprobeTimers = {
+  setTimeout: (fn, ms) => {
+    const timer = setTimeout(fn, ms);
+    timer.unref?.();
+    return timer;
+  },
+  clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
 
 /** Options for one more client connector on the link. */
 export interface LinkConnectorOptions {
@@ -191,6 +222,10 @@ export class SharedRelayLink {
   /** The current back-off after a stuck endpoint (0: none). */
   private stuckBackoffMs = 0;
   private reloading = false;
+  private readonly reprobeTimers: ReprobeTimers;
+  /** The pending re-election while refused, if any. */
+  private reprobeTimer: unknown;
+  private reprobeRounds = 0;
 
   constructor(options: SharedRelayLinkOptions) {
     if (!(options.token instanceof Uint8Array) || options.token.length !== 32) {
@@ -202,6 +237,7 @@ export class SharedRelayLink {
     this.uid = options.uid ?? ownUid;
     this.random = options.random ?? Math.random;
     this.logger = options.logger;
+    this.reprobeTimers = options.reprobeTimers ?? unrefTimers;
     this.endpoint = resolveEndpoint(options.home, options);
   }
 
@@ -258,10 +294,13 @@ export class SharedRelayLink {
   private handshakeEnded(outcome: SharedHandshakeOutcome): void {
     if (outcome === 'ready') {
       this.stuckBackoffMs = 0;
+      this.reprobeRounds = 0;
+      this.cancelReprobe();
       return;
     }
-    if (outcome === 'token') {
-      void this.reloadToken();
+    if (outcome === 'token' || outcome === 'version') {
+      if (outcome === 'token') void this.reloadToken();
+      this.armReprobe();
       return;
     }
     if ((outcome !== 'stalled' && outcome !== 'protocol') || this.current !== 'client') return;
@@ -272,6 +311,30 @@ export class SharedRelayLink {
     this.current = 'unavailable';
     this.unavailableUntil = Date.now() + this.stuckBackoffMs;
     this.logger?.info('shared relay link not used', { reason: outcome });
+  }
+
+  /**
+   * Refused: run the election again later, so a winner that exits (and a healthy one after it) is
+   * noticed although this program holds no channel. Bounded; never more than one pending.
+   */
+  private armReprobe(): void {
+    if (this.closed || this.reprobeTimer !== undefined) return;
+    if (this.reprobeRounds >= REPROBE_MAX_ROUNDS) return;
+    const delay = SHARED_LINK_REPROBE_MS * (1 + this.random() * 0.5);
+    this.reprobeTimer = this.reprobeTimers.setTimeout(() => {
+      this.reprobeTimer = undefined;
+      if (this.closed) return;
+      this.reprobeRounds += 1;
+      if (this.current !== 'client' || this.election !== undefined) return;
+      this.current = 'idle';
+      void this.elect(0); // a new epoch: refused connectors try the link once more
+    }, delay);
+  }
+
+  private cancelReprobe(): void {
+    if (this.reprobeTimer === undefined) return;
+    this.reprobeTimers.clearTimeout(this.reprobeTimer);
+    this.reprobeTimer = undefined;
   }
 
   /** The token file changed (another program replaced a corrupt one): use the new token. */
@@ -368,6 +431,7 @@ export class SharedRelayLink {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    this.cancelReprobe();
     this.skipDelay?.();
     for (const socket of this.dialled) socket.destroy();
     this.dialled.clear();
@@ -477,10 +541,15 @@ export class SharedRelayLink {
     }
     if (listened !== 'ok') return 'retry';
     // Only this user may connect, whatever the umask (the 0700 folder is the first guard).
-    await chmod(path, 0o600).catch(() => undefined);
+    try {
+      await (this.options.chmod ?? chmod)(path, 0o600);
+    } catch {
+      // Fixed code only (never the path or the error text); the socket check below decides.
+      this.logger?.warn('shared relay link socket mode not set', { reason: 'socket_mode' });
+    }
     if (
       !(await checkDir(dir, this.lstatFn, this.uid)) ||
-      (await checkSocket(path, this.lstatFn, this.uid)) !== 'ok'
+      (await checkSocket(path, this.lstatFn, this.uid, { privateMode: true })) !== 'ok'
     ) {
       await this.stopServer();
       return 'unsafe';
@@ -674,15 +743,19 @@ export class SharedRelayLink {
         handlers.onClose();
       });
     };
-    const client: SharedLinkClient = mux.attach({
-      send: (frame) => {
-        if (ending) throw new Unavailable();
-        microtask(() => {
-          if (!ended) handlers.onFrame(frame);
-        });
+    // In process, not through the endpoint: never counted against the pre-proof cap.
+    const client: SharedLinkClient = mux.attach(
+      {
+        send: (frame) => {
+          if (ending) throw new Unavailable();
+          microtask(() => {
+            if (!ended) handlers.onFrame(frame);
+          });
+        },
+        close: shut,
       },
-      close: shut,
-    });
+      { local: true },
+    );
     return {
       send: (frame) => {
         if (ending) throw new Unavailable();
