@@ -755,6 +755,7 @@ describe('Message network view: compact rows (NET-COMPACT, NET-BAR24)', () => {
       b.textContent?.includes('Old servers (3)'),
     ) as HTMLButtonElement;
     expect(group.textContent).toContain('read only until');
+    expect(group.closest('li')?.getAttribute('title')).toBe('Older AgentLink servers');
     expect(group.getAttribute('aria-expanded')).toBe('false');
     await act(async () => group.click());
     expect(group.getAttribute('aria-expanded')).toBe('true');

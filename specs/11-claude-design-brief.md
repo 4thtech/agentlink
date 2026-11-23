@@ -595,12 +595,12 @@ D-158 (decided by Tali in chat, 19–20 Nov 2026: the C1–C8 wireframes are the
 | C4, consequence: what servers see | "What servers can see" · "That you're online, and scrambled messages. Never what's inside them." |
 | C4, confirm | **Use these servers with {sensor}** / **Use these servers with your master code** · **Back** |
 | C5, system prompt reason | "Use {n} message servers" · "AgentLink wants to change which servers carry your messages." |
-| Message network, compact list (0.5.15) | Server row, one line: dot, host, state · time; it opens to roles, times, 24 h counts and bar, contacts, last worked. **Show all {n} servers** · **Show fewer servers** · "Old servers ({n}) · read only until {date}" · "{n} can't be reached" · diagram "+{n} more servers" / "+{n} more contacts". A slow, down or blocked server is always on top and never folded. |
+| Message network, compact list (0.5.15) | Server row, one line: dot, host, state · time; it opens to roles, times, 24 h counts and bar, contacts, last worked. **Show all {n} servers** · **Show fewer servers** · "Old servers ({n}) · read only until {date}" (tooltip "Older AgentLink servers"; not the banner's date) · "{n} can't be reached" · diagram "+{n} more servers" / "+{n} more contacts". A slow, down or blocked server is always on top and never folded. |
 | C6, progress | "Servers changed" · "{time} · done" · "Telling your contacts… {sent} of {total}" · "The rest wait if they're offline and get it when they're back." · "Old servers readable until {date}" · per contact "Sent" / "Waiting" |
-| C7, done | "Done" · "All {n} contacts have your new details" · "Your messages now use your {n} servers. Old ones stay readable until {date}." · "Back to automatic any time" · toast "Servers updated" · "Your contacts have your new details." |
+| C7, done | "Done" · "All {n} contacts have your new details" (one contact: "Your 1 contact has your new details") · "Your messages now use your {n} servers. Old ones stay readable until {date}." · "Back to automatic any time" · toast "Servers updated" · "Your contacts have your new details." |
 | C7b, paused | "Paused · Resume to change servers" · "Your ID is paused. Resume it with {sensor} first." |
 | C7b, a change still finishing | "An earlier change of this ID is still finishing. Try again in a minute." |
-| C7b, recent change (info) | "You changed servers on {date}" · "Servers you left stay readable until {date}. You can change again or go back to automatic at any time." |
+| C7b, recent change (info) | "You changed servers on {date}" · "Servers this ID left stay readable until {date}. You can change again or go back to automatic at any time." · after AgentLink's own update (automatic mode): "Your servers were updated on {date}" · "AgentLink updated your automatic servers. Servers this ID left stay readable until {date}." |
 | Refused: too many old servers | "Too many old servers are still being read" · "You can change again from {date}, or go back to automatic now." |
 | Refused: same list | "These are already your servers." |
 | Refused: changed since the test | "A server answered differently this time. Test again before you continue." |
