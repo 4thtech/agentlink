@@ -226,3 +226,74 @@ describe('a start failure says what went wrong (R1)', () => {
     expect(p.err).toEqual([UI_TEXT.startFailure.failed(PREFIX)]);
   });
 });
+
+// SHARED-LINK-HARDEN (08 §1 "One relay link per computer: who hosts it"): the terminal app host
+// starts this process's shared relay link before it opens an ID and closes it last, like `mcp`.
+describe('ui starts and closes the process relay link', () => {
+  function withLink(script: Script = {}) {
+    const f = fake(script);
+    const order: string[] = [];
+    const start = f.deps.start;
+    const deps: UiDeps = {
+      ...f.deps,
+      start: (name, options) => {
+        order.push('server start');
+        return start(name, options).then((server) =>
+          server === undefined
+            ? undefined
+            : {
+                ...server,
+                close: () => {
+                  order.push('server close');
+                  return server.close();
+                },
+              },
+        );
+      },
+      relayLink: {
+        start: () => {
+          order.push('link start');
+          return Promise.resolve();
+        },
+        close: () => {
+          order.push('link close');
+          return Promise.resolve();
+        },
+      },
+    };
+    return { ...f, deps, order };
+  }
+
+  it('the link starts before the server and closes after it on Ctrl+C', async () => {
+    const f = withLink();
+    const run = serveUi(probe().context, f.deps, PREFIX);
+    await tick();
+    expect(f.order).toEqual(['link start', 'server start']);
+    f.signal('SIGINT');
+    await expect(run).resolves.toBe(EXIT_OK);
+    expect(f.order).toEqual(['link start', 'server start', 'server close', 'link close']);
+  });
+
+  it('the link is closed when the server could not start', async () => {
+    const f = withLink({ start: 'none' });
+    await expect(serveUi(probe().context, f.deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(f.order).toEqual(['link start', 'server start', 'link close']);
+  });
+
+  it('a link that cannot start never stops the server', async () => {
+    const f = withLink();
+    const deps: UiDeps = {
+      ...f.deps,
+      relayLink: {
+        start: () => Promise.reject(new Error('endpoint')),
+        close: () => Promise.resolve(),
+      },
+    };
+    const p = probe();
+    const run = serveUi(p.context, deps, PREFIX);
+    await tick();
+    f.signal('SIGINT');
+    await expect(run).resolves.toBe(EXIT_OK);
+    expect(p.out[0]).toBe(UI_TEXT.opened);
+  });
+});

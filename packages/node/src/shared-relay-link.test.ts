@@ -40,10 +40,12 @@ import {
   RELAY_SOCKET_FILE,
   RELAY_TOKEN_FILE,
   SOCKET_PATH_MAX_BYTES,
+  checkSocket,
   ensureLinkToken,
   resolveEndpoint,
 } from './shared-relay-endpoint.js';
 import {
+  SHARED_LINK_REPROBE_MS,
   SHARED_RELAYS_DEFAULT,
   SHARED_RELAYS_ENV,
   SharedRelayLink,
@@ -743,5 +745,102 @@ describe.runIf(POSIX)('shared link hardening (Unix socket)', () => {
     expect(await a.link.status()).toEqual({ on: true, role: 'winner', programs: 2 });
     expect(await b.link.status()).toEqual({ on: true, role: 'client', programs: 2 });
     test.close();
+  });
+});
+
+// SHARED-LINK-HARDEN (0.5.19; D-159 build decisions 12 to 14; 04 §4 "Local relay link").
+describe.runIf(POSIX)('shared link hardening, 0.5.19', () => {
+  it('a winner that opens more IDs at once than the pre-proof cap shares every one of them', async () => {
+    const home = tempHome();
+    const a = makeLink(home, token());
+    expect(await a.link.start()).toBe('winner');
+    const connectors = Array.from(
+      { length: 12 },
+      () => new FallbackConnector(a.link.newConnector(), a.relay.connector),
+    );
+    await Promise.all(connectors.map((conn, i) => roundTrip(conn, `id-${i}`)));
+    expect(a.relay.opens).toHaveLength(1); // one shared upstream, none direct
+    expect(a.link.stats()?.ids).toBe(12);
+  });
+
+  it('a refused program re-elects on a timer and rejoins a healthy link after the winner restarts', async () => {
+    const home = tempHome();
+    const fileToken = await ensureLinkToken(home);
+    const scheduled: { fn: () => void; ms: number; cleared: boolean }[] = [];
+    const timers = {
+      setTimeout: (fn: () => void, ms: number): unknown => {
+        const entry = { fn, ms, cleared: false };
+        scheduled.push(entry);
+        return entry;
+      },
+      clearTimeout: (handle: unknown): void => {
+        (handle as { cleared: boolean }).cleared = true;
+      },
+    };
+    const old = makeLink(home, token()); // a winner this program cannot prove the token to
+    expect(await old.link.start()).toBe('winner');
+    const b = makeLink(home, fileToken, { reprobeTimers: timers });
+    expect(await b.link.start()).toBe('client');
+    const conn = new FallbackConnector(b.link.connector(), b.relay.connector);
+    await roundTrip(conn, 'refused');
+    expect(b.relay.opens).toHaveLength(1); // direct
+    await waitFor(() => scheduled.some((e) => !e.cleared));
+    const pending = scheduled.filter((e) => !e.cleared);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.ms).toBeGreaterThanOrEqual(SHARED_LINK_REPROBE_MS);
+    expect(pending[0]?.ms).toBeLessThan(SHARED_LINK_REPROBE_MS * 1.5);
+    await old.link.close(); // the winner exits; this program holds no channel and sees nothing
+    const healthy = makeLink(home, fileToken);
+    expect(await healthy.link.start()).toBe('winner');
+    expect(b.link.role).toBe('client');
+    pending[0]?.fn(); // the re-probe time comes
+    await waitFor(() => b.link.role === 'client');
+    await roundTrip(conn, 'rejoined');
+    expect(healthy.relay.opens).toHaveLength(1); // b's traffic now rides the healthy link
+    expect(b.relay.opens).toHaveLength(1);
+    expect(healthy.link.stats()?.ids).toBe(1);
+    // Ready again: no further re-probe is pending.
+    expect(scheduled.filter((e) => !e.cleared && e !== pending[0])).toHaveLength(0);
+  });
+
+  it('a failed chmod on the socket is logged with a fixed code and no path', async () => {
+    const home = tempHome();
+    const { lines, logger } = captureLogger();
+    const a = makeLink(home, token(), {
+      logger,
+      chmod: () => Promise.reject(new Error(`EPERM: chmod ${socketPath(home)}`)),
+    });
+    const role = await a.link.start();
+    expect(lines.filter((l) => l.includes('"reason":"socket_mode"')).length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line).not.toContain(home);
+      expect(line).not.toContain('EPERM');
+    }
+    // Held only when the socket is private anyway (the mode check decides).
+    if (role === 'winner') expect(statSync(socketPath(home)).mode & 0o077).toBe(0);
+    else expect(role).toBe('unavailable');
+  });
+
+  it('the socket check refuses a socket with group or other permission', async () => {
+    const home = tempHome();
+    const a = makeLink(home, token());
+    expect(await a.link.start()).toBe('winner');
+    const withMode =
+      (mode: number) =>
+      async (path: string): Promise<Stats> => {
+        const info = await lstat(path);
+        return Object.assign(Object.create(Object.getPrototypeOf(info) as object) as Stats, info, {
+          mode: (info.mode & ~0o777) | mode,
+        });
+      };
+    expect(await checkSocket(socketPath(home), withMode(0o600))).toBe('ok');
+    expect(await checkSocket(socketPath(home), withMode(0o660))).toBe('unsafe');
+    expect(await checkSocket(socketPath(home), withMode(0o606))).toBe('unsafe');
+    // A program that sees such a socket never connects to it.
+    const b = makeLink(home, token(), {
+      lstat: (path) => (path === socketPath(home) ? withMode(0o666)(path) : lstat(path)),
+    });
+    expect(await b.link.start()).toBe('unavailable');
+    expect(a.link.stats()?.clients).toBe(0);
   });
 });
