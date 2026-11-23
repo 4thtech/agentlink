@@ -7,11 +7,15 @@
 //
 //   node tools/docs/wiki-sync.mjs --preflight                         # CI here: the tree can be published
 //   node tools/docs/wiki-sync.mjs --wiki <wiki checkout> --tag v0.4.15 [--source <checkout of that tag>]
+//   node tools/docs/wiki-sync.mjs --wiki <wiki checkout> --ref main --version 0.4.15 [--source <checkout>]
+//                                                                      # after the release docs PR: docs from main
 //   node tools/docs/wiki-sync.mjs --wiki <wiki checkout> --check      # the wiki copy is unedited
 //   node tools/docs/wiki-sync.mjs --wiki <wiki checkout> --recorded-tag   # prints the synced tag
 //   node tools/docs/wiki-sync.mjs --latest-tag                        # prints the newest release tag
 //
-// Release tags only, never `main`, and the tag must be on main: the wiki shows what is released.
+// Default: release tags only, and the tag must be on main: the wiki shows what is released.
+// Release docs land on main after the tag, so --ref <branch|sha> --version X.Y.Z syncs the docs at that
+// commit (it must be on origin/main history) and records it as vX.Y.Z plus the exact commit sha.
 // Only .md pages and images are copied; symbolic links are refused; redirects stay inside agentlink/. docs/guide -> agentlink/,
 // docs/technical -> agentlink/technical/, docs/assets -> agentlink/.gitbook/assets/.
 // DOCS-COMPACT-A: the source paths come from tools/docs/paths.mjs and are picked per source tree
@@ -538,6 +542,32 @@ export function assertOnMain(srcRoot, commit, mainRef = 'origin/main') {
   }
 }
 
+/** Resolves a branch or sha to its full commit in the source checkout (origin/<ref> first). */
+export function resolveRefCommit(srcRoot, ref) {
+  if (!ref || ref.startsWith('-')) throw new Error(`cannot resolve "${ref}" in the source checkout`);
+  for (const cand of [`origin/${ref}`, ref]) {
+    try {
+      return git(['rev-parse', '--verify', '--quiet', `${cand}^{commit}`], srcRoot);
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  throw new Error(`cannot resolve "${ref}" in the source checkout`);
+}
+
+/** Validates --tag / --ref / --version. The tag flow stays the default. */
+export function resolveTarget(args) {
+  if (args.ref === undefined && args.version === undefined)
+    return { mode: 'tag', tag: args.tag ?? null };
+  if (args.tag) throw new Error('--tag cannot be combined with --ref/--version');
+  if (args.ref === undefined) throw new Error('--version needs --ref <branch|sha>');
+  if (args.version === undefined)
+    throw new Error('--ref needs --version X.Y.Z (the release the docs describe)');
+  if (!/^\d+\.\d+\.\d+$/.test(args.version))
+    throw new Error(`"${args.version}" is not a release version like 0.4.15 (X.Y.Z)`);
+  return { mode: 'ref', ref: args.ref, version: args.version, tag: `v${args.version}` };
+}
+
 export function latestTag(cwd = REPO_ROOT) {
   const out = git(['ls-remote', '--tags', '--refs', REPO_URL, 'v*'], cwd);
   const tags = out
@@ -704,13 +734,13 @@ export function preflight(srcRoot = REPO_ROOT) {
 
 // ---------- CLI ----------
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const a = {};
   for (let i = 0; i < argv.length; i += 1) {
     const k = argv[i];
     if (['--check', '--preflight', '--recorded-tag', '--latest-tag'].includes(k))
       a[k.slice(2)] = true;
-    else if (['--tag', '--source', '--wiki'].includes(k)) {
+    else if (['--tag', '--source', '--wiki', '--ref', '--version'].includes(k)) {
       const v = argv[i + 1];
       if (!v || v.startsWith('--')) throw new Error(`${k} needs a value`);
       a[k.slice(2)] = v;
@@ -755,7 +785,8 @@ function main() {
     console.log(`wiki-sync --check: OK (${st.files.length} files from ${st.tag})`);
     return;
   }
-  const tag = args.tag ?? latestTag();
+  const target = resolveTarget(args);
+  const tag = target.tag ?? latestTag();
   if (!TAG_RE.test(tag))
     throw new Error(`"${tag}" is not a release tag like v0.4.15 (sync from release tags only)`);
   let srcRoot = args.source ? path.resolve(args.source) : null;
@@ -764,20 +795,35 @@ function main() {
     if (!srcRoot) {
       tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlink-sync-'));
       srcRoot = path.join(tmp, 'agentlink');
-      // Full history without file contents, so the tag can be checked against main.
-      git(['clone', '--quiet', '--filter=blob:none', '--branch', tag, REPO_URL, srcRoot], tmp);
+      // Full history without file contents, so the commit can be checked against main.
+      const branch = target.mode === 'tag' ? ['--branch', tag] : [];
+      git(['clone', '--quiet', '--filter=blob:none', ...branch, REPO_URL, srcRoot], tmp);
     }
-    const commit = git(['rev-parse', 'HEAD'], srcRoot);
-    // `git describe` picks one tag when several point at HEAD; accept the tag if it is any of them.
-    const pointing = git(['tag', '--points-at', 'HEAD'], srcRoot)
-      .split('\n')
-      .map((t) => t.trim())
-      .filter(Boolean);
-    if (!pointing.includes(tag))
-      throw new Error(
-        `the source checkout is at ${pointing.join(', ') || 'no tag'}, not ${tag} (release tags only)`,
-      );
-    assertOnMain(srcRoot, commit);
+    let commit;
+    if (target.mode === 'ref') {
+      commit = resolveRefCommit(srcRoot, target.ref);
+      assertOnMain(srcRoot, commit);
+      const head = git(['rev-parse', 'HEAD'], srcRoot);
+      if (head !== commit) {
+        if (!tmp)
+          throw new Error(
+            `the source checkout is at ${head.slice(0, 12)}, not ${target.ref} (${commit.slice(0, 12)}): check it out first`,
+          );
+        git(['checkout', '--quiet', '--detach', commit], srcRoot);
+      }
+    } else {
+      commit = git(['rev-parse', 'HEAD'], srcRoot);
+      // `git describe` picks one tag when several point at HEAD; accept the tag if it is any of them.
+      const pointing = git(['tag', '--points-at', 'HEAD'], srcRoot)
+        .split('\n')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (!pointing.includes(tag))
+        throw new Error(
+          `the source checkout is at ${pointing.join(', ') || 'no tag'}, not ${tag} (release tags only)`,
+        );
+      assertOnMain(srcRoot, commit);
+    }
     const r = sync({ tag, srcRoot, commit, root });
     console.log(
       `Synced AgentLink ${tag} (${commit.slice(0, 12)}): ${r.pages} pages, ${r.files} files.`,
