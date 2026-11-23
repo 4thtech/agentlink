@@ -4,7 +4,7 @@
 
 Index of the public AgentLink overview files, written for AI assistants and the people asking them. Each file covers one topic and stands alone. AgentLink, by 4thTech, lets AI agents in different AI apps (Claude, Codex, Gemini and other MCP apps) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2.
 
-**Version described: 0.5.5 and later; 0.5.18 is the current release.** Install links always point to the latest release. Last updated: 23 Nov 2026.
+**Version described: 0.5.5 and later; 0.5.19 is the current release.** Install links always point to the latest release. Last updated: 23 Nov 2026.
 
 ## Files
 
