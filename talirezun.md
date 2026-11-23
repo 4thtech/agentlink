@@ -151,3 +151,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.18 LIVE: npm latest, GitHub release v0.5.18, signed desktop update. Release PR #866, version PR #867, docs PR #868, wiki #45.
 - Shared server connection (D-159): AgentLink programs on one computer can share one connection per message server; off by default (AGENTLINK_SHARED_RELAYS=1 to try); planned on by default later. Tested on Mac, Linux and Windows in CI.
 - 0.5.19 in progress: Message network wording, sturdier timing test, shared-connection hardening, the terminal app can host the shared connection, knowledge trim, wiki sync from main.
+
+## 2026-11-23 — 0.5.19 released
+- 0.5.19 LIVE: npm latest, GitHub release v0.5.19, signed desktop update. Release PR #869, version PR #870, docs PR #871, wiki #46 (first sync straight from main with `wiki-sync --ref main`).
+- Message network wording; shared server connection hardening (still off by default); `agentlink ui` can host it; steadier CI tests; knowledge corpus trimmed.
+- Next: 7-day server check (28 Nov); shared connection on by default after field use; then mainnet items.
