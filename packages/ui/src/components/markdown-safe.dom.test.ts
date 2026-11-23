@@ -402,18 +402,29 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
   );
 
   // IR-REL051-INT-4: the scans must be LINEAR, and a coarse ceiling alone does not prove it (the
-  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). So each scan-sensitive
-  // 256 KB pattern is timed against 256 KB of plain text on the same machine at the same moment
-  // (interleaved, fastest of 5 each): a linear scan stays within ~15x of plain text, a
-  // quadratic one is hundreds of times slower. A loaded runner slows both alike, so the ratio holds
-  // where an absolute bound does not; the absolute ceiling stays as a backstop.
-  const SCAN_CASES: Record<string, string> = {
-    'bare URL then punctuation': `http://x${'!'.repeat(K256)}a`,
-    'open brackets then one close': `${'['.repeat(K256)}]`,
-    'open brackets with a close and no paren': fill('[a]x '),
-    'autolinks with spaces then one close': `${fill('<https://a ')}>`,
+  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). TEST-FLAKE-MDSAFE: the
+  // check measures SCALING, not wall-clock against plain text (plain text renders in a couple of ms,
+  // so that ratio swung widely on a loaded CI runner while the scans were healthy). Each
+  // scan-sensitive pattern is timed at 64 KB and at 4x that, 256 KB (interleaved, fastest of 5
+  // each, after a warm-up): a linear scan grows ~4x, a quadratic one ~16x. A loaded runner slows
+  // both sizes alike, so the growth ratio holds where an absolute bound does not; the small
+  // time is floored so timer noise on a very fast render cannot inflate the ratio. The absolute
+  // ceiling stays as a backstop. The autolink pattern draws a full budget of pieces from ~8 KB on,
+  // so its render time is flat past that (about 14 ms): it is timed at 8 KB and at 256 KB, where a
+  // linear scan stays ~1x and any scan that grows with the input shows far above the limit.
+  const SCAN_CASES: Record<string, (size: number) => string> = {
+    'bare URL then punctuation': (n) => `http://x${'!'.repeat(n)}a`,
+    'open brackets then one close': (n) => `${'['.repeat(n)}]`,
+    'open brackets with a close and no paren': (n) => '[a]x '.repeat(Math.floor(n / 5)),
+    'autolinks with spaces then one close': (n) => `${'<https://a '.repeat(Math.floor(n / 11))}>`,
   };
-  const PLAIN = 'a'.repeat(K256);
+  const SCAN_SMALL = K256 / 4;
+  /** Patterns whose drawn work saturates early are compared with a smaller input instead. */
+  const SCAN_SMALL_FOR: Record<string, number> = { 'autolinks with spaces then one close': 8_192 };
+  /** Smallest small-size time counted, ms: below this the timer's own noise dominates. */
+  const SCAN_FLOOR_MS = 2;
+  /** Linear is ~4x for 4x the input, quadratic ~16x; 10x sits between with room for noise. */
+  const SCAN_GROWTH_MAX = 10;
   /** Times one fresh render of `text` (clearing the reader first is not timed). */
   const timeRender = (text: string): number => {
     act(() => root.render(h('div')));
@@ -422,20 +433,26 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     return performance.now() - start;
   };
   it.each(Object.keys(SCAN_CASES))(
-    '%s: within 50x of plain text of the same size (linear, not quadratic)',
+    '%s: a larger input takes under 10x the time (linear, not quadratic)',
     { timeout: 120_000 },
     (name) => {
-      const text = SCAN_CASES[name] as string;
-      let plain = Infinity;
-      let hostile = Infinity;
+      const make = SCAN_CASES[name] as (size: number) => string;
+      const small = make(SCAN_SMALL_FOR[name] ?? SCAN_SMALL);
+      const large = make(K256);
+      timeRender(small); // warm-up
+      let tSmall = Infinity;
+      let tLarge = Infinity;
       for (let round = 0; round < 5; round += 1) {
-        plain = Math.min(plain, timeRender(PLAIN));
-        hostile = Math.min(hostile, timeRender(text));
-        if (hostile > WALL_CLOCK_CEILING_MS) break; // already failing: no need for 4 more
+        tSmall = Math.min(tSmall, timeRender(small));
+        tLarge = Math.min(tLarge, timeRender(large));
+        if (tLarge > WALL_CLOCK_CEILING_MS) break; // already failing: no need for 4 more
       }
-      const ratio = hostile / plain;
-      expect(ratio, `${name}: ${ratio.toFixed(1)}x plain text`).toBeLessThan(50);
-      expect(hostile).toBeLessThan(WALL_CLOCK_CEILING_MS);
+      const growth = tLarge / Math.max(tSmall, SCAN_FLOOR_MS);
+      expect(
+        growth,
+        `${name}: ${tSmall.toFixed(1)} ms -> ${tLarge.toFixed(1)} ms = ${growth.toFixed(1)}x for the larger input`,
+      ).toBeLessThan(SCAN_GROWTH_MAX);
+      expect(tLarge).toBeLessThan(WALL_CLOCK_CEILING_MS);
     },
   );
 
