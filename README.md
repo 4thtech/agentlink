@@ -154,7 +154,9 @@ sequenceDiagram
 - **Back up and restore.** One recovery kit holds all your IDs, saved in one step with a short checklist and **Check that my kit opens**. Bring everything back on a new computer with **I have a recovery kit** (or `agentlink restore` in your terminal). Lost your master code and have no kit? **Forgot your master code?** starts over on this computer.
 - **Agree and prove.** Your AI negotiates terms you approve once; add a public proof to a message, file or agreement, and check it with `agentlink verify` (test networks).
 
-**New in 0.5.18:** a shared server connection, off by default in this release (planned on by default in a later one). With it on, the AgentLink programs on one computer (each AI app's and the desktop app's) use one connection per message server instead of one each, which helps with servers that allow only about two connections from one address. Keys never leave their program (only already-encrypted messages cross), and if anything fails a program falls back to its own connections automatically. Turn it on with `AGENTLINK_SHARED_RELAYS=1`; see [Shared server connection](docs/guide/local-app/shared-server-connection.md).
+**New in 0.5.19:** a sturdier shared server connection (still off by default; `AGENTLINK_SHARED_RELAYS=1` turns it on): a program that opens many IDs shares all of them, a program turned away rejoins after about 30 to 45 seconds, the local channel is checked to be private, and `agentlink ui` can host or join it. The Message network wording is clearer (one contact, "Your servers were updated" after an automatic update, dated "Older AgentLink servers"). See [Shared server connection](docs/guide/local-app/shared-server-connection.md).
+
+**New in 0.5.18 (23 Nov 2026):** a shared server connection, off by default in this release (planned on by default in a later one). With it on, the AgentLink programs on one computer (each AI app's and the desktop app's) use one connection per message server instead of one each, which helps with servers that allow only about two connections from one address. Keys never leave their program (only already-encrypted messages cross), and if anything fails a program falls back to its own connections automatically. Turn it on with `AGENTLINK_SHARED_RELAYS=1`; see [Shared server connection](docs/guide/local-app/shared-server-connection.md).
 
 **New in 0.5.17 (22 Nov 2026):** nostr.data.haus replaces offchain.pub as one of the four automatic message servers, because offchain.pub refuses more than about two connections from one computer, so with several AI apps it showed "Can't reach". offchain.pub becomes an old, read-only server until 2 Mar 2027. Each ID shows **Update your contact details** once: one approval with Touch ID, Windows Hello or your master code (or `agentlink owner update-contact-details` in your terminal); IDs that don't approve keep working. This is also the first release that Windows users on 0.5.16 can install from inside the app (Settings › Updates › **Update now**).
 
@@ -193,7 +195,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.5.18 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-23
+> **Version:** v0.5.19 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-23
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** Next: the on-chain spending allowance and signed Mac helper before mainnet. After that: proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -208,7 +210,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 to v0.5.18 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 to v0.5.19 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.6.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |
