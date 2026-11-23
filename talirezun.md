@@ -146,3 +146,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - nostr.data.haus replaces offchain.pub as an automatic message server (24 h retention check passed; 7-day check 28 Nov). Each ID updates its contact details once.
 - Owner confirmed: the first Windows in-app update (0.5.16 → 0.5.17) worked; Mac too; 4 of 4 servers connected.
 - Next: 0.5.18 shared server connection (off by default), then 0.5.19 polish.
+
+## 2026-11-23 — 0.5.18 released; 0.5.19 in progress
+- 0.5.18 LIVE: npm latest, GitHub release v0.5.18, signed desktop update. Release PR #866, version PR #867, docs PR #868, wiki #45.
+- Shared server connection (D-159): AgentLink programs on one computer can share one connection per message server; off by default (AGENTLINK_SHARED_RELAYS=1 to try); planned on by default later. Tested on Mac, Linux and Windows in CI.
+- 0.5.19 in progress: Message network wording, sturdier timing test, shared-connection hardening, the terminal app can host the shared connection, knowledge trim, wiki sync from main.
