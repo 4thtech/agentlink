@@ -1,5 +1,13 @@
 # @4thtech-io/node
 
+## 0.5.19
+
+### Patch Changes
+
+- @4thtech-io/core@0.5.19
+  - @4thtech-io/crypto@0.5.19
+  - @4thtech-io/transport-nostr@0.5.19
+
 ## 0.5.18
 
 ### Patch Changes
