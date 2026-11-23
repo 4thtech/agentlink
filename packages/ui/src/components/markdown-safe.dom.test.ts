@@ -402,29 +402,41 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
   );
 
   // IR-REL051-INT-4: the scans must be LINEAR, and a coarse ceiling alone does not prove it (the
-  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). TEST-FLAKE-MDSAFE: the
-  // check measures SCALING, not wall-clock against plain text (plain text renders in a couple of ms,
-  // so that ratio swung widely on a loaded CI runner while the scans were healthy). Each
-  // scan-sensitive pattern is timed at 64 KB and at 4x that, 256 KB (interleaved, fastest of 5
-  // each, after a warm-up): a linear scan grows ~4x, a quadratic one ~16x. A loaded runner slows
-  // both sizes alike, so the growth ratio holds where an absolute bound does not; the small
-  // time is floored so timer noise on a very fast render cannot inflate the ratio. The absolute
-  // ceiling stays as a backstop. The autolink pattern draws a full budget of pieces from ~8 KB on,
-  // so its render time is flat past that (about 14 ms): it is timed at 8 KB and at 256 KB, where a
-  // linear scan stays ~1x and any scan that grows with the input shows far above the limit.
-  const SCAN_CASES: Record<string, (size: number) => string> = {
-    'bare URL then punctuation': (n) => `http://x${'!'.repeat(n)}a`,
-    'open brackets then one close': (n) => `${'['.repeat(n)}]`,
-    'open brackets with a close and no paren': (n) => '[a]x '.repeat(Math.floor(n / 5)),
-    'autolinks with spaces then one close': (n) => `${'<https://a '.repeat(Math.floor(n / 11))}>`,
+  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). TEST-FLAKE-MDSAFE: each
+  // scan-sensitive 256 KB pattern is timed against a benign input of the SAME size that draws the
+  // same kind of output (plain text; for the autolink pattern, well-formed autolinks, which draw
+  // the same full budget), on the same machine at the same moment. Two earlier forms flaked on
+  // shared CI runners while the scans were healthy, for one reason: they compared the fastest of a
+  // few SINGLE renders of a few milliseconds, so one side's fastest sample was a render that
+  // happened to dodge garbage collection while the other side's was not ("2.7 ms -> 70.3 ms =
+  // 26.3x"). Comparing different sizes also measures the memory system, not the scan: even plain
+  // text takes ~5x longer at 256 KB than at 64 KB. So:
+  // - both sides have the same size and allocation pattern, so size effects cancel;
+  // - each sample is the mean of a batch of renders lasting at least SCAN_SAMPLE_MS (and at least
+  //   SCAN_SAMPLE_RENDERS renders), so collection pauses and timer noise are averaged into both
+  //   sides instead of dodged by one;
+  // - after a warm-up, batches alternate (benign, hostile, benign, hostile, ...) so a noisy period
+  //   hits both, and the fastest of SCAN_ROUNDS batches per side is compared.
+  // A linear scan stays within ~1.5x of its benign input; a quadratic one is ~100x (0.6 s against
+  // ~5 ms), far over SCAN_RATIO_MAX. The absolute ceiling stays as a backstop.
+  const PLAIN = 'a'.repeat(K256);
+  const SCAN_CASES: Record<string, { hostile: string; benign: string }> = {
+    'bare URL then punctuation': { hostile: `http://x${'!'.repeat(K256)}a`, benign: PLAIN },
+    'open brackets then one close': { hostile: `${'['.repeat(K256)}]`, benign: PLAIN },
+    'open brackets with a close and no paren': { hostile: fill('[a]x '), benign: PLAIN },
+    'autolinks with spaces then one close': {
+      hostile: `${fill('<https://a ')}>`,
+      benign: fill('<https://a> '),
+    },
   };
-  const SCAN_SMALL = K256 / 4;
-  /** Patterns whose drawn work saturates early are compared with a smaller input instead. */
-  const SCAN_SMALL_FOR: Record<string, number> = { 'autolinks with spaces then one close': 8_192 };
-  /** Smallest small-size time counted, ms: below this the timer's own noise dominates. */
-  const SCAN_FLOOR_MS = 2;
-  /** Linear is ~4x for 4x the input, quadratic ~16x; 10x sits between with room for noise. */
-  const SCAN_GROWTH_MAX = 10;
+  /** Each timed sample is a batch of renders lasting at least this long, ms. */
+  const SCAN_SAMPLE_MS = 50;
+  /** ... and of at least this many renders. */
+  const SCAN_SAMPLE_RENDERS = 3;
+  /** Batches per side; the fastest batch of each side is compared. */
+  const SCAN_ROUNDS = 7;
+  /** Linear stays within ~1.5x of the benign input, quadratic is ~100x; 10x leaves room for noise. */
+  const SCAN_RATIO_MAX = 10;
   /** Times one fresh render of `text` (clearing the reader first is not timed). */
   const timeRender = (text: string): number => {
     act(() => root.render(h('div')));
@@ -432,27 +444,42 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     md(text);
     return performance.now() - start;
   };
+  /** How many renders of `text` make one sample (sized from a render after a warm-up render). */
+  const batchSize = (text: string): number => {
+    timeRender(text);
+    const once = Math.max(timeRender(text), 0.05);
+    return Math.min(500, Math.max(SCAN_SAMPLE_RENDERS, Math.ceil(SCAN_SAMPLE_MS / once)));
+  };
+  /** The mean time of one render of `text` over a batch of `renders`. */
+  const timeBatch = (text: string, renders: number): number => {
+    let total = 0;
+    for (let k = 0; k < renders; k += 1) {
+      const took = timeRender(text);
+      total += took;
+      if (took > WALL_CLOCK_CEILING_MS) return total / (k + 1); // already failing
+    }
+    return total / renders;
+  };
   it.each(Object.keys(SCAN_CASES))(
-    '%s: a larger input takes under 10x the time (linear, not quadratic)',
+    '%s: under 10x the time of a benign input of the same size (linear, not quadratic)',
     { timeout: 120_000 },
     (name) => {
-      const make = SCAN_CASES[name] as (size: number) => string;
-      const small = make(SCAN_SMALL_FOR[name] ?? SCAN_SMALL);
-      const large = make(K256);
-      timeRender(small); // warm-up
-      let tSmall = Infinity;
-      let tLarge = Infinity;
-      for (let round = 0; round < 5; round += 1) {
-        tSmall = Math.min(tSmall, timeRender(small));
-        tLarge = Math.min(tLarge, timeRender(large));
-        if (tLarge > WALL_CLOCK_CEILING_MS) break; // already failing: no need for 4 more
+      const { hostile, benign } = SCAN_CASES[name] as { hostile: string; benign: string };
+      const benignRenders = batchSize(benign);
+      const hostileRenders = batchSize(hostile);
+      let tBenign = Infinity;
+      let tHostile = Infinity;
+      for (let round = 0; round < SCAN_ROUNDS; round += 1) {
+        tBenign = Math.min(tBenign, timeBatch(benign, benignRenders));
+        tHostile = Math.min(tHostile, timeBatch(hostile, hostileRenders));
+        if (tHostile > WALL_CLOCK_CEILING_MS) break; // already failing: no need for more
       }
-      const growth = tLarge / Math.max(tSmall, SCAN_FLOOR_MS);
+      const ratio = tHostile / tBenign;
       expect(
-        growth,
-        `${name}: ${tSmall.toFixed(1)} ms -> ${tLarge.toFixed(1)} ms = ${growth.toFixed(1)}x for the larger input`,
-      ).toBeLessThan(SCAN_GROWTH_MAX);
-      expect(tLarge).toBeLessThan(WALL_CLOCK_CEILING_MS);
+        ratio,
+        `${name}: ${tHostile.toFixed(1)} ms vs ${tBenign.toFixed(1)} ms benign = ${ratio.toFixed(1)}x`,
+      ).toBeLessThan(SCAN_RATIO_MAX);
+      expect(tHostile).toBeLessThan(WALL_CLOCK_CEILING_MS);
     },
   );
 
