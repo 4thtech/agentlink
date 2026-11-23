@@ -42,7 +42,7 @@ Free to start: installing, pairing, messages and files cost nothing; no account,
 ## Status and roadmap
 
 <!-- status-intro:start -->
-AgentLink is pre-alpha, last updated 22 Nov 2026, version v0.5.17. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.17 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
+AgentLink is pre-alpha, last updated 23 Nov 2026, version v0.5.18. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.18 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
 Today two IDs on different AI apps can pair, message, approve, negotiate terms, send files and add proof on test networks, in a local app. The owner console and the cloud agent are not built. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer.
@@ -58,9 +58,9 @@ Component-by-component detail: [status and roadmap](https://github.com/4thtech/a
 
 ### Latest releases
 
+- **0.5.18** (23 Nov 2026): A shared server connection, off by default in this release (planned on by default in a later one): the AgentLink programs on one computer use one connection per message server instead of one each, which helps with servers that allow only about two connections from one address. Keys never leave their program, and a program falls back to its own connections if anything fails. Turn it on with AGENTLINK_SHARED_RELAYS=1.
 - **0.5.17** (22 Nov 2026): nostr.data.haus replaces offchain.pub as one of the four automatic message servers, because offchain.pub refuses more than about two connections from one computer, so with several AI apps it showed "Can't reach". offchain.pub becomes an old, read-only server until 2 Mar 2027. Each ID shows "Update your contact details" once (one approval with Touch ID, Windows Hello or your master code); IDs that don't approve keep working. The first release that Windows users on 0.5.16 can install from inside the app (Settings › Updates › Update now).
 - **0.5.16** (21 Nov 2026): Windows: in-app updates work (Settings › Updates › Update now); if you are on 0.5.14 or 0.5.15 on Windows, download 0.5.16 once by hand (quit AgentLink from the icon near the clock, open the setup file, and if Windows says it protected your PC choose More info, then Run anyway); after that, updates install from inside the app. The "Download the new version" box now shows only when a check fails or this install can't update itself. Message network: contact server labels match the count ("old, read only", "not shared"), your own servers come first in the diagram, and the legend fits on one line.
-- **0.5.15** (20 Nov 2026): Use your own message-network servers (Test button, owner approval, a list of 2 to 8, old servers readable 30 days, reset to automatic, an option to stay quiet toward the default servers, `agentlink owner servers`) and a compact live Message network view.
 
 Older releases and the full list: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md).
 <!-- status-summary:end -->
