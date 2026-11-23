@@ -209,7 +209,7 @@ describe('C1: the entry', () => {
       },
     });
     expect(text()).toMatch(/You changed servers on/);
-    expect(text()).toContain('Servers you left stay readable until');
+    expect(text()).toContain('Servers this ID left stay readable until');
     expect(text()).toContain('change again or go back to automatic at any time');
     expect(button(S.changeServers)?.disabled).toBe(false);
     expect(button(S.useAutomatic)?.disabled).toBe(false);
@@ -269,22 +269,30 @@ describe('C2: add and test', () => {
   });
 
   it('shows Testing… while a test runs and the other refusals', async () => {
-    await openOwn({ delayMs: 40 });
+    const base = createMockServersApi({ now: NOW });
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    let gate = true;
+    const gated: ServersApi = {
+      ...base,
+      test: async (urls) => {
+        if (gate) await held;
+        return base.test(urls);
+      },
+    };
+    await mount({}, { api: gated });
+    await click(button(S.useOwn));
     await type(field(), 'wss://tiny.example.net');
     await act(async () => button(S.add)?.click());
+    // The test is held open, so Testing… stays until we release it.
     expect(text()).toContain(S.testing);
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 120));
-    });
+    gate = false;
+    await act(async () => release());
     await settle();
     expect(text()).toContain('Messages too large for it');
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 120));
-    });
     await addServers('http://nope.example.net');
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 120));
-    });
     await settle();
     expect(text()).toContain('Not a server address');
   });
@@ -593,6 +601,45 @@ describe('C6 and C7: progress and success', () => {
     expect(text()).toContain(S.doneChip);
     expect(text()).toContain(S.anyTime);
     expect(text()).not.toContain('Telling your contacts');
+  });
+
+  it('C7: the contact count is singular for one contact', async () => {
+    const done = (total: number) => ({
+      status: custom,
+      progress: {
+        changedAt: NOW - 600,
+        total,
+        sent: total,
+        waiting: 0,
+        items: [],
+        leavingUntil: NOW + 86_400 * 30,
+      },
+    });
+    await mount(done(1));
+    expect(text()).toContain('Your 1 contact has your new details');
+    expect(text()).not.toContain('All 1 contacts');
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount(done(3));
+    expect(text()).toContain('All 3 contacts have your new details');
+  });
+
+  it('C7b: an automatic update says AgentLink updated the servers, not the owner', async () => {
+    await mount({
+      status: { ...MOCK_STATUS, mode: 'automatic', previousUntil: NOW + 86_400 * 30 },
+      progress: {
+        changedAt: NOW - 3600,
+        total: 3,
+        sent: 3,
+        waiting: 0,
+        items: [],
+        leavingUntil: NOW + 86_400 * 30,
+      },
+    });
+    expect(text()).toMatch(/Your servers were updated on/);
+    expect(text()).not.toContain('You changed servers');
+    expect(text()).toContain('AgentLink updated your automatic servers');
+    expect(text()).toContain('Servers this ID left stay readable until');
   });
 
   it('shows nothing once nothing was changed or the overlap is over', async () => {

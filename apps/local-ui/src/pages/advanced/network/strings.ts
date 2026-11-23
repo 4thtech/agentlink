@@ -29,6 +29,8 @@ export const NETWORK_STRINGS = {
   showFewerServers: 'Show fewer servers',
   oldGroup: (n: number, date: string | undefined): string =>
     `Old servers (${String(n)}) · read only${date === undefined ? '' : ` until ${date}`}`,
+  /** Tooltip on the old-servers row: its date is not the date in the change banner. */
+  oldGroupHint: 'Older AgentLink servers',
   oldGroupDown: (n: number): string => `${String(n)} can't be reached`,
   lastOk: (ago: string): string => `Last worked ${ago}`,
   neverOk: 'Not heard from yet',

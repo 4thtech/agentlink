@@ -98,6 +98,15 @@ export interface SharedLinkClient {
   detach(): void;
 }
 
+/** How a program reaches the mux. */
+export interface SharedLinkAttachOptions {
+  /**
+   * The winner's own program, in process (no socket): exempt from the pre-proof cap, which bounds
+   * channels that arrive on the endpoint; it still proves the token like every other channel.
+   */
+  readonly local?: boolean;
+}
+
 export interface SharedLinkMuxOptions {
   /** Opens upstream relay connections (07 §4.2: to the checked address, no redirects, no proxy). */
   readonly connector: RelayConnector;
@@ -169,6 +178,8 @@ interface Client {
   cli: string | undefined;
   /** A short-lived channel (hello `kind: aux`): never counted as an ID. */
   aux: boolean;
+  /** In process (attach `local`): never counted against the pre-proof cap. */
+  readonly local: boolean;
 }
 
 interface VLink {
@@ -327,7 +338,8 @@ export class SharedLinkMux {
   }
 
   /** A program connected to the endpoint. It must send `hello` first. */
-  attach(peer: SharedLinkPeer): SharedLinkClient {
+  attach(peer: SharedLinkPeer, options: SharedLinkAttachOptions = {}): SharedLinkClient {
+    const local = options.local === true;
     const client: Client = {
       peer,
       state: 'hello',
@@ -337,12 +349,13 @@ export class SharedLinkMux {
       checks: 0,
       cli: undefined,
       aux: false,
+      local,
     };
     const handle: SharedLinkClient = {
       receive: (frame) => this.receive(client, frame),
       detach: () => this.detach(client),
     };
-    if (this.closed || this.pendingCount() >= this.maxPending) {
+    if (this.closed || (!local && this.pendingCount() >= this.maxPending)) {
       client.state = 'closed';
       this.counts.rejectedHandshakes += 1;
       this.sendTo(client, { t: 'reject', reason: 'busy' }, true);
@@ -357,10 +370,10 @@ export class SharedLinkMux {
     return handle;
   }
 
-  /** Channels still in the handshake. */
+  /** Socket channels still in the handshake (in-process ones never take a place). */
   private pendingCount(): number {
     let pending = 0;
-    for (const client of this.clients) if (client.state !== 'ready') pending += 1;
+    for (const client of this.clients) if (client.state !== 'ready' && !client.local) pending += 1;
     return pending;
   }
 

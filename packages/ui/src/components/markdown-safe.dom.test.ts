@@ -402,18 +402,41 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
   );
 
   // IR-REL051-INT-4: the scans must be LINEAR, and a coarse ceiling alone does not prove it (the
-  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). So each scan-sensitive
-  // 256 KB pattern is timed against 256 KB of plain text on the same machine at the same moment
-  // (interleaved, fastest of 5 each): a linear scan stays within ~15x of plain text, a
-  // quadratic one is hundreds of times slower. A loaded runner slows both alike, so the ratio holds
-  // where an absolute bound does not; the absolute ceiling stays as a backstop.
-  const SCAN_CASES: Record<string, string> = {
-    'bare URL then punctuation': `http://x${'!'.repeat(K256)}a`,
-    'open brackets then one close': `${'['.repeat(K256)}]`,
-    'open brackets with a close and no paren': fill('[a]x '),
-    'autolinks with spaces then one close': `${fill('<https://a ')}>`,
-  };
+  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). TEST-FLAKE-MDSAFE: each
+  // scan-sensitive 256 KB pattern is timed against a benign input of the SAME size that draws the
+  // same kind of output (plain text; for the autolink pattern, well-formed autolinks, which draw
+  // the same full budget), on the same machine at the same moment. Two earlier forms flaked on
+  // shared CI runners while the scans were healthy, for one reason: they compared the fastest of a
+  // few SINGLE renders of a few milliseconds, so one side's fastest sample was a render that
+  // happened to dodge garbage collection while the other side's was not ("2.7 ms -> 70.3 ms =
+  // 26.3x"). Comparing different sizes also measures the memory system, not the scan: even plain
+  // text takes ~5x longer at 256 KB than at 64 KB. So:
+  // - both sides have the same size and allocation pattern, so size effects cancel;
+  // - each sample is the mean of a batch of renders lasting at least SCAN_SAMPLE_MS (and at least
+  //   SCAN_SAMPLE_RENDERS renders), so collection pauses and timer noise are averaged into both
+  //   sides instead of dodged by one;
+  // - after a warm-up, batches alternate (benign, hostile, benign, hostile, ...) so a noisy period
+  //   hits both, and the fastest of SCAN_ROUNDS batches per side is compared.
+  // A linear scan stays within ~1.5x of its benign input; a quadratic one is ~100x (0.6 s against
+  // ~5 ms), far over SCAN_RATIO_MAX. The absolute ceiling stays as a backstop.
   const PLAIN = 'a'.repeat(K256);
+  const SCAN_CASES: Record<string, { hostile: string; benign: string }> = {
+    'bare URL then punctuation': { hostile: `http://x${'!'.repeat(K256)}a`, benign: PLAIN },
+    'open brackets then one close': { hostile: `${'['.repeat(K256)}]`, benign: PLAIN },
+    'open brackets with a close and no paren': { hostile: fill('[a]x '), benign: PLAIN },
+    'autolinks with spaces then one close': {
+      hostile: `${fill('<https://a ')}>`,
+      benign: fill('<https://a> '),
+    },
+  };
+  /** Each timed sample is a batch of renders lasting at least this long, ms. */
+  const SCAN_SAMPLE_MS = 50;
+  /** ... and of at least this many renders. */
+  const SCAN_SAMPLE_RENDERS = 3;
+  /** Batches per side; the fastest batch of each side is compared. */
+  const SCAN_ROUNDS = 7;
+  /** Linear stays within ~1.5x of the benign input, quadratic is ~100x; 10x leaves room for noise. */
+  const SCAN_RATIO_MAX = 10;
   /** Times one fresh render of `text` (clearing the reader first is not timed). */
   const timeRender = (text: string): number => {
     act(() => root.render(h('div')));
@@ -421,21 +444,42 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     md(text);
     return performance.now() - start;
   };
+  /** How many renders of `text` make one sample (sized from a render after a warm-up render). */
+  const batchSize = (text: string): number => {
+    timeRender(text);
+    const once = Math.max(timeRender(text), 0.05);
+    return Math.min(500, Math.max(SCAN_SAMPLE_RENDERS, Math.ceil(SCAN_SAMPLE_MS / once)));
+  };
+  /** The mean time of one render of `text` over a batch of `renders`. */
+  const timeBatch = (text: string, renders: number): number => {
+    let total = 0;
+    for (let k = 0; k < renders; k += 1) {
+      const took = timeRender(text);
+      total += took;
+      if (took > WALL_CLOCK_CEILING_MS) return total / (k + 1); // already failing
+    }
+    return total / renders;
+  };
   it.each(Object.keys(SCAN_CASES))(
-    '%s: within 50x of plain text of the same size (linear, not quadratic)',
+    '%s: under 10x the time of a benign input of the same size (linear, not quadratic)',
     { timeout: 120_000 },
     (name) => {
-      const text = SCAN_CASES[name] as string;
-      let plain = Infinity;
-      let hostile = Infinity;
-      for (let round = 0; round < 5; round += 1) {
-        plain = Math.min(plain, timeRender(PLAIN));
-        hostile = Math.min(hostile, timeRender(text));
-        if (hostile > WALL_CLOCK_CEILING_MS) break; // already failing: no need for 4 more
+      const { hostile, benign } = SCAN_CASES[name] as { hostile: string; benign: string };
+      const benignRenders = batchSize(benign);
+      const hostileRenders = batchSize(hostile);
+      let tBenign = Infinity;
+      let tHostile = Infinity;
+      for (let round = 0; round < SCAN_ROUNDS; round += 1) {
+        tBenign = Math.min(tBenign, timeBatch(benign, benignRenders));
+        tHostile = Math.min(tHostile, timeBatch(hostile, hostileRenders));
+        if (tHostile > WALL_CLOCK_CEILING_MS) break; // already failing: no need for more
       }
-      const ratio = hostile / plain;
-      expect(ratio, `${name}: ${ratio.toFixed(1)}x plain text`).toBeLessThan(50);
-      expect(hostile).toBeLessThan(WALL_CLOCK_CEILING_MS);
+      const ratio = tHostile / tBenign;
+      expect(
+        ratio,
+        `${name}: ${tHostile.toFixed(1)} ms vs ${tBenign.toFixed(1)} ms benign = ${ratio.toFixed(1)}x`,
+      ).toBeLessThan(SCAN_RATIO_MAX);
+      expect(tHostile).toBeLessThan(WALL_CLOCK_CEILING_MS);
     },
   );
 

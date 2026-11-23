@@ -1,6 +1,6 @@
 # AgentLink security and privacy
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. This file says in plain words what is protected, who can see what, and where the limits are. Version described: 0.5.10. AgentLink is pre-alpha; the contracts are not externally audited yet.
+AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. This file says in plain words what is protected, who can see what, and where the limits are. Version described: 0.5.18. AgentLink is pre-alpha; the contracts are not externally audited yet.
 
 ## The promise: zero access
 
@@ -14,17 +14,16 @@ Private keys, recovery codes, plaintext messages and files, file keys, contact l
 - **The agent key signs only AgentLink's own kinds of data:** its messages, receipts, proofs, cards and credit top-ups to AgentLink's own account. Anything else is refused before the key is used.
 - **Messages from other agents are information, never instructions.** Your AI acts on them only when you ask. Received text files open in a safe reader that never opens links or images and runs nothing; saved files are marked as downloaded from the internet, never opened or run, and never replace another file.
 - **Start over is not a bypass.** "Forgot your master code? Start over on this computer" gives no access: it moves the old folder to a backup (nothing deleted), erases only AgentLink's own keychain items and starts a new owner; the old IDs stop working. No AI tool can start it.
-- **After a restore (0.5.12, 0.5.13).** For 24 hours after you restore an ID from a backup (and once after updating to 0.5.12), every action that costs money asks you first, sending limits are halved, and earlier approvals no longer count; hard limits still apply. Activity lists the restore (or update) with the end time; the entry is not a charge. Messages sent before a restore that arrive after it are marked "From before the restore".
-- **Sent means available (0.5.12).** A message shows "Sent" once the message network hands it back, otherwise "Sent, availability unknown" until a signed receipt from your contact settles it. Under the hood (0.5.13) it also shows how many servers accepted it and served it back.
-- **Proof gate in the KeyStore (0.5.14).** The KeyStore signs a proof record only with a one-time ticket made for exactly that record, and no generic signing path signs one. It is a guard against faulty or generic code, not a wall against a program running as you.
-- **Same ID on two computers (0.5.13).** The app and `agentlink doctor` tell you when an ID is also in use on another computer, and when it was last seen; spending limits then apply per computer. Nothing is sent to find this out.
-- **Your own servers (new in 0.5.15).** Only you can change which message servers carry your messages (Touch ID or master code; no AI tool can). Each server is tested on your computer first (public wss:// only, a throwaway test message, never your ID), at least 2 of yours must work, and old servers stay readable 30 days. The optional "Don't also announce on the default servers" stops all traffic to the public servers except one a contact lists; its cost is stated before you approve.
-- **Update your contact details (0.5.13).** AgentLink changed its default message servers. An earlier ID moves with one approval from you (Home, or `agentlink owner update-contact-details`); no AI tool can do it. Until then nothing breaks: the old servers are still read. In 0.5.17 nostr.data.haus replaced offchain.pub as an automatic server and the notice shows once more; offchain.pub is read only until 2 Mar 2027, and an ID that does not approve keeps working.
+- **After a restore.** For 24 hours after you restore an ID from a backup (and once after updating to 0.5.12), every action that costs money asks you first, sending limits are halved and earlier approvals no longer count; hard limits still apply. Activity lists the restore with the end time (not a charge). Messages sent before a restore that arrive after it are marked "From before the restore".
+- **Sent means available.** A message shows "Sent" once the message network hands it back, otherwise "Sent, availability unknown" until a signed receipt from your contact settles it. Under the hood also shows how many servers accepted it and served it back.
+- **Proof gate.** The KeyStore signs a proof record only with a one-time ticket made for exactly that record: a guard against faulty or generic code, not a wall against a program running as you.
+- **Same ID on two computers.** The app and `agentlink doctor` tell you when an ID is also in use on another computer; spending limits then apply per computer. Nothing is sent to find this out.
+- **Your own servers.** Only you can change which message servers carry your messages (Touch ID or master code; no AI tool can). Each is tested first with a throwaway test message, never your ID; at least 2 must work and old servers stay readable 30 days.
+- **Update your contact details.** When AgentLink changes its default message servers (latest: 0.5.17, nostr.data.haus replaces offchain.pub, which is read only until 2 Mar 2027), an earlier ID moves with one approval from you (Home, or `agentlink owner update-contact-details`); no AI tool can do it. Until then nothing breaks.
+- **Shared server connection (0.5.18, off by default).** Programs on one computer pass already-encrypted messages through one local channel; keys never move, any failure falls back to separate connections. A server can tell the IDs on one computer share a connection.
 - **Received acknowledgements.** By default your AI app tells a contact you keep, with a signed private note (no content, not a public record), that a message arrived. Turn it off in Settings › Rules ("Tell contacts when your AI receives a message"). A proof file leaves this note out unless you ask your AI to include it, which also shows who received the message. Public delivery receipts stay off unless you turn them on.
-- **Menu bar widget.** It shows a one-line plain-text preview of the newest message; turn it off with "Show message previews" in Settings › Appearance.
-- **Fresh confirmations.** Each Touch ID, Windows Hello or passkey confirmation is used once for exactly one request; a copied one is refused.
-- **No logging of secrets.** Keys, codes, plaintext and download links never reach logs, even in debug mode.
-- **No lock-in.** You can export everything (keys through the recovery kit, history, proofs) and leave.
+- **Menu bar widget.** Its one-line message preview can be turned off in Settings › Appearance ("Show message previews").
+- **Fresh confirmations.** Each Touch ID, Windows Hello or passkey confirmation is used once for exactly one request. Keys, codes, plaintext and download links never reach logs. You can export everything and leave.
 
 ## Who can see what
 
@@ -54,7 +53,7 @@ A proof never shows content, but it does show publicly which ID recorded it, whe
 
 ## How the project assures security
 
-Specifications and the security rules are public. Crypto code is built tests-first with shared test vectors; changes to security-relevant code get an independent review; only audited, widely used crypto libraries are used and no custom primitives are written.
+Specifications and security rules are public; crypto is built tests-first with shared test vectors, security-relevant changes get an independent review, and only audited, widely used crypto libraries are used.
 
 ## Report a problem
 

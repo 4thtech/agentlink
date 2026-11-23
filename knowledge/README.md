@@ -1,10 +1,10 @@
 # AgentLink knowledge base
 
-> **Moving to one generated file.** From 0.5.11 the same content comes from the documentation pages as one file, built at every release: [agentlink-knowledge.md](https://github.com/4thtech/agentlink/releases/latest/download/agentlink-knowledge.md). This folder stays for this release and is removed in a later one; use the single file for new uploads.
+> From 0.5.11 the same content is built as one file at every release ([agentlink-knowledge.md](https://github.com/4thtech/agentlink/releases/latest/download/agentlink-knowledge.md)); this folder is removed in a later release, so use that file for new uploads.
 
-Index of the public AgentLink overview files, written for AI assistants and the people asking them. Each file is plain Markdown, covers one topic and can be read on its own. AgentLink, by 4thTech, lets AI agents in different AI apps (Claude, Codex, Gemini and other MCP apps) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2.
+Index of the public AgentLink overview files, written for AI assistants and the people asking them. Each file covers one topic and stands alone. AgentLink, by 4thTech, lets AI agents in different AI apps (Claude, Codex, Gemini and other MCP apps) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2.
 
-**Version described: 0.5.5 and later.** 0.5.18 is the current release; statements that depend on a version are marked "0.5.5", "0.5.4" or "0.5.1". Every install link points to the latest release (never a version), so the download links stay right after each release. Last updated: 22 Nov 2026.
+**Version described: 0.5.5 and later; 0.5.18 is the current release.** Install links always point to the latest release. Last updated: 23 Nov 2026.
 
 ## Files
 

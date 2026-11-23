@@ -1079,6 +1079,25 @@ describe('shared link hardening', () => {
     expect(busy.filter((f) => f.includes('"busy"')).length).toBeGreaterThan(0);
   });
 
+  it('in-process clients of the winner never meet the pre-proof cap; socket channels still do', async () => {
+    const { server } = setup();
+    // More in-process attaches than the pre-proof cap, all before any handshake ends.
+    const local: string[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      server.attach({ send: (f) => local.push(f), close: () => undefined }, { local: true });
+    }
+    expect(local.filter((f) => f.includes('"busy"'))).toHaveLength(0);
+    // In-process channels in their handshake take no place of a socket channel's.
+    const sockets: string[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      server.attach({ send: (f) => sockets.push(f), close: () => undefined });
+    }
+    expect(sockets.filter((f) => f.includes('"busy"'))).toHaveLength(0);
+    server.attach({ send: (f) => sockets.push(f), close: () => undefined });
+    expect(sockets.filter((f) => f.includes('"busy"'))).toHaveLength(1);
+    await flush();
+  });
+
   /** A relay for the check lane that answers a REQ with `frames(subId)` and never an EOSE. */
   function scripted(frames: (sub: string) => string[]): {
     connector: RelayConnector;

@@ -75,6 +75,7 @@ import {
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
 import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
 import { cliVersion } from '../runtime/cli-version.js';
+import { nodeProcessRelayLink, type ProcessRelayLink } from '../runtime/relay-link.js';
 import { nodeBrowserUpdateDesk, withUpdates } from '../runtime/npm-update-check.js';
 import {
   browserUpdateDeskWith,
@@ -291,6 +292,13 @@ export interface UiDeps {
    * it could not start. Absent: an `update` stop is a plain stop.
    */
   relaunch?(): Promise<number | undefined>;
+  /**
+   * SHARED-LINK-HARDEN (08 §1, D-159): this process's shared relay link, started before any ID is
+   * opened (so its pools are built on it) and closed after the server on every exit, as `agentlink
+   * mcp` does. On or off follows AGENTLINK_SHARED_RELAYS only (off by default). A start that fails
+   * never stops the server. Absent: none (tests, and the desktop host, which runs its own).
+   */
+  readonly relayLink?: ProcessRelayLink;
 }
 
 /** The command. Returns the process exit code. */
@@ -422,12 +430,26 @@ export async function serveUi(
   join?: UiJoin,
 ): Promise<number> {
   const { output } = context;
-  const started = await startUiServer(
-    deps,
-    context.parsed.agent,
-    join === undefined ? undefined : join.invite,
-  );
+  await deps.relayLink?.start().catch(() => undefined);
+  let linkClosed = false;
+  const closeLink = async (): Promise<void> => {
+    if (linkClosed) return;
+    linkClosed = true;
+    await deps.relayLink?.close().catch(() => undefined);
+  };
+  let started: UiStartResult;
+  try {
+    started = await startUiServer(
+      deps,
+      context.parsed.agent,
+      join === undefined ? undefined : join.invite,
+    );
+  } catch (error) {
+    await closeLink();
+    throw error;
+  }
   if (!started.ok) {
+    await closeLink();
     output.printError(UI_TEXT.startFailure[started.failure](prefix));
     await deps.recordExit?.(START_EXIT[started.failure]);
     return EXIT_FAILED;
@@ -502,6 +524,8 @@ export async function serveUi(
     if (reason.kind === 'stop' && reason.signal === 'update' && deps.relaunch !== undefined) {
       closed = true;
       await server.close().catch(() => undefined);
+      // The new version may host the link: this one lets it go first.
+      await closeLink();
       await deps.recordExit?.('updated');
       output.print(UI_TEXT.updating);
       const code = await deps.relaunch().catch(() => undefined);
@@ -546,6 +570,8 @@ export async function serveUi(
     unsubscribe?.();
     unguard?.();
     if (!closed) await server.close().catch(() => undefined);
+    // RELAY-SHARED-CONN: the link goes last (the others re-race; D-159 (8)).
+    await closeLink();
   }
 }
 
@@ -798,6 +824,9 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
             const launch = await updater?.launch();
             return launch === undefined ? undefined : relaunch(launch);
           },
+          // SHARED-LINK-HARDEN (08 §1): the terminal app host may host the shared relay link too
+          // (AGENTLINK_SHARED_RELAYS; off by default). The desktop host starts its own.
+          relayLink: nodeProcessRelayLink({ logger }),
         }
       : {}),
     // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.

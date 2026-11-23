@@ -21,7 +21,11 @@ export const SERVERS_STRINGS = {
   finishing: 'An earlier change of this ID is still finishing. Try again in a minute.',
   recentTitle: (date: string): string => `You changed servers on ${date}`,
   recent: (date: string): string =>
-    `Servers you left stay readable until ${date}. You can change again or go back to automatic at any time.`,
+    `Servers this ID left stay readable until ${date}. You can change again or go back to automatic at any time.`,
+  /** The same notice after AgentLink's own update (automatic mode): the owner changed nothing. */
+  autoTitle: (date: string): string => `Your servers were updated on ${date}`,
+  autoRecent: (date: string): string =>
+    `AgentLink updated your automatic servers. Servers this ID left stay readable until ${date}.`,
   // Proposed: states the entry needs that the spec does not word.
   offline: 'This computer is offline. Testing and changing servers needs a connection.',
   notRunning: 'Servers can be changed while your AI app is running AgentLink.',
@@ -163,7 +167,10 @@ export const SERVERS_STRINGS = {
   sent: 'Sent',
   waiting: 'Waiting',
   doneChip: 'Done',
-  allHave: (n: number): string => `All ${String(n)} contacts have your new details`,
+  allHave: (n: number): string =>
+    n === 1
+      ? 'Your 1 contact has your new details'
+      : `All ${String(n)} contacts have your new details`,
   nowUse: (n: number, date: string | undefined): string =>
     `Your messages now use your ${String(n)} servers.${date === undefined ? '' : ` Old ones stay readable until ${date}.`}`,
   anyTime: 'Back to automatic any time',
