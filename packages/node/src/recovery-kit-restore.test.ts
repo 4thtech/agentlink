@@ -60,6 +60,13 @@ import {
 } from './recovery-kit-restore.js';
 
 const POSIX = process.platform !== 'win32';
+/**
+ * TEST-SLOW-RECOVERY-KIT: every owner item, owner unlock, kit seal, presence and kit open here is one
+ * Argon2id run at the 04 §2.8 floor (FAST is that floor; nothing lower is accepted), about 120 ms on
+ * a laptop and 2 to 3 s on a loaded shared CI runner, where tests of 7 and 10 runs passed the 20 s
+ * default (CI runs 44905109872, 45127131754). The tests that need five or more runs take up to
+ * 60 s (`}, 60_000)`); what they do and check is unchanged.
+ */
 const ORIGIN = 'http://localhost:47821';
 
 let t: Awaited<ReturnType<typeof tempRoot>>;
@@ -347,7 +354,7 @@ describe.runIf(POSIX)('wrong code (T-4)', () => {
     expect(body(await openKit('S1', handle, right))).toEqual({ error: 'wait', retryAfter: 60 });
     clock += 60_000;
     expect((await openKit('S1', handle, right)).status).toBe(200);
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
@@ -406,7 +413,7 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
       )['error'],
     ).toBe('expired');
     await expectNothingWritten();
-  });
+  }, 60_000);
 
   it('with the gesture restores the ID, the owner under a new master code and Touch ID; the code is shown once', async () => {
     const { code: c, agents, owner } = await kitOnDisk();
@@ -548,7 +555,7 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
       expect(body(refused)['error']).toBe('invalid');
     }
     expect([...keychain.items.keys()]).toEqual([keychainAccount(a.agentId, 'seed')]);
-  });
+  }, 60_000);
 
   it('the name-taken ID restores under its new name; the one here and the removed one are untouched', async () => {
     const { a, b, gone, here, kit } = await renameMapKit();
@@ -613,7 +620,7 @@ describe.runIf(POSIX)('a computer with an owner (T-2; restore-only session)', ()
     expect(restore.boundTo(new Uint8Array(32))).toBe(false);
     restore.end();
     expect(restore.session.isActive()).toBe(false);
-  });
+  }, 60_000);
 
   it('needs presence before open, refuses another header, then restores without a second gesture', async () => {
     const owner = await makeOwner(keychain);
@@ -659,7 +666,7 @@ describe.runIf(POSIX)('a computer with an owner (T-2; restore-only session)', ()
     expect(keychain.items.has(keychainAccount(agents[0]?.agentId as string, 'seed'))).toBe(true);
     // The owner item is kept as it was.
     expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('the opened-kit hold (T-7)', () => {
@@ -716,7 +723,7 @@ describe.runIf(POSIX)('the opened-kit hold (T-7)', () => {
     expect(
       (await readdir(q).catch(() => [] as string[])).filter((n) => n.startsWith('.restore-')),
     ).toEqual([]);
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
@@ -759,7 +766,7 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     expect(
       await readFile(join(t.home, '.agentlink', 'agents', first.name, 'config.json'), 'utf8'),
     ).toContain(first.agentId);
-  });
+  }, 60_000);
 
   it('a crash between the agents and the owner: first run is held; owner-only completion with the same kit', async () => {
     const { code: c, agents, owner } = await kitOnDisk();
@@ -808,7 +815,7 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     expect(completed['masterCode']).toMatch(/^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){5}$/);
     expect(await ownerItemPresent(keychain)).toBe(true);
     expect(await engine.restorePending()).toBe(false);
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('uploads (T-5, T-6, T-7)', () => {
@@ -1120,7 +1127,7 @@ describe.runIf(POSIX)('serialised: one operation at a time (IR M1; T-4, T-7)', (
     const res = await Promise.all([engine.applyBegin('S1', input), engine.applyBegin('S1', input)]);
     expect(res.map((r) => body(r)['status'] ?? body(r)['error']).sort()).toEqual(['busy', 'done']);
     expect(keychain.items.has(keychainAccount(agents[0]?.agentId as string, 'seed'))).toBe(true);
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('restore step 7: the read-back (IR M2)', () => {
@@ -1146,7 +1153,7 @@ describe.runIf(POSIX)('restore step 7: the read-back (IR M2)', () => {
     expect(
       await readFile(join(t.home, '.agentlink', 'agents', 'good', 'config.json'), 'utf8'),
     ).toContain(good.agentId);
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verified label', () => {
@@ -1184,7 +1191,7 @@ describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verif
       label: 'work',
       outcome: 'restored',
     });
-  });
+  }, 60_000);
 
   it('KIT-NAMES: a kit label outside the folder label rule is not shown in step 3', async () => {
     const owner = await makeOwner();
@@ -1202,7 +1209,7 @@ describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verif
     const summary = body(opened)['summary'] as { ids: Record<string, unknown>[] };
     expect(summary.ids).toHaveLength(1);
     expect(summary.ids[0]).not.toHaveProperty('label');
-  });
+  }, 60_000);
 
   it('a label is display text only: anything not a plain restricted label shows the folder name', () => {
     expect(restoredLabel({ status: 'verified', label: 'Ana' }, 'default')).toBe('Ana');
@@ -1245,7 +1252,7 @@ describe.runIf(POSIX)(
       const other = await kitOnDisk([{ name: 'x' }], undefined, 'agentlink-recovery-kit-o.alkk');
       const oh = await foundHandle('S1', 'agentlink-recovery-kit-o.alkk');
       expect(body(await openKit('S1', oh, other.code))['error']).toBe('other_owner');
-    });
+    }, 60_000);
 
     it('the marker goes when every ID and the owner failed', async () => {
       const { code: c, agents } = await kitOnDisk();
@@ -1298,7 +1305,7 @@ describe.runIf(POSIX)(
         ownerPresent: true,
       });
       expect(b.owner.keys.ownerNostr).not.toEqual(a.owner.keys.ownerNostr);
-    });
+    }, 60_000);
   },
 );
 
@@ -1395,7 +1402,7 @@ describe.runIf(POSIX)('round 2: bounded keychain, silent cores, cancel during pr
     expect(body(await engine.header('S1', { handle: zh }))['header']).toBe('other_owner');
     expect(await engine.restorePending()).toBe(true);
     expect(logged).toEqual([]);
-  });
+  }, 60_000);
 
   it('a cancel while presence runs closes the new seedless session', async () => {
     const owner = await makeOwner(keychain);
@@ -1407,7 +1414,7 @@ describe.runIf(POSIX)('round 2: bounded keychain, silent cores, cancel during pr
     await engine.cancel('S1', { kit: 'none' });
     expect(body(await presence)['error']).toBe('expired');
     expect(body(await openKit('S1', handle, c))['error']).toBe('presence_required');
-  });
+  }, 60_000);
 });
 
 describe.runIf(POSIX)('first run fails closed on a hung keychain (owner decision)', () => {
