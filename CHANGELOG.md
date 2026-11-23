@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.19] - 2026-11-23
+
+### Changed
+
+- The README, status page, user guide and knowledge base describe AgentLink 0.5.18 as released: the shared server connection, off by default in this release and planned on by default in a later one (DOCS-REL-0518, S0).
+- The wiki sync can now generate the 4thTech Docs copy from `main` after the release docs PR merges: `tools/docs/wiki-sync.mjs --ref main --version X.Y.Z` (WIKI-SYNC-AFTER-DOCS, S1). The commit must be on `main`, and the wiki's state file records the version and the exact commit. The tag flow is unchanged.
+
+### Fixed
+
+- Message network wording (NET-COPY-0519, S1, 11 §5): one contact reads "Your 1 contact has your new details"; after AgentLink's automatic server update the notice says "Your servers were updated on {date}" instead of "You changed servers"; the notice says which servers "this ID left", and the old-servers row says it is about older AgentLink servers.
+- The shared server connection is sturdier. It is still off by default; AGENTLINK_SHARED_RELAYS=1 turns it on. A program that opens more than eight IDs at once now shares all of them instead of sending some on their own connections. A program that was turned away by the shared connection (another version, or another token) tries again about every 30 seconds, so it joins once a compatible program holds the connection. The local socket must be readable by your user only after it is created, and a failed permission change is logged with a fixed code. `agentlink ui` now hosts or joins the shared connection like `agentlink mcp`, so its Message network line shows the real state (SHARED-LINK-HARDEN, S2, D-159, 07 §4.2, 04 §4, 08 §1).
+
 ## [0.5.18] - 2026-11-22
 
 ### Added
@@ -1537,7 +1549,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.18...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.19...HEAD
+[0.5.19]: https://github.com/4thtech/agentlink/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/4thtech/agentlink/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/4thtech/agentlink/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/4thtech/agentlink/compare/v0.5.15...v0.5.16
