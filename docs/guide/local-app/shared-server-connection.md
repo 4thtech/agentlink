@@ -79,6 +79,8 @@ OpenCode. In `opencode.json`, add `"environment": { "AGENTLINK_SHARED_RELAYS": "
 
 The AgentLink desktop app. It reads the setting from its own environment when it starts. On a Mac, run `launchctl setenv AGENTLINK_SHARED_RELAYS 1` and reopen the app. On Windows, add a user environment variable with that name and the value `1`, then reopen the app. When the desktop app starts, it asks an AI app's program to hand the connection over, so the long-running app usually holds it.
 
+The terminal app (`agentlink ui`, from 0.5.19). It reads the setting from the terminal you start it in: `AGENTLINK_SHARED_RELAYS=1 agentlink ui` (macOS, Linux). Its Under the hood › Message network line then shows the real state.
+
 To turn it off, set the value to `0` (or remove it) and restart that program. The file for each AI app is described in [the technical reference for each AI app](../../technical/reference/harness-configuration.md).
 
 ## See it
