@@ -269,22 +269,30 @@ describe('C2: add and test', () => {
   });
 
   it('shows Testing… while a test runs and the other refusals', async () => {
-    await openOwn({ delayMs: 40 });
+    const base = createMockServersApi({ now: NOW });
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    let gate = true;
+    const gated: ServersApi = {
+      ...base,
+      test: async (urls) => {
+        if (gate) await held;
+        return base.test(urls);
+      },
+    };
+    await mount({}, { api: gated });
+    await click(button(S.useOwn));
     await type(field(), 'wss://tiny.example.net');
     await act(async () => button(S.add)?.click());
+    // The test is held open, so Testing… stays until we release it.
     expect(text()).toContain(S.testing);
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 120));
-    });
+    gate = false;
+    await act(async () => release());
     await settle();
     expect(text()).toContain('Messages too large for it');
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 120));
-    });
     await addServers('http://nope.example.net');
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 120));
-    });
     await settle();
     expect(text()).toContain('Not a server address');
   });
