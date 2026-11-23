@@ -31,6 +31,9 @@ import {
   updateSummary,
   detectLayout,
   LAYOUTS,
+  parseArgs,
+  resolveTarget,
+  resolveRefCommit,
 } from './wiki-sync.mjs';
 
 const ctx = (srcRel, extra = {}) => ({
@@ -442,5 +445,77 @@ describe('dual layout (DOCS-COMPACT-A)', () => {
     expect(out).not.toContain('ai-knowledge');
     expect(out).toContain('Applies to AgentLink 0.6.0 (pre-alpha');
     expect(out).toContain('Synced from 4thtech/agentlink docs@v0.6.0');
+  });
+});
+
+// WIKI-SYNC-AFTER-DOCS: the wiki is generated from main after the release docs PR (--ref + --version).
+describe('--ref and --version (WIKI-SYNC-AFTER-DOCS)', () => {
+  const g = (repo, ...a) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'core.hooksPath=/dev/null', ...a],
+      { cwd: repo, encoding: 'utf8' },
+    ).trim();
+
+  it('parses --ref and --version', () => {
+    expect(parseArgs(['--wiki', 'w', '--ref', 'main', '--version', '0.5.18'])).toEqual({
+      wiki: 'w',
+      ref: 'main',
+      version: '0.5.18',
+    });
+    expect(() => parseArgs(['--ref'])).toThrow(/needs a value/);
+    expect(() => parseArgs(['--version', '--wiki'])).toThrow(/needs a value/);
+  });
+
+  it('keeps the tag flow as the default', () => {
+    expect(resolveTarget({ tag: 'v0.5.18' })).toEqual({ mode: 'tag', tag: 'v0.5.18' });
+    expect(resolveTarget({})).toEqual({ mode: 'tag', tag: null });
+  });
+
+  it('requires --version with --ref, and refuses --version alone or with --tag', () => {
+    expect(() => resolveTarget({ ref: 'main' })).toThrow(/--version/);
+    expect(() => resolveTarget({ version: '0.5.18' })).toThrow(/--ref/);
+    expect(() => resolveTarget({ ref: 'main', version: '0.5.18', tag: 'v0.5.18' })).toThrow(/--tag/);
+    for (const v of ['v0.5.18', '0.5', '0.5.18-rc.1', 'x'])
+      expect(() => resolveTarget({ ref: 'main', version: v })).toThrow(/X\.Y\.Z/);
+  });
+
+  it('maps --ref + --version to the released tag name', () => {
+    expect(resolveTarget({ ref: 'main', version: '0.5.18' })).toEqual({
+      mode: 'ref',
+      ref: 'main',
+      version: '0.5.18',
+      tag: 'v0.5.18',
+    });
+  });
+
+  it('resolves a ref to its exact commit and keeps the on-main check', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ref-on-main-'));
+    g(repo, 'init', '-q', '-b', 'main');
+    g(repo, 'commit', '-q', '--allow-empty', '-m', 'one');
+    const one = g(repo, 'rev-parse', 'HEAD');
+    g(repo, 'commit', '-q', '--allow-empty', '-m', 'docs after tag');
+    const two = g(repo, 'rev-parse', 'HEAD');
+    g(repo, 'update-ref', 'refs/remotes/origin/main', two);
+    expect(resolveRefCommit(repo, 'origin/main')).toBe(two);
+    expect(resolveRefCommit(repo, 'main')).toBe(two);
+    expect(resolveRefCommit(repo, one.slice(0, 10))).toBe(one);
+    expect(() => assertOnMain(repo, resolveRefCommit(repo, one))).not.toThrow();
+    g(repo, 'switch', '-q', '-c', 'side');
+    g(repo, 'commit', '-q', '--allow-empty', '-m', 'side');
+    expect(() => assertOnMain(repo, resolveRefCommit(repo, 'side'))).toThrow(/not on origin\/main/);
+    expect(() => resolveRefCommit(repo, 'nope')).toThrow(/cannot resolve/);
+  });
+
+  it('records the version and the exact commit in the state file, wiki-compatible', () => {
+    const sha = 'a'.repeat(40);
+    const { tag } = resolveTarget({ ref: 'main', version: '0.5.18' });
+    const text = renderState(tag, sha, new Map([['agentlink/a.md', 'f'.repeat(64)]]));
+    expect(text).toContain('tag: v0.5.18\ncommit: ' + sha + '\n');
+    expect(parseState(text)).toEqual({
+      tag: 'v0.5.18',
+      commit: sha,
+      files: [{ path: 'agentlink/a.md', sha256: 'f'.repeat(64) }],
+    });
   });
 });
